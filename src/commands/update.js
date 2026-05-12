@@ -43,14 +43,16 @@ async function updateCommand(rootDir, options = {}) {
   return { changedFiles };
 }
 
-function getAllFiles(dir) {
+function getAllFiles(dir, ignoreDirs = ['node_modules', '.git', 'dist']) {
   const files = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   
   for (const entry of entries) {
+    if (entry.isDirectory() && ignoreDirs.includes(entry.name)) continue;
+    
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...getAllFiles(fullPath));
+      files.push(...getAllFiles(fullPath, ignoreDirs));
     } else {
       files.push(fullPath);
     }

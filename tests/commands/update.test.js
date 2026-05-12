@@ -16,9 +16,10 @@ describe('updateCommand', () => {
 
   test('should detect changed files', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    const relativePath = path.relative(testDir, path.join(testDir, 'src/index.js'));
     fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan'), JSON.stringify({
       timestamp: new Date().toISOString(),
-      files: { 'src\\index.js': 'abc123' }
+      files: { [relativePath]: 'abc123' }
     }));
     
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'new content');
@@ -29,12 +30,14 @@ describe('updateCommand', () => {
 
   test('should return empty array when no changes', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    const filePath = path.join(testDir, 'src/index.js');
+    fs.writeFileSync(filePath, 'content');
     const hash = require('crypto').createHash('md5').update('content').digest('hex');
+    const relativePath = path.relative(testDir, filePath);
     
     fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan'), JSON.stringify({
       timestamp: new Date().toISOString(),
-      files: { 'src\\index.js': hash }
+      files: { [relativePath]: hash }
     }));
     
     const result = await updateCommand(testDir, { dryRun: true });
@@ -49,5 +52,19 @@ describe('updateCommand', () => {
     
     const lastScanPath = path.join(testDir, 'ai-docs/.last-scan');
     expect(fs.existsSync(lastScanPath)).toBe(true);
+  });
+
+  test('should handle first run when .last-scan does not exist', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    
+    const result = await updateCommand(testDir, { dryRun: true });
+    const relativePath = path.relative(testDir, path.join(testDir, 'src/index.js'));
+    expect(result.changedFiles).toContain(relativePath);
+  });
+
+  test('should handle missing src directory', async () => {
+    const result = await updateCommand(testDir, { dryRun: true });
+    expect(result.changedFiles).toEqual([]);
   });
 });

@@ -21,4 +21,35 @@ describe('matchScenario', () => {
     const result = matchScenario('优化性能');
     expect(result.confidence).toBeLessThan(100);
   });
+
+  test('should throw TypeError for null input', () => {
+    expect(() => matchScenario(null)).toThrow(TypeError);
+  });
+
+  test('should throw TypeError for undefined input', () => {
+    expect(() => matchScenario(undefined)).toThrow(TypeError);
+  });
+
+  test('should return default result for empty string', () => {
+    const result = matchScenario('');
+    expect(result.scenarioId).toBe('A');
+    expect(result.confidence).toBe(30);
+    expect(result.matchedKeyword).toBeNull();
+  });
+
+  test('should match case-insensitively', () => {
+    const result = matchScenario('MINIAPP');
+    expect(result.scenarioId).toBe('A');
+    expect(result.confidence).toBe(100);
+  });
+
+  test('should return object with correct structure', () => {
+    const result = matchScenario('test');
+    expect(result).toHaveProperty('scenarioId');
+    expect(result).toHaveProperty('confidence');
+    expect(result).toHaveProperty('matchedKeyword');
+    expect(typeof result.scenarioId).toBe('string');
+    expect(typeof result.confidence).toBe('number');
+    expect(result.matchedKeyword === null || typeof result.matchedKeyword === 'string').toBe(true);
+  });
 });

@@ -9,7 +9,16 @@ const KEYWORDS = {
   'H': ['跨端', '多端', '联动', '全栈']
 };
 
+const HIGH_CONFIDENCE = 100;
+const MEDIUM_CONFIDENCE = 60;
+const LOW_CONFIDENCE = 30;
+const MIN_KEYWORD_LENGTH_FOR_HIGH_CONFIDENCE = 3;
+
 function matchScenario(taskDescription) {
+  if (typeof taskDescription !== 'string') {
+    throw new TypeError('taskDescription must be a string');
+  }
+  
   const task = taskDescription.toLowerCase();
 
   let bestMatch = null;
@@ -26,7 +35,7 @@ function matchScenario(taskDescription) {
   }
 
   if (bestMatch) {
-    const confidence = bestLength >= 3 ? 100 : 60;
+    const confidence = bestLength >= MIN_KEYWORD_LENGTH_FOR_HIGH_CONFIDENCE ? HIGH_CONFIDENCE : MEDIUM_CONFIDENCE;
     return {
       scenarioId: bestMatch.scenarioId,
       confidence,
@@ -36,7 +45,7 @@ function matchScenario(taskDescription) {
 
   return {
     scenarioId: 'A',
-    confidence: 30,
+    confidence: LOW_CONFIDENCE,
     matchedKeyword: null
   };
 }

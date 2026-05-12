@@ -164,14 +164,46 @@ function getAIConfig(rootDir) {
 function getToolDirectory() {
   // 尝试获取 code-ctx 工具的安装目录
   try {
-    const toolPath = require.resolve('../../package.json');
-    return path.dirname(toolPath);
-  } catch (e) {
-    // 如果找不到，尝试从全局安装路径获取
-    const globalPath = path.join(process.env.APPDATA || process.env.HOME || '', 'npm', 'node_modules', 'code-ctx');
-    if (fs.existsSync(globalPath)) {
-      return globalPath;
+    // 方法 1: 从当前文件的目录向上查找
+    const currentFileDir = path.dirname(__filename || __dirname);
+    let currentDir = currentFileDir;
+    
+    while (currentDir !== path.dirname(currentDir)) {
+      const pkgPath = path.join(currentDir, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (pkg.name === 'code-ctx') {
+          return currentDir;
+        }
+      }
+      currentDir = path.dirname(currentDir);
     }
+    
+    // 方法 2: 从 npm link 的位置查找
+    const linkPath = path.resolve(currentFileDir, '..', '..');
+    if (fs.existsSync(path.join(linkPath, 'package.json'))) {
+      const pkg = JSON.parse(fs.readFileSync(path.join(linkPath, 'package.json'), 'utf8'));
+      if (pkg.name === 'code-ctx') {
+        return linkPath;
+      }
+    }
+    
+    // 方法 3: 从全局 npm 目录查找
+    const globalPaths = [
+      path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'code-ctx'),
+      path.join(process.env.HOME || '', '.npm', 'node_modules', 'code-ctx'),
+      '/usr/local/lib/node_modules/code-ctx',
+      '/usr/lib/node_modules/code-ctx'
+    ];
+    
+    for (const globalPath of globalPaths) {
+      if (fs.existsSync(globalPath)) {
+        return globalPath;
+      }
+    }
+    
+    return null;
+  } catch (e) {
     return null;
   }
 }

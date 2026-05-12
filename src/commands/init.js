@@ -46,12 +46,18 @@ async function initCommand(rootDir, options = {}) {
     try {
       const aiConfig = getAIConfig(rootDir);
       
+      console.log('配置信息:');
+      console.log('  协议:', aiConfig.protocol);
+      console.log('  地址:', aiConfig.baseUrl);
+      console.log('  模型:', aiConfig.model);
+      console.log('  API Key:', aiConfig.apiKey ? '***' + aiConfig.apiKey.slice(-4) : '未配置');
+      
       if (!aiConfig.apiKey) {
         console.log('\n⚠️ 未配置 API Key，请先在 .env 文件中配置');
         console.log('然后运行: code-ctx use "生成项目文档"');
       } else {
         // 生成 OVERVIEW.md
-        console.log('生成 OVERVIEW.md...');
+        console.log('\n生成 OVERVIEW.md...');
         const overviewPrompt = generateOverviewPrompt(config, scanResults);
         const overview = await generateWithAI(overviewPrompt, aiConfig);
         fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), overview);

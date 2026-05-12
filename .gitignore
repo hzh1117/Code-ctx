@@ -1,3 +1,5 @@
 node_modules/
 dist/
 .ai-prompt.md
+codecontext-design-v2.md
+docs/plans/

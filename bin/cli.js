@@ -12,5 +12,6 @@ program
 
 program.addCommand(require('./commands/init'));
 program.addCommand(require('./commands/use'));
+program.addCommand(require('./commands/dashboard'));
 
 program.parse();

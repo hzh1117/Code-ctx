@@ -4,10 +4,16 @@ const path = require('path');
 
 describe('readFileUTF8', () => {
   const testDir = path.join(__dirname, '../fixtures');
-  
+
   beforeAll(() => {
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
+    }
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
     }
   });
 
@@ -23,5 +29,16 @@ describe('readFileUTF8', () => {
     const buffer = iconv.encode('你好世界', 'gbk');
     fs.writeFileSync(filePath, buffer);
     expect(readFileUTF8(filePath)).toBe('你好世界');
+  });
+
+  test('should read empty file correctly', () => {
+    const filePath = path.join(testDir, 'empty.txt');
+    fs.writeFileSync(filePath, '', 'utf8');
+    expect(readFileUTF8(filePath)).toBe('');
+  });
+
+  test('should throw meaningful error for non-existent file', () => {
+    const filePath = path.join(testDir, 'nonexistent.txt');
+    expect(() => readFileUTF8(filePath)).toThrow('File not found');
   });
 });

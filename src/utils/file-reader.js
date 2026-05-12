@@ -5,6 +5,10 @@ const iconv = require('iconv-lite');
 const CJK_ENCODINGS = ['GBK', 'GB2312', 'GB18030', 'Big5'];
 
 function readFileUTF8(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
   const buffer = fs.readFileSync(filePath);
   
   if (isUTF8(buffer)) {

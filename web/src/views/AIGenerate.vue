@@ -23,17 +23,11 @@
           <div class="form-stack">
             <div class="input-group">
               <label class="input-label">选择场景</label>
-              <div class="scenario-grid">
-                <div 
-                  v-for="scenario in scenarios" 
-                  :key="scenario.id"
-                  :class="['scenario-item', selectedScenario === scenario.id ? 'active' : '']"
-                  @click="selectedScenario = scenario.id"
-                >
-                  <div class="scenario-id">{{ scenario.id }}</div>
-                  <div class="scenario-name">{{ scenario.name }}</div>
-                </div>
-              </div>
+              <select v-model="selectedScenario" class="input">
+                <option v-for="s in scenarios" :key="s.id" :value="s.id">
+                  {{ s.id }} - {{ s.name }}
+                </option>
+              </select>
             </div>
 
             <div class="input-group">
@@ -104,7 +98,16 @@
               </svg>
               AI 响应
             </h2>
-            <span v-if="aiResponse" class="badge badge-success">已完成</span>
+            <div class="response-actions" v-if="aiResponse">
+              <span class="badge badge-success">已完成</span>
+              <button class="btn btn-secondary btn-sm" @click="copyResponse">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                复制响应
+              </button>
+            </div>
           </div>
 
           <div v-if="aiResponse" class="response-content">
@@ -167,7 +170,6 @@ export default {
         const res = await axios.get('/api/scenarios');
         this.scenarios = res.data;
       } catch (err) {
-        // 使用默认场景
         this.scenarios = [
           { id: 'A', name: '新增功能' },
           { id: 'B', name: '后台功能' },
@@ -191,14 +193,12 @@ export default {
       this.aiResponse = '';
 
       try {
-        // 生成 prompt
         const promptRes = await axios.post('/api/generate-prompt', {
           scenario: this.selectedScenario,
           task: this.taskDescription
         });
         this.generatedPrompt = promptRes.data.prompt;
 
-        // 调用 AI
         const aiRes = await axios.post('/api/ai/generate', {
           prompt: this.generatedPrompt
         });
@@ -218,6 +218,10 @@ export default {
     copyPrompt() {
       navigator.clipboard.writeText(this.generatedPrompt);
       this.showToast('已复制到剪贴板', 'success');
+    },
+    copyResponse() {
+      navigator.clipboard.writeText(this.aiResponse);
+      this.showToast('已复制响应到剪贴板', 'success');
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
@@ -295,51 +299,6 @@ export default {
   gap: 20px;
 }
 
-/* Scenario Grid */
-.scenario-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.scenario-item {
-  padding: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  text-align: center;
-}
-
-.scenario-item:hover {
-  border-color: var(--text-muted);
-  transform: translateY(-1px);
-}
-
-.scenario-item.active {
-  border-color: var(--accent-primary);
-  background: #00F5A008;
-  box-shadow: 0 0 10px #00F5A022;
-}
-
-.scenario-id {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-primary);
-  margin-bottom: 4px;
-}
-
-.scenario-item.active .scenario-id {
-  text-shadow: 0 0 10px var(--accent-primary);
-}
-
-.scenario-name {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 /* Textarea */
 .textarea {
   min-height: 120px;
@@ -389,6 +348,12 @@ export default {
 }
 
 /* Response */
+.response-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .response-content {
   flex: 1;
   overflow-y: auto;
@@ -482,5 +447,21 @@ export default {
 
 .required {
   color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .page {
+    height: auto;
+  }
+
+  .generate-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .response-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

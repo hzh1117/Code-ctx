@@ -23,6 +23,7 @@
     </div>
 
     <div v-else class="config-content">
+      <!-- 基本信息 -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
@@ -80,6 +81,7 @@
         </div>
       </div>
 
+      <!-- 子项目列表 -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
@@ -117,6 +119,7 @@
         </div>
       </div>
 
+      <!-- 排除目录 -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
@@ -126,16 +129,31 @@
             </svg>
             排除目录
           </h2>
+          <span class="badge badge-success">{{ config.excludeDirs?.length || 0 }} 个目录</span>
         </div>
 
-        <div class="tags-list">
-          <span 
-            v-for="dir in config.excludeDirs" 
-            :key="dir" 
-            class="tag"
-          >
-            {{ dir }}
-          </span>
+        <div class="tags-editor">
+          <div class="tags-list">
+            <span 
+              v-for="(dir, index) in config.excludeDirs" 
+              :key="index" 
+              class="tag"
+            >
+              {{ dir }}
+              <button class="tag-remove" @click="removeDir(index)" title="删除">×</button>
+            </span>
+          </div>
+          <div class="tag-input-wrapper">
+            <input 
+              v-model="newDir" 
+              @keyup.enter="addDir"
+              class="input tag-input"
+              placeholder="输入目录名称，按回车添加"
+            />
+            <button class="btn btn-secondary btn-sm" @click="addDir" :disabled="!newDir">
+              添加
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -157,6 +175,7 @@ export default {
       config: {},
       loading: true,
       saving: false,
+      newDir: '',
       toast: {
         show: false,
         message: '',
@@ -188,6 +207,18 @@ export default {
       } finally {
         this.saving = false;
       }
+    },
+    addDir() {
+      if (this.newDir && !this.config.excludeDirs?.includes(this.newDir)) {
+        if (!this.config.excludeDirs) {
+          this.config.excludeDirs = [];
+        }
+        this.config.excludeDirs.push(this.newDir);
+        this.newDir = '';
+      }
+    },
+    removeDir(index) {
+      this.config.excludeDirs.splice(index, 1);
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
@@ -311,6 +342,13 @@ export default {
   color: var(--text-secondary);
 }
 
+/* Tags Editor */
+.tags-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .tags-list {
   display: flex;
   flex-wrap: wrap;
@@ -318,15 +356,53 @@ export default {
 }
 
 .tag {
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font-mono);
   color: var(--text-secondary);
+  transition: all var(--transition-normal);
 }
 
+.tag:hover {
+  border-color: var(--accent-primary);
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.tag-remove:hover {
+  color: var(--danger);
+}
+
+.tag-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-input {
+  flex: 1;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+/* Toggle */
 .toggle-group {
   display: flex;
   align-items: center;
@@ -378,7 +454,7 @@ export default {
 
 .toggle input:checked + .toggle-slider:before {
   transform: translateX(20px);
-  background-color: var(--bg-primary);
+  background-color: white;
 }
 
 .toggle-label {
@@ -393,5 +469,26 @@ code {
   border-radius: 4px;
   font-size: 12px;
   color: var(--accent-primary);
+}
+
+.required {
+  color: var(--danger);
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>

@@ -64,6 +64,7 @@ function detectProjects(rootDir) {
             type,
             name: entry.name
           });
+          break;
         }
       }
       continue;

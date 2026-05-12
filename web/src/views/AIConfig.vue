@@ -104,7 +104,6 @@
                 v-model="apiKey" 
                 class="input"
                 placeholder="输入 API Key"
-                @blur="saveApiKey"
               />
               <button class="btn btn-secondary btn-sm" @click="showApiKey = !showApiKey">
                 {{ showApiKey ? '隐藏' : '显示' }}
@@ -112,6 +111,12 @@
             </div>
             <span class="input-hint">API Key 将保存到 .env 文件中，不会提交到版本控制</span>
           </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-primary" @click="saveAll" :disabled="saving">
+            {{ saving ? '保存中...' : '保存配置' }}
+          </button>
         </div>
       </div>
     </div>
@@ -133,6 +138,7 @@ export default {
       config: {},
       loading: true,
       testing: false,
+      saving: false,
       testResult: null,
       showApiKey: false,
       apiKey: '',
@@ -182,6 +188,20 @@ export default {
         this.config.hasApiKey = true;
       } catch (err) {
         console.error('保存 API Key 失败:', err);
+      }
+    },
+    async saveAll() {
+      this.saving = true;
+      try {
+        // 保存 API Key
+        if (this.apiKey) {
+          await this.saveApiKey();
+        }
+        this.showToast('配置已保存', 'success');
+      } catch (err) {
+        this.showToast('保存失败: ' + err.message, 'error');
+      } finally {
+        this.saving = false;
       }
     },
     showToast(message, type = 'success') {
@@ -312,6 +332,14 @@ export default {
   padding: 8px 16px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
 }
 
 @media (max-width: 768px) {

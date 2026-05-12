@@ -107,8 +107,20 @@ function getAIProviders(projectConfig = {}) {
 }
 
 function getAIConfig(rootDir) {
-  const envConfig = loadEnvConfig(rootDir);
-  const projectConfig = loadProjectConfig(rootDir);
+  // 先读取项目目录的配置
+  let envConfig = loadEnvConfig(rootDir);
+  let projectConfig = loadProjectConfig(rootDir);
+  
+  // 如果项目目录没有配置，尝试读取工具目录的配置
+  if (!envConfig.ANTHROPIC_AUTH_TOKEN && !envConfig.ANTHROPIC_API_KEY && !envConfig.OPENAI_API_KEY) {
+    const toolDir = getToolDirectory();
+    if (toolDir && toolDir !== rootDir) {
+      const toolEnvConfig = loadEnvConfig(toolDir);
+      if (toolEnvConfig.ANTHROPIC_AUTH_TOKEN || toolEnvConfig.ANTHROPIC_API_KEY || toolEnvConfig.OPENAI_API_KEY) {
+        envConfig = { ...toolEnvConfig, ...envConfig };
+      }
+    }
+  }
   
   const aiConfig = projectConfig.ai || {};
   const providers = getAIProviders(projectConfig);
@@ -147,6 +159,21 @@ function getAIConfig(rootDir) {
     apiKey,
     providers
   };
+}
+
+function getToolDirectory() {
+  // 尝试获取 code-ctx 工具的安装目录
+  try {
+    const toolPath = require.resolve('../../package.json');
+    return path.dirname(toolPath);
+  } catch (e) {
+    // 如果找不到，尝试从全局安装路径获取
+    const globalPath = path.join(process.env.APPDATA || process.env.HOME || '', 'npm', 'node_modules', 'code-ctx');
+    if (fs.existsSync(globalPath)) {
+      return globalPath;
+    }
+    return null;
+  }
 }
 
 function saveAIConfig(rootDir, aiConfig) {

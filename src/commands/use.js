@@ -1,7 +1,11 @@
 const { getScenarios, renderTemplate } = require('../template/engine');
 
-async function useCommand(options = {}) {
+function useCommand(options = {}) {
   const { scenario, projectName, featureName, apiPrefix } = options;
+  
+  if (!scenario) {
+    throw new Error('缺少必填参数: scenario');
+  }
   
   // 获取场景模板
   const scenarios = getScenarios();

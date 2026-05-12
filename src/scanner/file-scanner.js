@@ -59,6 +59,10 @@ const SCAN_PATTERNS = {
 };
 
 function scanProject(projectDir, projectType) {
+  if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
+    throw new Error(`Directory does not exist: ${projectDir}`);
+  }
+
   const patterns = SCAN_PATTERNS[projectType] || [];
   const keyFiles = [];
   const tree = buildTree(projectDir);
@@ -76,7 +80,9 @@ function scanProject(projectDir, projectType) {
   return { tree, keyFiles: uniqueFiles };
 }
 
-function buildTree(dir, prefix = '') {
+function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
+  if (depth >= maxDepth) return prefix + '└── ...\n';
+
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   let tree = '';
 
@@ -86,29 +92,13 @@ function buildTree(dir, prefix = '') {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       tree += `${prefix}├── ${entry.name}/\n`;
-      tree += buildTree(fullPath, prefix + '│   ');
+      tree += buildTree(fullPath, prefix + '│   ', depth + 1, maxDepth);
     } else {
       tree += `${prefix}├── ${entry.name}\n`;
     }
   }
 
   return tree;
-}
-
-function getAllFiles(dir) {
-  const files = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...getAllFiles(fullPath));
-    } else {
-      files.push(fullPath);
-    }
-  }
-
-  return files;
 }
 
 module.exports = { scanProject };

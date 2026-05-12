@@ -1,8 +1,11 @@
 const https = require('https');
 const http = require('http');
 
-async function callOpenAI(prompt, options) {
-  const { apiKey, baseUrl, model, maxTokens } = options;
+const DEFAULT_TIMEOUT = 60000; // 60 秒超时
+const MAX_RETRIES = 2; // 最多重试 2 次
+
+async function callOpenAI(prompt, options, retries = 0) {
+  const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
   const url = new URL(`${baseUrl}/chat/completions`);
   const protocol = url.protocol === 'https:' ? https : http;
@@ -19,7 +22,8 @@ async function callOpenAI(prompt, options) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
-      }
+      },
+      timeout
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -37,14 +41,32 @@ async function callOpenAI(prompt, options) {
       });
     });
 
-    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      if (retries < MAX_RETRIES) {
+        console.log(`请求超时，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
+        callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject);
+      } else {
+        reject(new Error(`请求超时 (${timeout}ms)`));
+      }
+    });
+
+    req.on('error', (err) => {
+      if (retries < MAX_RETRIES && err.code === 'ETIMEDOUT') {
+        console.log(`连接失败，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
+        callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+
     req.write(body);
     req.end();
   });
 }
 
-async function callAnthropic(prompt, options) {
-  const { apiKey, baseUrl, model, maxTokens } = options;
+async function callAnthropic(prompt, options, retries = 0) {
+  const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
   // 处理不同的 baseUrl 格式
   let url;
@@ -72,7 +94,8 @@ async function callAnthropic(prompt, options) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01'
-      }
+      },
+      timeout
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -90,7 +113,25 @@ async function callAnthropic(prompt, options) {
       });
     });
 
-    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      if (retries < MAX_RETRIES) {
+        console.log(`请求超时，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
+        callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject);
+      } else {
+        reject(new Error(`请求超时 (${timeout}ms)`));
+      }
+    });
+
+    req.on('error', (err) => {
+      if (retries < MAX_RETRIES && err.code === 'ETIMEDOUT') {
+        console.log(`连接失败，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
+        callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+
     req.write(body);
     req.end();
   });
@@ -102,14 +143,15 @@ async function generateWithAI(prompt, options = {}) {
     protocol = 'openai',
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-4',
-    maxTokens = 4096
+    maxTokens = 4096,
+    timeout = DEFAULT_TIMEOUT
   } = options;
 
   if (!apiKey) {
     throw new Error('需要配置 API key');
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens };
+  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout };
 
   if (protocol === 'openai') {
     return callOpenAI(prompt, callOptions);

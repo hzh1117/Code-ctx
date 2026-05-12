@@ -25,6 +25,22 @@ module.exports = function(rootDir) {
   router.post('/test', async (req, res) => {
     try {
       const config = getAIConfig(rootDir);
+      
+      // 检查配置
+      if (!config.apiKey) {
+        return res.json({ 
+          success: false, 
+          error: '未配置 API Key，请在 .env 文件中配置 OPENAI_API_KEY 或 ANTHROPIC_API_KEY' 
+        });
+      }
+      
+      if (!config.baseUrl) {
+        return res.json({ 
+          success: false, 
+          error: '未配置 API 地址，请在 code-ctx.config.js 中配置 ai.baseUrl' 
+        });
+      }
+      
       const result = await generateWithAI('回复"连接成功"', {
         ...config,
         maxTokens: 100

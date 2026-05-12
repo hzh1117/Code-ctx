@@ -15,7 +15,8 @@ module.exports = function(rootDir) {
         baseUrl: config.baseUrl,
         model: config.model,
         maxTokens: config.maxTokens,
-        hasApiKey: !!config.apiKey
+        hasApiKey: !!config.apiKey,
+        apiKey: config.apiKey ? '***' + config.apiKey.slice(-4) : ''
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

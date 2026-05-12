@@ -103,7 +103,7 @@
                 :type="showApiKey ? 'text' : 'password'" 
                 v-model="apiKey" 
                 class="input"
-                placeholder="输入 API Key"
+                :placeholder="config.apiKey ? `已配置: ${config.apiKey}` : '输入 API Key'"
               />
               <button class="btn btn-secondary btn-sm" @click="showApiKey = !showApiKey">
                 {{ showApiKey ? '隐藏' : '显示' }}

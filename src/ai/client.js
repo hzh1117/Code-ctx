@@ -46,7 +46,18 @@ async function callOpenAI(prompt, options) {
 async function callAnthropic(prompt, options) {
   const { apiKey, baseUrl, model, maxTokens } = options;
 
-  const url = new URL(`${baseUrl}/messages`);
+  // 处理不同的 baseUrl 格式
+  let url;
+  if (baseUrl.includes('/v1')) {
+    // 已经包含 /v1，直接拼接 /messages
+    url = new URL(`${baseUrl}/messages`);
+  } else if (baseUrl.endsWith('/')) {
+    // 以 / 结尾，拼接 v1/messages
+    url = new URL(`${baseUrl}v1/messages`);
+  } else {
+    // 默认拼接 /v1/messages
+    url = new URL(`${baseUrl}/v1/messages`);
+  }
 
   const body = JSON.stringify({
     model,

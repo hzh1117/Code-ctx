@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { globSync } = require('glob');
 
 const SCAN_PATTERNS = {
   'vue2-admin': [
@@ -20,8 +21,17 @@ const SCAN_PATTERNS = {
     'config/app.js',
     'utils/request.js'
   ],
+  'react': [
+    'src/components/**/*.{jsx,tsx}',
+    'src/pages/**/*.{jsx,tsx}',
+    'src/hooks/*.js',
+    'src/App.{jsx,tsx}',
+    'src/index.{jsx,tsx}'
+  ],
   'java-backend': [
     '**/controller/**/*.java',
+    '**/service/**/*.java',
+    '**/entity/**/*.java',
     'application.yml',
     'application.properties'
   ],
@@ -29,6 +39,22 @@ const SCAN_PATTERNS = {
     'routes/*.js',
     'controllers/*.js',
     'app.js'
+  ],
+  'go-backend': [
+    '**/handler/*.go',
+    '**/service/*.go',
+    '**/model/*.go',
+    '**/middleware/*.go',
+    'main.go',
+    'go.mod'
+  ],
+  'python-backend': [
+    '**/views.py',
+    '**/models.py',
+    '**/serializers.py',
+    '**/urls.py',
+    'app.py',
+    'requirements.txt'
   ]
 };
 
@@ -38,15 +64,16 @@ function scanProject(projectDir, projectType) {
   const tree = buildTree(projectDir);
 
   for (const pattern of patterns) {
-    const dir = pattern.split('/')[0];
-    const dirPath = path.join(projectDir, dir);
-    if (fs.existsSync(dirPath)) {
-      const files = getAllFiles(dirPath);
-      keyFiles.push(...files);
-    }
+    const matches = globSync(pattern, {
+      cwd: projectDir,
+      absolute: true,
+      nodir: true
+    });
+    keyFiles.push(...matches);
   }
 
-  return { tree, keyFiles };
+  const uniqueFiles = [...new Set(keyFiles)];
+  return { tree, keyFiles: uniqueFiles };
 }
 
 function buildTree(dir, prefix = '') {

@@ -1,8 +1,29 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const { getAIConfig } = require('../../utils/config');
+const { getAIConfig, loadEnvConfig, saveAIConfig } = require('../../utils/config');
 const { generateWithAI } = require('../../ai/client');
+
+function maskKey(apiKey) {
+  return apiKey ? '***' + apiKey.slice(-4) : '';
+}
+
+function getKeyInfo(rootDir) {
+  const envConfig = loadEnvConfig(rootDir);
+  const openaiKey = envConfig.OPENAI_API_KEY || '';
+  const anthropicKey = envConfig.ANTHROPIC_AUTH_TOKEN || envConfig.ANTHROPIC_API_KEY || '';
+
+  return {
+    openai: {
+      hasApiKey: !!openaiKey,
+      apiKey: maskKey(openaiKey)
+    },
+    anthropic: {
+      hasApiKey: !!anthropicKey,
+      apiKey: maskKey(anthropicKey)
+    }
+  };
+}
 
 module.exports = function(rootDir) {
   const router = express.Router();
@@ -15,9 +36,28 @@ module.exports = function(rootDir) {
         baseUrl: config.baseUrl,
         model: config.model,
         maxTokens: config.maxTokens,
+        providers: config.providers,
         hasApiKey: !!config.apiKey,
-        apiKey: config.apiKey ? '***' + config.apiKey.slice(-4) : ''
+        apiKey: maskKey(config.apiKey),
+        keys: getKeyInfo(rootDir)
       });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.put('/config', (req, res) => {
+    try {
+      const { protocol, baseUrl, model, maxTokens, openai, anthropic } = req.body;
+      const saved = saveAIConfig(rootDir, {
+        protocol,
+        baseUrl,
+        model,
+        maxTokens,
+        openai,
+        anthropic
+      });
+      res.json({ success: true, ai: saved });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -65,14 +105,14 @@ module.exports = function(rootDir) {
 
   router.post('/save-key', (req, res) => {
     try {
-      const { apiKey } = req.body;
+      const { apiKey, protocol } = req.body;
       if (!apiKey) {
         return res.status(400).json({ error: 'API Key 不能为空' });
       }
 
       const envPath = path.join(rootDir, '.env');
-      const config = getAIConfig(rootDir);
-      const keyName = config.protocol === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+      const activeProtocol = protocol === 'anthropic' ? 'anthropic' : 'openai';
+      const keyName = activeProtocol === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
       
       let envContent = '';
       if (fs.existsSync(envPath)) {

@@ -197,7 +197,7 @@ code-ctx dashboard
 
 ## AI API 集成
 
-支持所有兼容 OpenAI 和 Anthropic 接口协议的大模型。
+支持所有兼容 OpenAI 和 Anthropic 接口协议的大模型。两种协议可以分别配置，互不覆盖；当前启用协议决定测试连接和 AI 生成时实际调用哪套配置。
 
 ### 支持的服务商
 
@@ -218,22 +218,47 @@ code-ctx dashboard
 # OpenAI 兼容 API Key（适用于 DeepSeek、Kimi、MiniMax 等）
 OPENAI_API_KEY=your-api-key
 
-# 或 Anthropic API Key
+# Anthropic API Key（适用于 Claude 或 Anthropic 兼容服务）
 ANTHROPIC_API_KEY=your-api-key
+
+# 可选：通过环境变量覆盖服务地址/模型
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
 ```
 
-2. 在 `code-ctx.config.js` 中配置 AI 参数：
+2. 在 `code-ctx.config.js` 中分别配置两种协议参数：
 
 ```javascript
 module.exports = {
   ai: {
-    protocol: 'openai',  // 'openai' | 'anthropic'
-    baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-chat',
-    maxTokens: 4096
+    // 当前启用协议：'openai' | 'anthropic'
+    protocol: 'openai',
+
+    // OpenAI 兼容协议，调用 {baseUrl}/chat/completions
+    openai: {
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat',
+      maxTokens: 4096
+    },
+
+    // Anthropic 协议，调用 {baseUrl}/v1/messages 或兼容 messages 端点
+    anthropic: {
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-3-5-sonnet-20241022',
+      maxTokens: 4096
+    }
   }
 }
 ```
+
+也可以在 Web 管理界面的 `AI 配置` 页面分别维护两套配置和 API Key。保存后：
+
+- OpenAI 兼容协议的 Key 写入 `.env` 的 `OPENAI_API_KEY`
+- Anthropic 协议的 Key 写入 `.env` 的 `ANTHROPIC_API_KEY`
+- `code-ctx.config.js` 只保存 `baseUrl`、`model`、`maxTokens` 等非密钥配置
+- 旧版扁平配置 `ai.baseUrl` / `ai.model` / `ai.maxTokens` 仍可读取，重新保存后会迁移到当前启用协议的分组配置
 
 ### 使用方式
 

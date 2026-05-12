@@ -58,59 +58,133 @@
 
         <div class="form-grid">
           <div class="input-group">
-            <label class="input-label">协议类型</label>
+            <label class="input-label">当前启用协议</label>
             <select v-model="config.protocol" class="input">
               <option value="openai">OpenAI 兼容</option>
               <option value="anthropic">Anthropic</option>
             </select>
             <span class="input-hint">
-              {{ config.protocol === 'openai' ? '适用于 DeepSeek、Kimi、MiniMax 等' : '适用于 Claude 系列' }}
+              测试连接和 AI 生成会使用当前启用协议
             </span>
           </div>
+        </div>
 
-          <div class="input-group">
-            <label class="input-label">API 地址</label>
-            <input 
-              v-model="config.baseUrl" 
-              class="input" 
-              placeholder="https://api.deepseek.com"
-            />
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">模型名称</label>
-            <input 
-              v-model="config.model" 
-              class="input" 
-              :placeholder="config.protocol === 'openai' ? 'deepseek-chat' : 'claude-3-5-sonnet-20241022'"
-            />
-          </div>
-
-          <div class="input-group">
-            <label class="input-label">最大 Tokens</label>
-            <input 
-              v-model.number="config.maxTokens" 
-              type="number" 
-              class="input" 
-              placeholder="4096"
-            />
-          </div>
-
-          <div class="input-group full-width">
-            <label class="input-label">API Key</label>
-            <div class="input-with-action">
-              <input 
-                :type="showApiKey ? 'text' : 'password'" 
-                v-model="apiKey" 
-                class="input"
-                :placeholder="config.apiKey ? `已配置: ${config.apiKey}` : '输入 API Key'"
-              />
-              <button class="btn btn-secondary btn-sm" @click="showApiKey = !showApiKey">
-                {{ showApiKey ? '隐藏' : '显示' }}
-              </button>
+        <div class="provider-grid">
+          <section class="provider-panel">
+            <div class="provider-header">
+              <div>
+                <h3 class="provider-title">OpenAI 兼容协议</h3>
+                <p class="provider-desc">适用于 OpenAI、DeepSeek、Kimi、MiniMax 等兼容 /chat/completions 的服务</p>
+              </div>
+              <span :class="['badge', config.protocol === 'openai' ? 'badge-success' : 'badge-warning']">
+                {{ config.protocol === 'openai' ? '当前启用' : '备用配置' }}
+              </span>
             </div>
-            <span class="input-hint">API Key 将保存到 .env 文件中，不会提交到版本控制</span>
-          </div>
+
+            <div class="form-stack">
+              <div class="input-group">
+                <label class="input-label">API 地址</label>
+                <input 
+                  v-model="config.providers.openai.baseUrl" 
+                  class="input" 
+                  placeholder="https://api.openai.com/v1"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">模型名称</label>
+                <input 
+                  v-model="config.providers.openai.model" 
+                  class="input" 
+                  placeholder="gpt-4o-mini / deepseek-chat"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">最大 Tokens</label>
+                <input 
+                  v-model.number="config.providers.openai.maxTokens" 
+                  type="number" 
+                  class="input" 
+                  placeholder="4096"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">API Key</label>
+                <div class="input-with-action">
+                  <input 
+                    :type="showOpenAIKey ? 'text' : 'password'" 
+                    v-model="apiKeys.openai" 
+                    class="input"
+                    :placeholder="keyPlaceholders.openai"
+                  />
+                  <button class="btn btn-secondary btn-sm" @click="showOpenAIKey = !showOpenAIKey">
+                    {{ showOpenAIKey ? '隐藏' : '显示' }}
+                  </button>
+                </div>
+                <span class="input-hint">保存到 .env 的 OPENAI_API_KEY</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="provider-panel">
+            <div class="provider-header">
+              <div>
+                <h3 class="provider-title">Anthropic 协议</h3>
+                <p class="provider-desc">适用于 Claude Messages API 和 Anthropic 兼容服务</p>
+              </div>
+              <span :class="['badge', config.protocol === 'anthropic' ? 'badge-success' : 'badge-warning']">
+                {{ config.protocol === 'anthropic' ? '当前启用' : '备用配置' }}
+              </span>
+            </div>
+
+            <div class="form-stack">
+              <div class="input-group">
+                <label class="input-label">API 地址</label>
+                <input 
+                  v-model="config.providers.anthropic.baseUrl" 
+                  class="input" 
+                  placeholder="https://api.anthropic.com"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">模型名称</label>
+                <input 
+                  v-model="config.providers.anthropic.model" 
+                  class="input" 
+                  placeholder="claude-sonnet-4-5-20250929"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">最大 Tokens</label>
+                <input 
+                  v-model.number="config.providers.anthropic.maxTokens" 
+                  type="number" 
+                  class="input" 
+                  placeholder="4096"
+                />
+              </div>
+
+              <div class="input-group">
+                <label class="input-label">API Key</label>
+                <div class="input-with-action">
+                  <input 
+                    :type="showAnthropicKey ? 'text' : 'password'" 
+                    v-model="apiKeys.anthropic" 
+                    class="input"
+                    :placeholder="keyPlaceholders.anthropic"
+                  />
+                  <button class="btn btn-secondary btn-sm" @click="showAnthropicKey = !showAnthropicKey">
+                    {{ showAnthropicKey ? '隐藏' : '显示' }}
+                  </button>
+                </div>
+                <span class="input-hint">保存到 .env 的 ANTHROPIC_API_KEY</span>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div class="form-actions">
@@ -136,12 +210,28 @@ export default {
   data() {
     return {
       config: {},
+      defaultProviders: {
+        openai: {
+          baseUrl: 'https://api.openai.com/v1',
+          model: 'gpt-4',
+          maxTokens: 4096
+        },
+        anthropic: {
+          baseUrl: 'https://api.anthropic.com',
+          model: 'claude-3-5-sonnet-20241022',
+          maxTokens: 4096
+        }
+      },
       loading: true,
       testing: false,
       saving: false,
       testResult: null,
-      showApiKey: false,
-      apiKey: '',
+      showOpenAIKey: false,
+      showAnthropicKey: false,
+      apiKeys: {
+        openai: '',
+        anthropic: ''
+      },
       toast: {
         show: false,
         message: '',
@@ -152,11 +242,37 @@ export default {
   async mounted() {
     await this.loadConfig();
   },
+  computed: {
+    keyPlaceholders() {
+      const keys = this.config.keys || {};
+      return {
+        openai: keys.openai?.apiKey ? `已配置: ${keys.openai.apiKey}` : '输入 OpenAI 兼容 API Key',
+        anthropic: keys.anthropic?.apiKey ? `已配置: ${keys.anthropic.apiKey}` : '输入 Anthropic API Key'
+      };
+    }
+  },
   methods: {
+    normalizeConfig(data) {
+      const providers = data.providers || {};
+      return {
+        ...data,
+        protocol: data.protocol || 'openai',
+        providers: {
+          openai: {
+            ...this.defaultProviders.openai,
+            ...(providers.openai || {})
+          },
+          anthropic: {
+            ...this.defaultProviders.anthropic,
+            ...(providers.anthropic || {})
+          }
+        }
+      };
+    },
     async loadConfig() {
       try {
         const res = await axios.get('/api/ai/config');
-        this.config = res.data;
+        this.config = this.normalizeConfig(res.data);
       } catch (err) {
         this.showToast('加载配置失败', 'error');
       } finally {
@@ -181,22 +297,29 @@ export default {
         this.testing = false;
       }
     },
-    async saveApiKey() {
-      if (!this.apiKey) return;
+    async saveApiKey(protocol) {
+      const apiKey = this.apiKeys[protocol];
+      if (!apiKey) return;
       try {
-        await axios.post('/api/ai/save-key', { apiKey: this.apiKey });
-        this.config.hasApiKey = true;
+        await axios.post('/api/ai/save-key', { apiKey, protocol });
+        this.apiKeys[protocol] = '';
       } catch (err) {
         console.error('保存 API Key 失败:', err);
+        throw err;
       }
     },
     async saveAll() {
       this.saving = true;
       try {
+        await axios.put('/api/ai/config', {
+          protocol: this.config.protocol,
+          openai: this.config.providers.openai,
+          anthropic: this.config.providers.anthropic
+        });
         // 保存 API Key
-        if (this.apiKey) {
-          await this.saveApiKey();
-        }
+        await this.saveApiKey('openai');
+        await this.saveApiKey('anthropic');
+        await this.loadConfig();
         this.showToast('配置已保存', 'success');
       } catch (err) {
         this.showToast('保存失败: ' + err.message, 'error');
@@ -305,12 +428,42 @@ export default {
 /* Form */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 20px;
 }
 
-.full-width {
-  grid-column: 1 / -1;
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.provider-panel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  background: var(--bg-primary);
+}
+
+.provider-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.provider-title {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.provider-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .input-hint {
@@ -350,6 +503,14 @@ export default {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .provider-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .provider-header {
+    flex-direction: column;
   }
 }
 </style>

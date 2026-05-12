@@ -17,6 +17,7 @@ function createServer(rootDir) {
   app.use('/api/config', require('./api/config')(rootDir));
   app.use('/api/projects', require('./api/projects')(rootDir));
   app.use('/api/ai', require('./api/ai')(rootDir));
+  app.use('/api', require('./api/prompt')(rootDir));
 
   app.get('/{*path}', (req, res) => {
     const indexPath = path.join(staticDir, 'index.html');

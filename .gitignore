@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.env
 .ai-prompt.md
+test-api.js
 codecontext-design-v2.md
 docs/plans/

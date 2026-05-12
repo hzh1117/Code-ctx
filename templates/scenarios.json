@@ -1,0 +1,23 @@
+[
+  {
+    "id": "A",
+    "name": "新增前端功能",
+    "description": "新增页面、组件、功能",
+    "relatedProjects": ["web", "api"],
+    "template": "任务：在{{projectName}}新增【{{featureName}}】功能。\n\n要求：\n1. 页面位置：【待填写】\n2. 功能描述：【待填写】\n3. 接口路径：遵循 {{apiPrefix}} 约定\n\n先列出需要改动的完整文件清单，确认后逐个实现。"
+  },
+  {
+    "id": "B",
+    "name": "新增后台功能",
+    "description": "新增管理后台功能",
+    "relatedProjects": ["admin", "api"],
+    "template": "任务：在管理后台新增【{{featureName}}】功能。\n\n要求：\n1. 菜单位置：【待填写】\n2. 页面功能：【待填写】\n3. 后端接口：路径遵循 {{apiPrefix}} 约定\n\n先列出需要改动的完整文件清单，确认后逐个实现。"
+  },
+  {
+    "id": "F",
+    "name": "排查 Bug",
+    "description": "定位和修复问题",
+    "relatedProjects": [],
+    "template": "任务：排查并修复以下问题。\n\n问题描述：【待填写：详细描述问题现象】\n\n复现步骤：【待填写】\n\n期望行为：【待填写】\n\n请先分析可能的原因，然后给出修复方案。"
+  }
+]

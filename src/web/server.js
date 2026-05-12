@@ -9,6 +9,7 @@ function createServer(rootDir) {
 
   app.use('/api/config', require('./api/config')(rootDir));
   app.use('/api/projects', require('./api/projects')(rootDir));
+  app.use('/api/ai', require('./api/ai')(rootDir));
 
   app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

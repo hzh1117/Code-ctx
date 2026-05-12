@@ -1,0 +1,27 @@
+{
+  "name": "code-ctx",
+  "version": "1.0.0",
+  "description": "AI 开发上下文工具",
+  "main": "src/index.js",
+  "bin": {
+    "code-ctx": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "glob": "^10.0.0",
+    "chardet": "^1.0.0",
+    "iconv-lite": "^0.6.0",
+    "clipboardy": "^3.0.0",
+    "inquirer": "^9.0.0",
+    "chalk": "^4.1.0",
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "eslint": "^8.0.0"
+  }
+}

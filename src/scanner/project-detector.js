@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const { readFileUTF8 } = require('../utils/file-reader');
 
+function generateAlias(name) {
+  return name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 10);
+}
+
 const PROJECT_TYPES = {
   'uniapp-miniprogram': {
     check: (pkg, files) => {
@@ -59,7 +63,7 @@ function detectProjects(rootDir) {
       for (const [type, config] of Object.entries(PROJECT_TYPES)) {
         if (config.check({}, files)) {
           projects.push({
-            alias: entry.name.replace(/[^a-z0-9]/g, '-').substring(0, 10),
+            alias: generateAlias(entry.name),
             path: projectDir,
             type,
             name: entry.name
@@ -71,12 +75,17 @@ function detectProjects(rootDir) {
     }
 
     const pkgPath = path.join(projectDir, 'package.json');
-    const pkg = JSON.parse(readFileUTF8(pkgPath));
+    let pkg;
+    try {
+      pkg = JSON.parse(readFileUTF8(pkgPath));
+    } catch (e) {
+      continue;
+    }
 
     for (const [type, config] of Object.entries(PROJECT_TYPES)) {
       if (config.check(pkg, files)) {
         projects.push({
-          alias: entry.name.replace(/[^a-z0-9]/g, '-').substring(0, 10),
+          alias: generateAlias(entry.name),
           path: projectDir,
           type,
           name: entry.name

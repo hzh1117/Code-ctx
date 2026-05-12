@@ -1,0 +1,77 @@
+const { initCommand } = require('../../src/commands/init');
+const { useCommand } = require('../../src/commands/use');
+const { doctorCommand } = require('../../src/commands/doctor');
+const fs = require('fs');
+const path = require('path');
+
+describe('Full Flow Integration', () => {
+  const testDir = path.join(__dirname, '../fixtures/integration-test');
+  
+  beforeAll(async () => {
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
+      dependencies: { vue: '^2.0.0', 'element-ui': '^2.0.0' }
+    }));
+  });
+
+  afterAll(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('should complete full workflow', async () => {
+    // 1. Init
+    const initResult = await initCommand(testDir, { skipPrompt: true });
+    expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
+    expect(initResult).toBeDefined();
+    expect(initResult.projects).toBeDefined();
+    
+    // 2. Use
+    const prompt = useCommand({
+      scenario: 'B',
+      projectName: 'test-app',
+      featureName: '用户管理'
+    });
+    expect(prompt).toContain('用户管理');
+    expect(typeof prompt).toBe('string');
+    
+    // 3. Doctor
+    const report = await doctorCommand(testDir);
+    expect(report).toBeDefined();
+    expect(report.issues).toBeDefined();
+    expect(report.warnings).toBeDefined();
+  });
+
+  test('should handle init with multiple projects', async () => {
+    const multiDir = path.join(__dirname, '../fixtures/multi-project-test');
+    fs.mkdirSync(path.join(multiDir, 'frontend'), { recursive: true });
+    fs.mkdirSync(path.join(multiDir, 'backend'), { recursive: true });
+    fs.writeFileSync(path.join(multiDir, 'frontend', 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0' }
+    }));
+    fs.writeFileSync(path.join(multiDir, 'backend', 'package.json'), JSON.stringify({
+      dependencies: { express: '^4.0.0' }
+    }));
+
+    const result = await initCommand(multiDir, { skipPrompt: true });
+    expect(result.projects.length).toBeGreaterThanOrEqual(1);
+    
+    fs.rmSync(multiDir, { recursive: true, force: true });
+  });
+
+  test('should throw error for invalid scenario in use', () => {
+    expect(() => {
+      useCommand({ scenario: 'INVALID' });
+    }).toThrow('未找到场景: INVALID');
+  });
+
+  test('should detect issues with doctor when ai-docs missing', async () => {
+    const emptyDir = path.join(__dirname, '../fixtures/empty-test');
+    fs.mkdirSync(emptyDir, { recursive: true });
+
+    const report = await doctorCommand(emptyDir);
+    expect(report.issues).toContain('ai-docs/ 目录不存在');
+    
+    fs.rmSync(emptyDir, { recursive: true, force: true });
+  });
+});

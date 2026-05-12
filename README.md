@@ -284,17 +284,28 @@ git commit -m "docs: 更新 AI 上下文文档"
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/code-ctx.git
+git clone https://gitee.com/yo-yo-lu-mingming/code-ctx.git
+
+# 进入项目目录
+cd code-ctx
 
 # 安装依赖
 npm install
 
-# 运行测试
-npm test
+# 安装前端依赖并构建
+cd web
+npm install
+npm run build
+cd ..
 
-# 本地运行
-node bin/cli.js --help
+# 创建全局链接
+npm link
+
+# 启动 Web 界面
+code-ctx dashboard
 ```
+
+访问 http://localhost:3456
 
 ## 目录结构
 

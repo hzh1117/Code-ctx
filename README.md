@@ -17,6 +17,7 @@ Code-ctx 是一个 CLI 工具，帮助 AI 编程助手（如 Claude、ChatGPT、
 - 🏥 **健康检查** - 检测文档完整性和敏感信息泄露
 - 🖥️ **Web 管理** - 可视化配置和管理
 - 🔒 **安全优先** - 自动过滤敏感信息（密码、密钥等）
+- 🤖 **AI API 集成** - 兼容 OpenAI 和 Anthropic 协议，支持 DeepSeek、Kimi、MiniMax 等
 
 ## 安装
 
@@ -191,6 +192,58 @@ code-ctx dashboard
 - 场景模板编辑
 - 敏感字段管理
 - Prompt 预览和生成
+- AI 配置和测试
+- AI 文档生成
+
+## AI API 集成
+
+支持所有兼容 OpenAI 和 Anthropic 接口协议的大模型。
+
+### 支持的服务商
+
+| 服务商 | 协议 | baseUrl | 模型示例 |
+|--------|------|---------|----------|
+| DeepSeek | OpenAI | `https://api.deepseek.com` | `deepseek-chat` |
+| Kimi | OpenAI | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| MiniMax | OpenAI | `https://api.minimax.chat` | `abab6.5-chat` |
+| 智谱 AI | OpenAI | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
+| 百川 | OpenAI | `https://api.baichuan-ai.com/v1` | `Baichuan4` |
+| Claude | Anthropic | `https://api.anthropic.com` | `claude-3-5-sonnet-20241022` |
+
+### 配置方式
+
+1. 在项目根目录创建 `.env` 文件：
+
+```env
+# OpenAI 兼容 API Key（适用于 DeepSeek、Kimi、MiniMax 等）
+OPENAI_API_KEY=your-api-key
+
+# 或 Anthropic API Key
+ANTHROPIC_API_KEY=your-api-key
+```
+
+2. 在 `code-ctx.config.js` 中配置 AI 参数：
+
+```javascript
+module.exports = {
+  ai: {
+    protocol: 'openai',  // 'openai' | 'anthropic'
+    baseUrl: 'https://api.deepseek.com',
+    model: 'deepseek-chat',
+    maxTokens: 4096
+  }
+}
+```
+
+### 使用方式
+
+```bash
+# 启动 Web 界面
+code-ctx dashboard
+
+# 访问 AI 配置页面：http://localhost:3456/ai
+# 访问 AI 生成页面：http://localhost:3456/ai-generate
+```
 
 ## 常见问题
 

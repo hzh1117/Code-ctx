@@ -3,6 +3,7 @@
     <nav>
       <router-link to="/">配置</router-link>
       <router-link to="/ai">AI 配置</router-link>
+      <router-link to="/ai-generate">AI 生成</router-link>
       <router-link to="/projects">项目</router-link>
       <router-link to="/generate">生成</router-link>
     </nav>

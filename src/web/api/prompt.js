@@ -13,16 +13,15 @@ module.exports = function () {
     }
   });
 
-  router.post('/generate-prompt', (req, res) => {
+  router.post('/generate-prompt', async (req, res) => {
     try {
-      const { scenario, task, projectName, featureName, apiPrefix } = req.body;
-      const prompt = useCommand({
+      const { scenario, task } = req.body;
+      const result = await useCommand({
         scenario,
-        projectName,
-        featureName: featureName || task,
-        apiPrefix
+        taskDescription: task,
+        rootDir: process.cwd()
       });
-      res.json({ success: true, prompt });
+      res.json({ success: true, prompt: result.prompt });
     } catch (err) {
       res.status(400).json({ success: false, error: err.message });
     }

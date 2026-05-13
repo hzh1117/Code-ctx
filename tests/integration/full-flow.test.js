@@ -27,13 +27,13 @@ describe('Full Flow Integration', () => {
     expect(initResult.projects).toBeDefined();
     
     // 2. Use
-    const prompt = useCommand({
+    const result = await useCommand({
       scenario: 'B',
-      projectName: 'test-app',
-      featureName: '用户管理'
+      taskDescription: '用户管理',
+      rootDir: testDir
     });
-    expect(prompt).toContain('用户管理');
-    expect(typeof prompt).toBe('string');
+    expect(result.prompt).toContain('用户管理');
+    expect(typeof result.prompt).toBe('string');
     
     // 3. Doctor
     const report = await doctorCommand(testDir);
@@ -59,10 +59,8 @@ describe('Full Flow Integration', () => {
     fs.rmSync(multiDir, { recursive: true, force: true });
   });
 
-  test('should throw error for invalid scenario in use', () => {
-    expect(() => {
-      useCommand({ scenario: 'INVALID' });
-    }).toThrow('未找到场景: INVALID');
+  test('should throw error for invalid scenario in use', async () => {
+    await expect(useCommand({ scenario: 'INVALID' })).rejects.toThrow('未找到场景: INVALID');
   });
 
   test('should detect issues with doctor when ai-docs missing', async () => {

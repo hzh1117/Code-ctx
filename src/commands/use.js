@@ -31,7 +31,6 @@ async function useCommand(options = {}) {
   // 3. 加载项目文档上下文
   let overviewContent = '';
   let relatedDocs = {};
-  let projectContext = '';
 
   if (rootDir) {
     const aiDocsDir = path.join(rootDir, 'ai-docs');
@@ -61,9 +60,7 @@ async function useCommand(options = {}) {
 
   // 4. 组装 prompt
   const prompt = buildUsePrompt({
-    scenarioId: matchedScenario,
     taskDescription: taskDescription || '',
-    projectContext,
     overviewContent,
     relatedDocs,
     template: selectedScenario.template

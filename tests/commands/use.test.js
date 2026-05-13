@@ -1,3 +1,4 @@
+// Tests depend on real scenarios.json loaded via getScenarios() — acceptable for integration-style testing
 const { useCommand } = require('../../src/commands/use');
 const { matchScenario } = require('../../src/matcher/scenario-matcher');
 const path = require('path');
@@ -77,6 +78,19 @@ describe('useCommand', () => {
 
     test('should throw error for invalid scenario', async () => {
       await expect(useCommand({ scenario: 'X' })).rejects.toThrow('未找到场景');
+    });
+  });
+
+  describe('no doc loading', () => {
+    test('should work without rootDir (no doc loading)', async () => {
+      const result = await useCommand({
+        taskDescription: '新增页面',
+        scenario: 'A'
+      });
+
+      expect(result.prompt).not.toContain('项目总览');
+      expect(result.prompt).toContain('【第二部分：任务模板】');
+      expect(result.matchedScenario).toBe('A');
     });
   });
 

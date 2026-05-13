@@ -165,7 +165,7 @@ function getToolDirectory() {
   // 尝试获取 code-ctx 工具的安装目录
   try {
     // 方法 1: 从当前文件的目录向上查找
-    const currentFileDir = path.dirname(__filename || __dirname);
+    const currentFileDir = __dirname;
     let currentDir = currentFileDir;
     
     while (currentDir !== path.dirname(currentDir)) {
@@ -179,16 +179,7 @@ function getToolDirectory() {
       currentDir = path.dirname(currentDir);
     }
     
-    // 方法 2: 从 npm link 的位置查找
-    const linkPath = path.resolve(currentFileDir, '..', '..');
-    if (fs.existsSync(path.join(linkPath, 'package.json'))) {
-      const pkg = JSON.parse(fs.readFileSync(path.join(linkPath, 'package.json'), 'utf8'));
-      if (pkg.name === 'code-ctx') {
-        return linkPath;
-      }
-    }
-    
-    // 方法 3: 从全局 npm 目录查找
+    // 方法 2: 从全局 npm 目录查找
     const globalPaths = [
       path.join(process.env.APPDATA || '', 'npm', 'node_modules', 'code-ctx'),
       path.join(process.env.HOME || '', '.npm', 'node_modules', 'code-ctx'),
@@ -199,6 +190,15 @@ function getToolDirectory() {
     for (const globalPath of globalPaths) {
       if (fs.existsSync(globalPath)) {
         return globalPath;
+      }
+    }
+    
+    // 方法 3: 从当前工作目录查找
+    const cwdPkgPath = path.join(process.cwd(), 'package.json');
+    if (fs.existsSync(cwdPkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(cwdPkgPath, 'utf8'));
+      if (pkg.name === 'code-ctx') {
+        return process.cwd();
       }
     }
     

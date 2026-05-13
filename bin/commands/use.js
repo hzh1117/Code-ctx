@@ -48,6 +48,7 @@ const use = new Command('use')
   .description('生成开发 prompt')
   .argument('[task]', '任务描述')
   .option('-s, --scenario <id>', '指定场景 ID（不指定则自动匹配）')
+  .option('-n, --non-interactive', '非交互模式，跳过占位符填写，直接复制到剪贴板')
   .option('--stdout', '输出到 stdout 而非剪贴板')
   .option('--out <file>', '输出到指定文件')
   .action(async (task, options) => {
@@ -66,7 +67,9 @@ const use = new Command('use')
         }
       }
 
-      const finalPrompt = await fillPlaceholders(result.prompt);
+      const finalPrompt = options.nonInteractive
+        ? result.prompt
+        : await fillPlaceholders(result.prompt);
       await outputPrompt(finalPrompt, options);
 
       try {
@@ -77,7 +80,9 @@ const use = new Command('use')
         });
       } catch {}
 
-      console.log('\n提示：粘贴后记得补充具体需求细节');
+      if (!options.nonInteractive) {
+        console.log('\n提示：粘贴后记得补充具体需求细节');
+      }
     } catch (err) {
       console.error('生成失败:', err.message);
       process.exit(1);

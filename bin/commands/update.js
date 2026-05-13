@@ -1,7 +1,6 @@
 const { Command } = require('commander');
 const { updateCommand } = require('../../src/commands/update');
-const clipboardy = require('clipboardy');
-const fs = require('fs');
+const { writeToClipboard } = require('../../src/utils/clipboard');
 
 const update = new Command('update')
   .description('检测变化，更新相关文档')
@@ -26,12 +25,11 @@ const update = new Command('update')
         if (options.stdout) {
           process.stdout.write(result.prompt);
         } else {
-          try {
-            await clipboardy.write(result.prompt);
+          const clipResult = await writeToClipboard(result.prompt);
+          if (clipResult.success) {
             console.log('\n✓ 增量更新 prompt 已复制到剪贴板');
-          } catch {
-            fs.writeFileSync('.ai-prompt.md', result.prompt);
-            console.log('\n⚠️ 剪贴板写入失败，已输出到 .ai-prompt.md');
+          } else {
+            console.log(`\n⚠️ 剪贴板写入失败，已降级输出到 ${clipResult.fallbackPath}`);
           }
         }
       }

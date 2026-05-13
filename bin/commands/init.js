@@ -8,7 +8,7 @@ const init = new Command('init')
   .action(async (options) => {
     try {
       await initCommand(process.cwd(), {
-        skipAI: options.skipAi,
+        skipAi: options.skipAi,
         force: options.force
       });
     } catch (err) {

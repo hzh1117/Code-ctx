@@ -103,7 +103,7 @@ function applySectionUpdates(docPath, updates) {
 }
 
 async function updateCommand(rootDir, options = {}) {
-  const lastScanPath = path.join(rootDir, 'ai-docs/.last-scan');
+  const lastScanPath = path.join(rootDir, 'ai-docs/.last-scan.json');
 
   let lastScan = { timestamp: null, files: {} };
   if (fs.existsSync(lastScanPath)) {

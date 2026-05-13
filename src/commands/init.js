@@ -108,7 +108,7 @@ async function initCommand(rootDir, options = {}) {
   const generatedDocs = {};
 
   // 生成文档（除非跳过 AI）
-  if (options.generateDocs !== false && !options.skipAI) {
+  if (options.generateDocs !== false && !options.skipAi) {
     console.log('\n📝 生成项目文档...');
 
     // 估算 token 数量
@@ -242,6 +242,13 @@ async function initCommand(rootDir, options = {}) {
   // 保存最终状态
   state.lastRun = new Date().toISOString();
   saveInitState(outputDir, state);
+
+  // 写入 .last-scan.json 供 update 命令使用
+  const lastScanPath = path.join(outputDir, '.last-scan.json');
+  fs.writeFileSync(lastScanPath, JSON.stringify({
+    timestamp: Date.now(),
+    projects: projects.map(p => p.alias)
+  }, null, 2));
 
   // 引导提示
   console.log('\n✓ 初始化完成！');

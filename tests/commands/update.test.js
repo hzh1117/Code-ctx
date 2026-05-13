@@ -67,4 +67,23 @@ describe('updateCommand', () => {
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles).toEqual([]);
   });
+
+  test('should generate incremental prompt for changed files', async () => {
+    const testDir = path.join(__dirname, '../fixtures/update-test');
+    if (fs.existsSync(testDir)) {
+      fs.rmSync(testDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'app.js'), 'console.log("hello")');
+
+    const result = await updateCommand(testDir);
+
+    expect(result).toHaveProperty('changedFiles');
+    expect(result).toHaveProperty('prompt');
+    expect(Array.isArray(result.changedFiles)).toBe(true);
+
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
 });

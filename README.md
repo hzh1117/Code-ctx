@@ -1,6 +1,10 @@
 # Code-ctx
 
+> **⚠️ 项目状态：开发中 (In Development)** — 本项目尚未完成，部分功能可能不稳定或不可用。欢迎试用和反馈，但请勿用于生产环境。
+
 > AI 开发上下文工具 - 让 AI 编程助手立刻"认识"你的代码库
+
+[English](README_EN.md) | 中文
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

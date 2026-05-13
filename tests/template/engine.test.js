@@ -66,5 +66,26 @@ describe('Template Engine', () => {
         fs.unlinkSync(tmpFile);
       }
     });
+
+    test('should load all 8 scenarios (A-H)', () => {
+      const scenarios = getScenarios();
+      const ids = scenarios.map(s => s.id);
+      expect(ids).toEqual(expect.arrayContaining(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']));
+      expect(scenarios.length).toBe(8);
+    });
+
+    test('each scenario should have required fields', () => {
+      const scenarios = getScenarios();
+      for (const s of scenarios) {
+        expect(s).toHaveProperty('id');
+        expect(s).toHaveProperty('name');
+        expect(s).toHaveProperty('description');
+        expect(s).toHaveProperty('relatedProjects');
+        expect(s).toHaveProperty('template');
+        expect(Array.isArray(s.relatedProjects)).toBe(true);
+        expect(typeof s.template).toBe('string');
+        expect(s.template.length).toBeGreaterThan(0);
+      }
+    });
   });
 });

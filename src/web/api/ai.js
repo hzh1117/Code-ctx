@@ -105,27 +105,34 @@ module.exports = function(rootDir) {
 
   router.post('/save-key', (req, res) => {
     try {
-      const { apiKey, protocol } = req.body;
+      const { apiKey, protocol, baseUrl, model } = req.body;
       if (!apiKey) {
         return res.status(400).json({ error: 'API Key 不能为空' });
       }
 
       const envPath = path.join(rootDir, '.env');
-      const activeProtocol = protocol === 'anthropic' ? 'anthropic' : 'openai';
-      const keyName = activeProtocol === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
       
       let envContent = '';
       if (fs.existsSync(envPath)) {
         envContent = fs.readFileSync(envPath, 'utf8');
       }
       
-      if (envContent.includes(keyName + '=')) {
-        envContent = envContent.replace(new RegExp(`${keyName}=.*`, 'g'), `${keyName}=${apiKey}`);
-      } else {
-        if (envContent && !envContent.endsWith('\n')) {
-          envContent += '\n';
+      // 保存 API Key
+      if (protocol === 'anthropic') {
+        envContent = updateEnvValue(envContent, 'ANTHROPIC_AUTH_TOKEN', apiKey);
+        if (baseUrl) {
+          envContent = updateEnvValue(envContent, 'ANTHROPIC_BASE_URL', baseUrl);
         }
-        envContent += `${keyName}=${apiKey}\n`;
+      } else {
+        envContent = updateEnvValue(envContent, 'OPENAI_API_KEY', apiKey);
+        if (baseUrl) {
+          envContent = updateEnvValue(envContent, 'OPENAI_BASE_URL', baseUrl);
+        }
+      }
+      
+      if (model) {
+        const modelKey = protocol === 'anthropic' ? 'ANTHROPIC_MODEL' : 'OPENAI_MODEL';
+        envContent = updateEnvValue(envContent, modelKey, model);
       }
       
       fs.writeFileSync(envPath, envContent);
@@ -134,6 +141,17 @@ module.exports = function(rootDir) {
       res.status(500).json({ error: err.message });
     }
   });
+
+function updateEnvValue(content, key, value) {
+  if (content.includes(key + '=')) {
+    return content.replace(new RegExp(`${key}=.*`, 'g'), `${key}=${value}`);
+  } else {
+    if (content && !content.endsWith('\n')) {
+      content += '\n';
+    }
+    return content + `${key}=${value}\n`;
+  }
+}
 
   return router;
 };

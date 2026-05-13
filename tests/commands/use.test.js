@@ -40,7 +40,7 @@ describe('useCommand', () => {
 
     test('should inject OVERVIEW content into prompt', async () => {
       const result = await useCommand({
-        taskDescription: '测试功能',
+        taskDescription: '商户后台新增功能',
         rootDir: fixturesDir
       });
 
@@ -97,7 +97,7 @@ describe('useCommand', () => {
   describe('output format', () => {
     test('should return prompt with context and template sections', async () => {
       const result = await useCommand({
-        taskDescription: '测试功能',
+        taskDescription: '商户后台新增功能',
         rootDir: fixturesDir
       });
 
@@ -114,6 +114,103 @@ describe('useCommand', () => {
 
       expect(result).toHaveProperty('scenarioName');
       expect(result.scenarioName).toBeTruthy();
+    });
+  });
+
+  describe('low confidence', () => {
+    test('should return lowConfidenceScenarios when confidence < 50%', async () => {
+      const result = await useCommand({
+        taskDescription: '随便写点什么'
+      });
+
+      expect(result.lowConfidenceScenarios).toBeDefined();
+      expect(Array.isArray(result.lowConfidenceScenarios)).toBe(true);
+      expect(result.lowConfidenceScenarios.length).toBeGreaterThan(0);
+      expect(result.prompt).toBeUndefined();
+      expect(result.confidence).toBeLessThan(50);
+    });
+
+    test('lowConfidenceScenarios should contain id, name, description', async () => {
+      const result = await useCommand({
+        taskDescription: 'xyz'
+      });
+
+      const first = result.lowConfidenceScenarios[0];
+      expect(first).toHaveProperty('id');
+      expect(first).toHaveProperty('name');
+      expect(first).toHaveProperty('description');
+    });
+  });
+
+  describe('sensitive filtering', () => {
+    test('should filter sensitive content from prompt', async () => {
+      const aiDocsDir = path.join(fixturesDir, 'ai-docs');
+      fs.writeFileSync(
+        path.join(aiDocsDir, 'OVERVIEW.md'),
+        '# 项目总览\npassword = "abc123"\ntoken = "secret_token_value"'
+      );
+
+      const result = await useCommand({
+        taskDescription: '商户后台新增功能',
+        rootDir: fixturesDir
+      });
+
+      expect(result.prompt).not.toContain('abc123');
+      expect(result.prompt).not.toContain('secret_token_value');
+      expect(result.prompt).toContain('[REDACTED]');
+    });
+  });
+
+  describe('compact mode', () => {
+    test('should compress prompt when exceeding 8000 chars', async () => {
+      const aiDocsDir = path.join(fixturesDir, 'ai-docs');
+      const longContent = 'x'.repeat(4000);
+      const overviewWithSections = [
+        '# 总览',
+        '<!-- section:改动项目速查表 -->',
+        '| 项目 | 说明 |',
+        '<!-- /section:改动项目速查表 -->',
+        '<!-- section:其他 -->',
+        longContent,
+        '<!-- /section:其他 -->'
+      ].join('\n');
+      const merWithSections = [
+        '# 商户端',
+        '<!-- section:核心功能模块 -->',
+        '核心功能描述',
+        '<!-- /section:核心功能模块 -->',
+        '<!-- section:开发注意事项 -->',
+        '注意事项',
+        '<!-- /section:开发注意事项 -->',
+        '<!-- section:详细设计 -->',
+        longContent,
+        '<!-- /section:详细设计 -->'
+      ].join('\n');
+      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), overviewWithSections);
+      fs.writeFileSync(path.join(aiDocsDir, 'mer.md'), merWithSections);
+
+      const result = await useCommand({
+        taskDescription: '商户后台新增功能',
+        rootDir: fixturesDir
+      });
+
+      expect(result.compactInfo).toBeDefined();
+      expect(result.compactInfo.originalLength).toBeGreaterThan(8000);
+      expect(result.compactInfo.compactLength).toBeLessThan(result.compactInfo.originalLength);
+      expect(result.prompt).toContain('| 项目 | 说明 |');
+      expect(result.prompt).toContain('核心功能描述');
+      expect(result.prompt).toContain('注意事项');
+      expect(result.prompt).not.toContain(longContent);
+      expect(result.prompt).toContain('商户后台新增功能');
+    });
+
+    test('should not compress when under 8000 chars', async () => {
+      const result = await useCommand({
+        taskDescription: '商户后台新增功能',
+        rootDir: fixturesDir
+      });
+
+      expect(result.compactInfo).toBeNull();
     });
   });
 });

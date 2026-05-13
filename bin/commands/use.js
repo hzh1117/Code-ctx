@@ -1,5 +1,5 @@
 const { Command } = require('commander');
-const { input, confirm } = require('@inquirer/prompts');
+const { input, confirm, select } = require('@inquirer/prompts');
 const { useCommand } = require('../../src/commands/use');
 const { writeToClipboard } = require('../../src/utils/clipboard');
 const { addTask } = require('../../src/utils/task-history');
@@ -54,17 +54,40 @@ const use = new Command('use')
   .action(async (task, options) => {
     try {
       const rootDir = process.cwd();
-      const result = await useCommand({
+      let result = await useCommand({
         taskDescription: task,
         scenario: options.scenario,
         rootDir
       });
 
-      if (!options.scenario) {
+      // 低置信度：让用户手动选择场景
+      if (result.lowConfidenceScenarios) {
+        console.log(`⚠️ 任务描述匹配度较低（${result.confidence}%），请手动选择场景：`);
+        const choices = result.lowConfidenceScenarios.map(s => ({
+          name: `${s.id} - ${s.name}（${s.description}）`,
+          value: s.id
+        }));
+        const selectedId = await select({
+          message: '选择场景',
+          choices
+        });
+        result = await useCommand({
+          taskDescription: task,
+          scenario: selectedId,
+          rootDir
+        });
+      }
+
+      if (!options.scenario && !result.lowConfidenceScenarios) {
         console.log(`✓ 识别为：场景 ${result.matchedScenario}（${result.scenarioName}）置信度 ${result.confidence}%`);
         if (result.confidence < 100) {
           console.log('  不对？使用 -s 参数指定场景，如：code-ctx use -s B "任务描述"');
         }
+      }
+
+      if (result.compactInfo) {
+        const { originalLength, compactLength } = result.compactInfo;
+        console.log(`✓ 已启用精简模式（原 ${originalLength} 字 → ${compactLength} 字）`);
       }
 
       const finalPrompt = options.nonInteractive

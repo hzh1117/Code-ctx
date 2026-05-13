@@ -1,3 +1,4 @@
+const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class GoBackendAdapter extends BaseAdapter {
@@ -15,6 +16,18 @@ class GoBackendAdapter extends BaseAdapter {
       '**/middleware/*.go',
       'main.go',
       'go.mod'
+    ];
+  }
+
+  getPromptHints() {
+    return 'Go 后端项目，注意 handler-service-repository 分层，关注 go.mod 依赖版本，错误处理使用 error 接口';
+  }
+
+  extractKeyFiles(dir) {
+    return [
+      path.join(dir, 'main.go'),
+      path.join(dir, 'go.mod'),
+      path.join(dir, 'go.sum')
     ];
   }
 }

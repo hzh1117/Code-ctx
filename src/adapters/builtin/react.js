@@ -1,3 +1,4 @@
+const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class ReactAdapter extends BaseAdapter {
@@ -14,6 +15,21 @@ class ReactAdapter extends BaseAdapter {
       'src/hooks/*.js',
       'src/App.{jsx,tsx}',
       'src/index.{jsx,tsx}'
+    ];
+  }
+
+  getPromptHints() {
+    return 'React 前端项目，注意组件 props 类型定义，关注自定义 Hooks 复用逻辑，状态管理方案（Redux/Zustand/Context）';
+  }
+
+  extractKeyFiles(dir) {
+    return [
+      path.join(dir, 'src', 'App.tsx'),
+      path.join(dir, 'src', 'App.jsx'),
+      path.join(dir, 'src', 'index.tsx'),
+      path.join(dir, 'src', 'index.jsx'),
+      path.join(dir, 'vite.config.js'),
+      path.join(dir, 'craco.config.js')
     ];
   }
 }

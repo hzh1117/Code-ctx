@@ -10,6 +10,14 @@ class BaseAdapter {
   get scanPatterns() {
     return [];
   }
+
+  getPromptHints() {
+    return '';
+  }
+
+  extractKeyFiles(dir) {
+    return [];
+  }
 }
 
 module.exports = { BaseAdapter };

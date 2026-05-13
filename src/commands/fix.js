@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { scanProject } = require('../scanner/file-scanner');
+const { getAIConfig } = require('../utils/config');
+const { generateWithAI } = require('../ai/client');
+const { filterSensitive } = require('../utils/sensitive-filter');
+const { buildInitPrompt } = require('../generator/prompt-builder');
 
 async function fixCommand(rootDir, projectAlias, options = {}) {
   const configPath = path.join(rootDir, 'code-ctx.config.js');
@@ -10,7 +14,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   }
 
   const config = require(configPath);
-  const project = config.projects.find(p => p.alias === projectAlias);
+  const project = (config.projects || []).find(p => p.alias === projectAlias);
 
   if (!project) {
     throw new Error(`未找到项目: ${projectAlias}`);
@@ -19,30 +23,40 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   const projectDir = path.join(rootDir, project.path);
   const scanResult = scanProject(projectDir, project.type);
 
-  const prompt = `请重新生成 ${project.name || project.alias} (${project.type}) 的文档。
+  const prompt = buildInitPrompt({
+    project,
+    scanResult
+  });
 
-项目结构：
-${scanResult.tree}
-
-关键文件：
-${scanResult.keyFiles.join('\n')}
-
-请生成完整的项目文档，包含：
-1. 项目概述
-2. 目录结构说明
-3. 核心模块说明
-4. 开发注意事项`;
-
-  if (!options.dryRun) {
-    const docPath = path.join(rootDir, config.outputDir || 'ai-docs', `${projectAlias}.md`);
-    const docDir = path.dirname(docPath);
-    if (!fs.existsSync(docDir)) {
-      fs.mkdirSync(docDir, { recursive: true });
-    }
-    fs.writeFileSync(docPath, `# ${project.name || project.alias}\n\n> 自动生成中...`);
+  if (options.dryRun) {
+    return { project: projectAlias, prompt };
   }
 
-  return { project: projectAlias, prompt };
+  const aiConfig = getAIConfig(rootDir);
+  if (aiConfig.apiKey) {
+    console.log(`正在重新生成 ${projectAlias}.md...`);
+    try {
+      const doc = await generateWithAI(prompt, aiConfig);
+      const safeDoc = filterSensitive(doc);
+
+      const docDir = path.join(rootDir, config.outputDir || 'ai-docs');
+      if (!fs.existsSync(docDir)) {
+        fs.mkdirSync(docDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(docDir, `${projectAlias}.md`), safeDoc);
+      console.log(`✓ ${projectAlias}.md 已重新生成`);
+      return { project: projectAlias, generated: true };
+    } catch (err) {
+      console.error(`⚠️ AI 生成失败: ${err.message}`);
+      console.log('prompt 已生成，请手动粘贴给 AI：');
+      console.log(prompt);
+      return { project: projectAlias, prompt, generated: false, error: err.message };
+    }
+  } else {
+    console.log('未配置 API Key，生成 prompt 供手动使用：');
+    console.log(prompt);
+    return { project: projectAlias, prompt, generated: false };
+  }
 }
 
 module.exports = { fixCommand };

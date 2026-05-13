@@ -2,10 +2,17 @@ const { fixCommand } = require('../../src/commands/fix');
 const fs = require('fs');
 const path = require('path');
 
+jest.mock('../../src/ai/client', () => ({
+  generateWithAI: jest.fn().mockResolvedValue('# Generated Doc\n\nproject: web')
+}));
+
+const { generateWithAI } = require('../../src/ai/client');
+
 describe('fixCommand', () => {
   const testDir = path.join(__dirname, '../fixtures/fix-test');
 
   beforeEach(() => {
+    jest.clearAllMocks();
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
@@ -61,19 +68,20 @@ describe('fixCommand', () => {
       .rejects.toThrow('未找到项目');
   });
 
-  test('should write doc file when not dryRun', async () => {
+  test('should write doc file when AI generates successfully', async () => {
     const webDir = path.join(testDir, 'web');
     fs.mkdirSync(path.join(webDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(webDir, 'package.json'), '{}');
     fs.writeFileSync(path.join(webDir, 'src/index.js'), 'console.log("hello")');
     createConfig('web', './web', 'react');
 
-    await fixCommand(testDir, 'web', { dryRun: false });
+    const result = await fixCommand(testDir, 'web', { dryRun: false });
 
+    expect(result.generated).toBe(true);
     const docPath = path.join(testDir, 'ai-docs', 'web.md');
     expect(fs.existsSync(docPath)).toBe(true);
     const content = fs.readFileSync(docPath, 'utf8');
-    expect(content).toContain('web');
+    expect(content).toContain('Generated Doc');
   });
 
   test('should return prompt with project structure', async () => {
@@ -84,7 +92,30 @@ describe('fixCommand', () => {
     createConfig('web', './web', 'react');
 
     const result = await fixCommand(testDir, 'web', { dryRun: true });
-    expect(result.prompt).toContain('项目结构');
+    expect(result.prompt).toContain('目录结构');
     expect(result.prompt).toContain('关键文件');
+  });
+
+  test('should generate proper prompt with scan results', async () => {
+    const testDir2 = path.join(__dirname, '../fixtures/fix-test-2');
+    if (fs.existsSync(testDir2)) {
+      fs.rmSync(testDir2, { recursive: true, force: true });
+    }
+    fs.mkdirSync(testDir2, { recursive: true });
+    fs.writeFileSync(path.join(testDir2, 'code-ctx.config.js'), `module.exports = {
+    projectName: 'test-app',
+    outputDir: './ai-docs',
+    projects: [{ alias: 'web', path: './web', type: 'react', label: '前端' }]
+  };`);
+    fs.mkdirSync(path.join(testDir2, 'web'), { recursive: true });
+    fs.writeFileSync(path.join(testDir2, 'web', 'package.json'), '{"dependencies":{"react":"^18.0.0"}}');
+
+    const result = await fixCommand(testDir2, 'web', { dryRun: true });
+
+    expect(result.prompt).toContain('web');
+    expect(result.prompt).toContain('react');
+    expect(result.project).toBe('web');
+
+    fs.rmSync(testDir2, { recursive: true, force: true });
   });
 });

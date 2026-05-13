@@ -1,4 +1,4 @@
-function buildUsePrompt({ scenarioId, taskDescription, projectContext, overviewContent, relatedDocs, template }) {
+function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template }) {
   const parts = [];
 
   parts.push('【第一部分：项目上下文】');
@@ -29,19 +29,23 @@ function buildUsePrompt({ scenarioId, taskDescription, projectContext, overviewC
   parts.push('（请根据以下任务描述执行开发）');
   parts.push('');
 
-  const renderedTemplate = template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    const vars = { featureName: taskDescription, projectName: '', apiPrefix: '/api/' };
-    return vars[key] !== undefined ? vars[key] : match;
-  });
-
-  parts.push(renderedTemplate);
+  if (template) {
+    const renderedTemplate = template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+      const vars = { featureName: taskDescription, projectName: '', apiPrefix: '/api/' };
+      return vars[key] !== undefined ? vars[key] : match;
+    });
+    parts.push(renderedTemplate);
+  } else {
+    parts.push(taskDescription || '');
+  }
 
   return parts.join('\n');
 }
 
 function buildInitPrompt({ project, scanResult, type, config, generatedDocs }) {
   if (type === 'overview') {
-    const projectSummaries = (config.projects || []).map(p => {
+    const configObj = config || {};
+    const projectSummaries = (configObj.projects || []).map(p => {
       const doc = (generatedDocs || {})[p.alias] || '';
       const lines = doc.split('\n');
       const summary = lines.slice(0, 20).join('\n');
@@ -50,9 +54,9 @@ function buildInitPrompt({ project, scanResult, type, config, generatedDocs }) {
 
     return `请为以下项目生成一个总览文档（OVERVIEW.md）。
 
-项目名称：${config.projectName}
+项目名称：${configObj.projectName || ''}
 子项目列表：
-${(config.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n')}
+${(configObj.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n')}
 
 已生成的子项目文档摘要：
 ${projectSummaries}
@@ -66,17 +70,20 @@ ${projectSummaries}
 请用 Markdown 格式输出。`;
   }
 
+  const projectObj = project || {};
+  const scanObj = scanResult || {};
+
   return `请为以下子项目生成结构文档。
 
-项目名称：${project.name}
-项目类型：${project.type}
-项目路径：${project.path}
+项目名称：${projectObj.name || ''}
+项目类型：${projectObj.type || ''}
+项目路径：${projectObj.path || ''}
 
 目录结构：
-${scanResult.tree}
+${scanObj.tree || ''}
 
 关键文件：
-${(scanResult.keyFiles || []).join('\n')}
+${(scanObj.keyFiles || []).join('\n')}
 
 请生成以下内容：
 1. 项目概述

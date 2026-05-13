@@ -1,6 +1,7 @@
 const { Command } = require('commander');
 const { useCommand } = require('../../src/commands/use');
-const clipboardy = require('clipboardy');
+const { writeToClipboard } = require('../../src/utils/clipboard');
+const { addTask } = require('../../src/utils/task-history');
 const fs = require('fs');
 const path = require('path');
 
@@ -32,15 +33,21 @@ const use = new Command('use')
         fs.writeFileSync(path.resolve(options.out), result.prompt);
         console.log(`✓ 已写入 ${options.out}`);
       } else {
-        try {
-          await clipboardy.write(result.prompt);
+        const clipResult = await writeToClipboard(result.prompt);
+        if (clipResult.success) {
           console.log('✓ 已复制到剪贴板，去你的 AI 工具粘贴即可');
-        } catch {
-          const fallbackPath = '.ai-prompt.md';
-          fs.writeFileSync(fallbackPath, result.prompt);
-          console.log(`⚠️ 剪贴板写入失败，已降级输出到 ${fallbackPath}`);
+        } else {
+          console.log(`⚠️ 剪贴板写入失败，已降级输出到 ${clipResult.fallbackPath}`);
         }
       }
+
+      try {
+        addTask(rootDir, {
+          task: task,
+          scenario: result.matchedScenario,
+          projects: result.relatedProjects || []
+        });
+      } catch {}
 
       console.log('\n提示：粘贴后记得补充具体需求细节');
     } catch (err) {

@@ -16,7 +16,6 @@ program.addCommand(require('./commands/update'));
 program.addCommand(require('./commands/fix'));
 program.addCommand(require('./commands/status'));
 program.addCommand(require('./commands/doctor'));
-program.addCommand(require('./commands/dashboard'));
 
 program
   .command('help')
@@ -35,7 +34,6 @@ code-ctx - AI 开发上下文工具
   fix <alias>       重新生成指定子项目的文档
   status            查看 ai-docs 各文档的最后更新时间
   doctor            检查文档健康状态
-  dashboard         打开本地 Web 管理页面
   help              显示此帮助信息
 
 选项:
@@ -50,7 +48,6 @@ code-ctx - AI 开发上下文工具
   code-ctx fix web
   code-ctx status
   code-ctx doctor
-  code-ctx dashboard -p 8080
 `);
   });
 

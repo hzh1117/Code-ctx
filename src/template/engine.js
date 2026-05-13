@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_SCENARIOS_PATH = path.join(__dirname, '../../templates/scenarios.json');
+const TEMPLATES_DIR = path.join(__dirname, '../../templates');
+const DEFAULT_SCENARIOS_PATH = path.join(TEMPLATES_DIR, 'scenarios.json');
 
 function renderTemplate(template, variables) {
   if (typeof template !== 'string') {
@@ -13,6 +14,18 @@ function renderTemplate(template, variables) {
   return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
     return variables[key] !== undefined ? variables[key] : match;
   });
+}
+
+function loadTemplate(name) {
+  const filePath = path.join(TEMPLATES_DIR, name);
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      throw new Error(`Template not found: ${name}`);
+    }
+    throw err;
+  }
 }
 
 function getScenarios(customPath) {
@@ -31,4 +44,4 @@ function getScenarios(customPath) {
   }
 }
 
-module.exports = { renderTemplate, getScenarios };
+module.exports = { renderTemplate, loadTemplate, getScenarios };

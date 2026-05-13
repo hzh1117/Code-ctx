@@ -1,3 +1,5 @@
+const { renderTemplate, loadTemplate } = require('../template/engine');
+
 function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template }) {
   const parts = [];
 
@@ -42,7 +44,7 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
   return parts.join('\n');
 }
 
-function buildInitPrompt({ project, scanResult, type, config, generatedDocs }) {
+function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs }) {
   if (type === 'overview') {
     const configObj = config || {};
     const projectSummaries = (configObj.projects || []).map(p => {
@@ -52,46 +54,57 @@ function buildInitPrompt({ project, scanResult, type, config, generatedDocs }) {
       return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
     }).join('\n');
 
-    return `请为以下项目生成一个总览文档（OVERVIEW.md）。
+    const tpl = loadTemplate('scan-prompt-overview.md');
+    return renderTemplate(tpl, {
+      projectName: configObj.projectName || '',
+      projectList: (configObj.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n'),
+      projectSummaries
+    });
+  }
 
-项目名称：${configObj.projectName || ''}
-子项目列表：
-${(configObj.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n')}
+  if (type === 'one-shot') {
+    const projectList = projects || [];
+    const results = scanResults || {};
+    const projectSections = projectList.map(p => {
+      const result = results[p.alias] || {};
+      return `## ${p.alias}
+项目名称：${p.name}
+项目类型：${p.type}
+项目路径：${p.path}
 
-已生成的子项目文档摘要：
-${projectSummaries}
+目录结构：
+${result.tree || ''}
 
-请生成以下内容：
-1. 项目概述（一句话描述）
-2. 子项目列表及其职责
-3. 技术栈说明
-4. 项目关系图（哪个前端调用哪个后端）
+关键文件：
+${(result.keyFiles || []).join('\n')}`;
+    }).join('\n\n---\n\n');
 
-请用 Markdown 格式输出。`;
+    const tpl = loadTemplate('scan-prompt-one-shot.md');
+    return renderTemplate(tpl, { projectSections });
   }
 
   const projectObj = project || {};
   const scanObj = scanResult || {};
 
-  return `请为以下子项目生成结构文档。
+  let otherDocsSection = '';
+  if (otherDocs && Object.keys(otherDocs).length > 0) {
+    otherDocsSection = '其他子项目文档摘要（供参考）：';
+    for (const [alias, doc] of Object.entries(otherDocs)) {
+      const lines = doc.split('\n');
+      const summary = lines.slice(0, 15).join('\n');
+      otherDocsSection += `\n\n### ${alias}\n${summary}`;
+    }
+  }
 
-项目名称：${projectObj.name || ''}
-项目类型：${projectObj.type || ''}
-项目路径：${projectObj.path || ''}
-
-目录结构：
-${scanObj.tree || ''}
-
-关键文件：
-${(scanObj.keyFiles || []).join('\n')}
-
-请生成以下内容：
-1. 项目概述
-2. 目录结构说明
-3. 核心模块说明
-4. 开发注意事项
-
-请用 Markdown 格式输出。`;
+  const tpl = loadTemplate('scan-prompt.md');
+  return renderTemplate(tpl, {
+    projectName: projectObj.name || '',
+    projectType: projectObj.type || '',
+    projectPath: projectObj.path || '',
+    tree: scanObj.tree || '',
+    keyFiles: (scanObj.keyFiles || []).join('\n'),
+    otherDocsSection
+  });
 }
 
 module.exports = { buildUsePrompt, buildInitPrompt };

@@ -1,0 +1,11 @@
+{
+  "lastRun": null,
+  "projects": {
+    "backend": {
+      "status": "scanned"
+    },
+    "frontend": {
+      "status": "scanned"
+    }
+  }
+}

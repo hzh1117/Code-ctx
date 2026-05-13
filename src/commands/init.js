@@ -1,11 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
-const { scanProject } = require('../scanner/file-scanner');
+const { scanProject, estimateTokens } = require('../scanner/file-scanner');
 const { getAIConfig } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive, DETECTION_PATTERNS } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
+
+const STRATEGY_THRESHOLDS = {
+  ONE_SHOT_MAX: 60000,
+  BATCH_WITH_CONTEXT_MAX: 200000
+};
 
 function loadInitState(outputDir) {
   const statePath = path.join(outputDir, '.init-state.json');
@@ -106,6 +111,29 @@ async function initCommand(rootDir, options = {}) {
   if (options.generateDocs !== false && !options.skipAI) {
     console.log('\n📝 生成项目文档...');
 
+    // 估算 token 数量
+    let totalTokens = 0;
+    for (const project of projects) {
+      const result = scanResults[project.alias];
+      if (result && result.keyFiles) {
+        const tokens = estimateTokens(result.keyFiles);
+        totalTokens += tokens;
+        console.log(`  ${project.alias}: ~${tokens} tokens`);
+      }
+    }
+    console.log(`  总计: ~${totalTokens} tokens`);
+
+    // 选择策略
+    let strategy;
+    if (totalTokens < STRATEGY_THRESHOLDS.ONE_SHOT_MAX) {
+      strategy = 'ONE_SHOT';
+    } else if (totalTokens <= STRATEGY_THRESHOLDS.BATCH_WITH_CONTEXT_MAX) {
+      strategy = 'BATCH_WITH_CONTEXT';
+    } else {
+      strategy = 'BATCH_MINIMAL';
+    }
+    console.log(`  策略: ${strategy}`);
+
     try {
       const aiConfig = getAIConfig(rootDir);
 
@@ -113,29 +141,75 @@ async function initCommand(rootDir, options = {}) {
         console.log('\n⚠️ 未配置 API Key，请先在 .env 文件中配置');
       } else {
         const failedDocs = [];
-        for (const project of projects) {
-          if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
 
-          console.log(`\n生成 ${project.alias}.md...`);
-          try {
-            const projectPrompt = buildInitPrompt({
-              project,
-              scanResult: scanResults[project.alias]
-            });
-            const doc = await generateWithAI(projectPrompt, aiConfig);
-            const safeDoc = filterSensitive(doc);
-            fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
-            generatedDocs[project.alias] = safeDoc;
-            state.projects[project.alias] = { status: 'completed' };
-            saveInitState(outputDir, state);
-          } catch (err) {
-            console.error(`  ⚠️ ${project.alias}.md 生成失败:`, err.message);
-            failedDocs.push({ alias: project.alias, error: err.message });
-            state.projects[project.alias] = { status: 'failed', error: err.message };
-            saveInitState(outputDir, state);
+        if (strategy === 'ONE_SHOT') {
+          // ONE_SHOT: 所有子项目拼一个 prompt
+          console.log('\n🚀 ONE_SHOT 模式：所有子项目合并生成...');
+          const allPrompt = buildInitPrompt({
+            projects,
+            scanResults,
+            type: 'one-shot'
+          });
+          const allDocs = await generateWithAI(allPrompt, aiConfig);
+          const safeDocs = filterSensitive(allDocs);
+
+          // 拆分各子项目文档
+          for (const project of projects) {
+            if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
+            const strictRegex = new RegExp(`(?:^|\\n)## ${project.alias}[\\s\\S]*?(?=\\n## |$)`, 'i');
+            const fuzzyRegex = new RegExp(`(?:^|\\n)##[^\\n]*${project.alias}[\\s\\S]*?(?=\\n## |$)`, 'i');
+            const match = safeDocs.match(strictRegex) || safeDocs.match(fuzzyRegex);
+            if (!match) {
+              console.warn(`  ⚠️ ${project.alias}: 文档拆分失败，标记为待重新生成`);
+            }
+            const doc = match ? match[0].trim() : `# ${project.alias}\n\n文档生成中，请稍后重试。`;
+            fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
+            generatedDocs[project.alias] = doc;
+            state.projects[project.alias] = { status: match ? 'completed' : 'needs-regen' };
+          }
+          saveInitState(outputDir, state);
+        } else {
+          // BATCH: 逐个生成
+          for (const project of projects) {
+            if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
+
+            console.log(`\n生成 ${project.alias}.md...`);
+            try {
+              let projectPrompt;
+              if (strategy === 'BATCH_WITH_CONTEXT') {
+                // 带其他子项目摘要
+                const otherDocs = Object.fromEntries(
+                  Object.entries(generatedDocs).filter(([k]) => k !== project.alias)
+                );
+                projectPrompt = buildInitPrompt({
+                  project,
+                  scanResult: scanResults[project.alias],
+                  otherDocs
+                });
+              } else {
+                // BATCH_MINIMAL: 不带其他子项目内容
+                projectPrompt = buildInitPrompt({
+                  project,
+                  scanResult: scanResults[project.alias]
+                });
+              }
+
+              const doc = await generateWithAI(projectPrompt, aiConfig);
+              const safeDoc = filterSensitive(doc);
+              fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
+              generatedDocs[project.alias] = safeDoc;
+              state.projects[project.alias] = { status: 'completed' };
+              saveInitState(outputDir, state);
+            } catch (err) {
+              console.error(`  ⚠️ ${project.alias}.md 生成失败:`, err.message);
+              failedDocs.push({ alias: project.alias, error: err.message });
+              state.projects[project.alias] = { status: 'failed', error: err.message };
+              saveInitState(outputDir, state);
+            }
           }
         }
 
+        // OVERVIEW 始终最后生成
         const successCount = Object.keys(generatedDocs).length;
         if (successCount > 0) {
           console.log('\n生成 OVERVIEW.md...');

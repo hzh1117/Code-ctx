@@ -1,69 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const { globSync } = require('glob');
-
-const SCAN_PATTERNS = {
-  'vue2-admin': [
-    'src/api/*.js',
-    'src/router/modules/*.js',
-    'src/store/modules/*.js',
-    '.env.*'
-  ],
-  'vue3-admin': [
-    'src/api/*.js',
-    'src/router/*.js',
-    'src/stores/*.js',
-    '.env.*'
-  ],
-  'uniapp-miniprogram': [
-    'api/*.js',
-    'pages.json',
-    'config/app.js',
-    'utils/request.js'
-  ],
-  'react': [
-    'src/components/**/*.{jsx,tsx}',
-    'src/pages/**/*.{jsx,tsx}',
-    'src/hooks/*.js',
-    'src/App.{jsx,tsx}',
-    'src/index.{jsx,tsx}'
-  ],
-  'java-backend': [
-    '**/controller/**/*.java',
-    '**/service/**/*.java',
-    '**/entity/**/*.java',
-    'application.yml',
-    'application.properties'
-  ],
-  'node-backend': [
-    'routes/*.js',
-    'controllers/*.js',
-    'app.js'
-  ],
-  'go-backend': [
-    '**/handler/*.go',
-    '**/service/*.go',
-    '**/model/*.go',
-    '**/middleware/*.go',
-    'main.go',
-    'go.mod'
-  ],
-  'python-backend': [
-    '**/views.py',
-    '**/models.py',
-    '**/serializers.py',
-    '**/urls.py',
-    'app.py',
-    'requirements.txt'
-  ]
-};
+const { defaultRegistry } = require('../adapters');
 
 function scanProject(projectDir, projectType) {
   if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
     throw new Error(`Directory does not exist: ${projectDir}`);
   }
 
-  const patterns = SCAN_PATTERNS[projectType] || [];
+  const patterns = defaultRegistry.getScanPatterns(projectType);
   const keyFiles = [];
   const tree = buildTree(projectDir);
 
@@ -101,4 +46,40 @@ function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
   return tree;
 }
 
-module.exports = { scanProject };
+function estimateTokens(filePaths) {
+  let totalTokens = 0;
+
+  for (const filePath of filePaths) {
+    if (!fs.existsSync(filePath)) continue;
+
+    let content;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+
+    let enCount = 0;
+    let cnCount = 0;
+    let codeCount = 0;
+
+    for (const char of content) {
+      const code = char.codePointAt(0);
+      if (code >= 0x4e00 && code <= 0x9fff) {
+        cnCount++;
+      } else if ((code >= 0x0020 && code <= 0x007e) || code === 0x000a || code === 0x000d) {
+        if (/[a-zA-Z0-9\s]/.test(char)) {
+          enCount++;
+        } else {
+          codeCount++;
+        }
+      }
+    }
+
+    totalTokens += enCount * 0.3 + cnCount * 0.6 + codeCount * 0.4;
+  }
+
+  return Math.round(totalTokens);
+}
+
+module.exports = { scanProject, estimateTokens };

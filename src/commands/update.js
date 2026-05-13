@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { extractSection, replaceSection, listSections } = require('../core/section');
+const { renderTemplate, loadTemplate } = require('../template/engine');
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
@@ -40,6 +42,66 @@ function findRelatedDoc(rootDir, changedFile) {
   return null;
 }
 
+/**
+ * Build per-section prompts for changed files.
+ * Returns an array of { docName, sectionName, prompt } objects.
+ */
+function buildSectionUpdatePrompts(rootDir, changedFiles) {
+  const changesByProject = {};
+  for (const file of changedFiles) {
+    const fileParts = file.split(path.sep);
+    const project = fileParts[0] === 'ai-docs' ? null : fileParts[0];
+    if (project) {
+      if (!changesByProject[project]) changesByProject[project] = [];
+      changesByProject[project].push(file);
+    }
+  }
+
+  const sectionUpdates = [];
+
+  for (const [project, projFiles] of Object.entries(changesByProject)) {
+    const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
+    if (!relatedDoc) continue;
+
+    const sections = listSections(relatedDoc.content);
+    if (sections.length === 0) continue;
+
+    const tpl = loadTemplate('update-prompt.md');
+    for (const sectionName of sections) {
+      const sectionContent = extractSection(relatedDoc.content, sectionName);
+      if (sectionContent === null) continue;
+
+      const prompt = renderTemplate(tpl, {
+        project,
+        sectionName,
+        changedFiles: projFiles.map(f => `- ${f}`).join('\n'),
+        sectionContent
+      });
+
+      sectionUpdates.push({
+        docName: relatedDoc.name,
+        sectionName,
+        prompt
+      });
+    }
+  }
+
+  return sectionUpdates;
+}
+
+/**
+ * Apply section-level updates to a doc file.
+ * @param {string} docPath - Path to the doc file
+ * @param {Array<{sectionName: string, newContent: string}>} updates
+ */
+function applySectionUpdates(docPath, updates) {
+  let content = fs.readFileSync(docPath, 'utf8');
+  for (const { sectionName, newContent } of updates) {
+    content = replaceSection(content, sectionName, newContent);
+  }
+  fs.writeFileSync(docPath, content);
+}
+
 async function updateCommand(rootDir, options = {}) {
   const lastScanPath = path.join(rootDir, 'ai-docs/.last-scan');
 
@@ -62,11 +124,12 @@ async function updateCommand(rootDir, options = {}) {
     }
   }
 
-  let prompt = null;
-  if (changedFiles.length > 0) {
-    const parts = [];
-    parts.push('以下是项目中发生变化的文件，请根据变化更新对应的文档：\n');
+  // Build section-aware update prompts
+  const sectionUpdates = buildSectionUpdatePrompts(rootDir, changedFiles);
 
+  // Fallback: if no sections found, build a single full-doc prompt
+  let prompt = null;
+  if (sectionUpdates.length === 0 && changedFiles.length > 0) {
     const changesByProject = {};
     for (const file of changedFiles) {
       const fileParts = file.split(path.sep);
@@ -77,9 +140,9 @@ async function updateCommand(rootDir, options = {}) {
       }
     }
 
+    const projectSections = [];
     for (const [project, projFiles] of Object.entries(changesByProject)) {
-      parts.push(`### 子项目: ${project}`);
-      parts.push('变化文件：');
+      const parts = [`### 子项目: ${project}`, '变化文件：'];
       projFiles.forEach(f => parts.push(`- ${f}`));
 
       const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
@@ -89,11 +152,11 @@ async function updateCommand(rootDir, options = {}) {
         parts.push(relatedDoc.content);
         parts.push('```');
       }
-      parts.push('');
+      projectSections.push(parts.join('\n'));
     }
 
-    parts.push('请更新对应的文档，只修改变化的部分，保持其他内容不变。');
-    prompt = parts.join('\n');
+    const tpl = loadTemplate('update-prompt-full.md');
+    prompt = renderTemplate(tpl, { projectSections: projectSections.join('\n\n') });
   }
 
   if (!options.dryRun) {
@@ -104,7 +167,7 @@ async function updateCommand(rootDir, options = {}) {
     fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
   }
 
-  return { changedFiles, prompt };
+  return { changedFiles, prompt, sectionUpdates };
 }
 
-module.exports = { updateCommand };
+module.exports = { updateCommand, applySectionUpdates };

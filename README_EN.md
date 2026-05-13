@@ -20,12 +20,13 @@ Code-ctx is a CLI tool that helps AI programming assistants (such as Claude, Cha
 - 📝 **Scenario Templates** - 8 development scenarios (new features, bug fixes, refactoring, etc.) generate customized prompts
 - 📄 **Document Auto-Injection** - Automatically loads OVERVIEW and related sub-project documents, no manual specification needed
 - 🔄 **Incremental Updates** - Only updates changed files, generates incremental update prompts
-- 🏥 **Health Check** - Detects document completeness, OVERVIEW consistency, and sensitive information leaks
+- 🏥 **Health Check + Auto-Fix** - Detects document completeness and consistency, supports `--fix` to auto-repair outdated documents
 - 💾 **Fault Tolerance** - Can resume after init interruption, automatically skips completed sub-projects
 - 🖥️ **Web Management** - Visual configuration, scenario templates, document status management
 - 📋 **Clipboard Fallback** - Automatically falls back to file output when writing large content fails
 - 🔒 **Security First** - Automatically filters sensitive information (passwords, keys, etc.)
 - 🤖 **AI API Integration** - Compatible with OpenAI and Anthropic protocols, supports DeepSeek, Kimi, MiniMax, etc.
+- 📊 **Task History** - Records generated prompts for easy review and reuse
 
 ---
 

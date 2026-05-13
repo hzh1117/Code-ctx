@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { getAIConfig, saveAIConfig, loadEnvConfig } = require('../../utils/config');
 const { generateWithAI } = require('../../ai/client');
+const { filterSensitive } = require('../../utils/sensitive-filter');
 
 function maskKey(apiKey) {
   return apiKey ? '***' + apiKey.slice(-4) : '';
@@ -106,8 +107,9 @@ module.exports = function(rootDir) {
   router.post('/generate', async (req, res) => {
     try {
       const { prompt } = req.body;
+      const safePrompt = filterSensitive(prompt || '').content;
       const config = getAIConfig(rootDir);
-      const result = await generateWithAI(prompt, config);
+      const result = await generateWithAI(safePrompt, config);
       res.json({ success: true, content: result });
     } catch (err) {
       res.json({ success: false, error: err.message });
@@ -123,6 +125,15 @@ module.exports = function(rootDir) {
 
       const envPath = path.join(rootDir, '.env');
       
+      // Backup before writing
+      if (fs.existsSync(envPath)) {
+        try {
+          fs.copyFileSync(envPath, envPath + '.bak');
+        } catch (backupErr) {
+          console.warn('.env 备份失败:', backupErr.message);
+        }
+      }
+
       let envContent = '';
       if (fs.existsSync(envPath)) {
         envContent = fs.readFileSync(envPath, 'utf8');

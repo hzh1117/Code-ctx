@@ -30,34 +30,26 @@ function loadProjectConfig(rootDir) {
     return {};
   }
 
-  const code = fs.readFileSync(configPath, 'utf8');
-  const module = { exports: {} };
-  const sandbox = {
-    module,
-    exports: module.exports,
-    require,
-    process,
-    __dirname: path.dirname(configPath),
-    __filename: configPath
-  };
-
-  vm.runInNewContext(code, sandbox, { filename: configPath });
-  return module.exports;
+  return loadConfigWithVM(configPath);
 }
 
 function loadConfigWithVM(configPath) {
   const code = fs.readFileSync(configPath, 'utf8');
-  const module = { exports: {} };
-  const sandbox = {
-    module,
-    exports: module.exports,
-    require,
-    process,
-    __dirname: path.dirname(configPath),
-    __filename: configPath
-  };
-  vm.runInNewContext(code, sandbox, { filename: configPath });
-  return module.exports;
+  try {
+    const module = { exports: {} };
+    const sandbox = {
+      module,
+      exports: module.exports,
+      require,
+      process,
+      __dirname: path.dirname(configPath),
+      __filename: configPath
+    };
+    vm.runInNewContext(code, sandbox, { filename: configPath });
+    return module.exports;
+  } catch (err) {
+    throw new Error(`配置文件解析失败 (${configPath}): ${err.message}`);
+  }
 }
 
 const DEFAULT_PROVIDER_CONFIG = {

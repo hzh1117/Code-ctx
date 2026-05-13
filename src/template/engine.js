@@ -4,6 +4,9 @@ const path = require('path');
 const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 const DEFAULT_SCENARIOS_PATH = path.join(TEMPLATES_DIR, 'scenarios.json');
 
+const templateCache = new Map();
+const scenariosCache = new Map();
+
 function renderTemplate(template, variables) {
   if (typeof template !== 'string') {
     throw new TypeError('Template must be a string');
@@ -16,10 +19,36 @@ function renderTemplate(template, variables) {
   });
 }
 
-function loadTemplate(name) {
+function loadTemplate(name, language) {
+  // Try language-specific template first
+  if (language && language !== 'zh') {
+    const ext = path.extname(name);
+    const base = name.slice(0, -ext.length);
+    const langName = `${base}.${language}${ext}`;
+    const cacheKey = langName;
+
+    if (templateCache.has(cacheKey)) {
+      return templateCache.get(cacheKey);
+    }
+
+    const langPath = path.join(TEMPLATES_DIR, langName);
+    if (fs.existsSync(langPath)) {
+      const content = fs.readFileSync(langPath, 'utf8');
+      templateCache.set(cacheKey, content);
+      return content;
+    }
+  }
+
+  // Fall back to default template
+  if (templateCache.has(name)) {
+    return templateCache.get(name);
+  }
+
   const filePath = path.join(TEMPLATES_DIR, name);
   try {
-    return fs.readFileSync(filePath, 'utf8');
+    const content = fs.readFileSync(filePath, 'utf8');
+    templateCache.set(name, content);
+    return content;
   } catch (err) {
     if (err.code === 'ENOENT') {
       throw new Error(`Template not found: ${name}`);
@@ -28,11 +57,41 @@ function loadTemplate(name) {
   }
 }
 
-function getScenarios(customPath) {
+function getScenarios(customPath, language) {
+  // Try language-specific scenarios file
+  if (language && language !== 'zh') {
+    const basePath = customPath || DEFAULT_SCENARIOS_PATH;
+    const ext = path.extname(basePath);
+    const base = basePath.slice(0, -ext.length);
+    const langPath = `${base}.${language}${ext}`;
+
+    if (scenariosCache.has(langPath)) {
+      return scenariosCache.get(langPath);
+    }
+
+    if (fs.existsSync(langPath)) {
+      try {
+        const content = fs.readFileSync(langPath, 'utf8');
+        const scenarios = JSON.parse(content);
+        scenariosCache.set(langPath, scenarios);
+        return scenarios;
+      } catch (err) {
+        // Fall through to default
+      }
+    }
+  }
+
   const scenariosPath = customPath || DEFAULT_SCENARIOS_PATH;
+
+  if (scenariosCache.has(scenariosPath)) {
+    return scenariosCache.get(scenariosPath);
+  }
+
   try {
     const content = fs.readFileSync(scenariosPath, 'utf8');
-    return JSON.parse(content);
+    const scenarios = JSON.parse(content);
+    scenariosCache.set(scenariosPath, scenarios);
+    return scenarios;
   } catch (err) {
     if (err.code === 'ENOENT') {
       throw new Error(`Scenarios file not found: ${scenariosPath}`);
@@ -44,4 +103,9 @@ function getScenarios(customPath) {
   }
 }
 
-module.exports = { renderTemplate, loadTemplate, getScenarios };
+function clearCache() {
+  templateCache.clear();
+  scenariosCache.clear();
+}
+
+module.exports = { renderTemplate, loadTemplate, getScenarios, clearCache };

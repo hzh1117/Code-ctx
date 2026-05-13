@@ -1,3 +1,6 @@
+const { generateWithAI } = require('../ai/client');
+const { getScenarios } = require('../template/engine');
+
 const KEYWORDS = {
   'A': ['小程序', 'miniapp', 'uni-app', '前端', '页面', 'C端', '用户端'],
   'B': ['商户', '管理后台', 'admin', '后台', '管理端'],
@@ -12,6 +15,7 @@ const KEYWORDS = {
 const HIGH_CONFIDENCE = 100;
 const MEDIUM_CONFIDENCE = 60;
 const LOW_CONFIDENCE = 30;
+const AI_CONFIDENCE_THRESHOLD = 50;
 const MIN_KEYWORD_LENGTH_FOR_HIGH_CONFIDENCE = 3;
 
 function matchScenario(taskDescription) {
@@ -50,4 +54,65 @@ function matchScenario(taskDescription) {
   };
 }
 
-module.exports = { matchScenario };
+function buildScenarioMatchPrompt(taskDescription, scenarios) {
+  const scenarioList = scenarios.map(s =>
+    `- ${s.id}: ${s.name} — ${s.description}`
+  ).join('\n');
+
+  return `你是一个开发任务分类器。根据用户的任务描述，从以下场景中选择最匹配的一个。
+
+场景列表：
+${scenarioList}
+
+用户任务：${taskDescription}
+
+请只返回一个 JSON 对象，格式如下，不要返回其他内容：
+{"scenarioId": "X", "reason": "简短理由"}`;
+}
+
+async function matchScenarioWithAI(taskDescription, aiConfig, options = {}) {
+  // First try keyword matching
+  const keywordResult = matchScenario(taskDescription);
+
+  // If confidence is high enough, return keyword result
+  if (keywordResult.confidence >= AI_CONFIDENCE_THRESHOLD) {
+    return { ...keywordResult, method: 'keyword' };
+  }
+
+  // If --no-ai-match is set or no AI config, return keyword result
+  if (options.noAiMatch || !aiConfig || !aiConfig.apiKey) {
+    return { ...keywordResult, method: 'keyword' };
+  }
+
+  // AI fallback
+  try {
+    const scenarios = getScenarios();
+    const prompt = buildScenarioMatchPrompt(taskDescription, scenarios);
+    const response = await generateWithAI(prompt, {
+      ...aiConfig,
+      maxTokens: 200
+    });
+
+    // Parse AI response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const validIds = scenarios.map(s => s.id);
+      if (parsed.scenarioId && validIds.includes(parsed.scenarioId)) {
+        return {
+          scenarioId: parsed.scenarioId,
+          confidence: 80,
+          matchedKeyword: keywordResult.matchedKeyword,
+          method: 'ai',
+          aiReason: parsed.reason
+        };
+      }
+    }
+  } catch (err) {
+    // AI fallback failed, fall through to keyword result
+  }
+
+  return { ...keywordResult, method: 'keyword' };
+}
+
+module.exports = { matchScenario, matchScenarioWithAI, buildScenarioMatchPrompt };

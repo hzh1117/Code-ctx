@@ -1,4 +1,6 @@
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const clipboardy = require('clipboardy');
 
 async function writeToClipboard(content) {
@@ -10,7 +12,7 @@ async function writeToClipboard(content) {
     }
     return { success: true };
   } catch (err) {
-    const fallbackPath = '.ai-prompt.md';
+    const fallbackPath = path.join(os.tmpdir(), '.ai-prompt.md');
     fs.writeFileSync(fallbackPath, content);
     return { success: false, fallbackPath, error: err.message };
   }

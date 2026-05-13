@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getScenarios } = require('../template/engine');
-const { matchScenario } = require('../matcher/scenario-matcher');
+const { matchScenarioWithAI } = require('../matcher/scenario-matcher');
 const { buildUsePrompt } = require('../generator/prompt-builder');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { extractSection } = require('../core/section');
@@ -46,7 +46,7 @@ function compactPrompt(prompt, taskDescription, template, overviewContent, relat
 }
 
 async function useCommand(options = {}) {
-  const { taskDescription, scenario, rootDir } = options;
+  const { taskDescription, scenario, rootDir, aiConfig, noAiMatch, language } = options;
 
   if (!taskDescription && !scenario) {
     throw new Error('请提供任务描述或指定场景');
@@ -55,14 +55,18 @@ async function useCommand(options = {}) {
   // 1. 确定场景
   let matchedScenario = scenario;
   let confidence = 100;
+  let matchMethod = 'manual';
+  let aiReason = null;
 
   if (!matchedScenario && taskDescription) {
-    const match = matchScenario(taskDescription);
+    const match = await matchScenarioWithAI(taskDescription, aiConfig, { noAiMatch });
     matchedScenario = match.scenarioId;
     confidence = match.confidence;
+    matchMethod = match.method;
+    aiReason = match.aiReason || null;
 
     // 低置信度：返回所有场景供用户选择
-    if (confidence < LOW_CONFIDENCE_THRESHOLD) {
+    if (confidence < LOW_CONFIDENCE_THRESHOLD && matchMethod === 'keyword') {
       const allScenarios = getScenarios();
       return {
         lowConfidenceScenarios: allScenarios.map(s => ({
@@ -72,21 +76,23 @@ async function useCommand(options = {}) {
         })),
         matchedScenario,
         confidence,
-        matchedKeyword: match.matchedKeyword
+        matchedKeyword: match.matchedKeyword,
+        matchMethod
       };
     }
   }
 
   // 2. 加载场景模板
-  const scenarios = getScenarios();
+  const scenarios = getScenarios(undefined, language);
   const selectedScenario = scenarios.find(s => s.id === matchedScenario);
   if (!selectedScenario) {
-    throw new Error(`未找到场景: ${matchedScenario}`);
+    throw new Error(language === 'en' ? `Scenario not found: ${matchedScenario}` : `未找到场景: ${matchedScenario}`);
   }
 
   // 3. 加载项目文档上下文
   let overviewContent = '';
   let relatedDocs = {};
+  const loadedDocs = [];
 
   if (rootDir) {
     const aiDocsDir = path.join(rootDir, 'ai-docs');
@@ -95,6 +101,7 @@ async function useCommand(options = {}) {
     const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
     if (fs.existsSync(overviewPath)) {
       overviewContent = fs.readFileSync(overviewPath, 'utf8');
+      loadedDocs.push('OVERVIEW.md');
     }
 
     // 加载相关子项目文档
@@ -103,6 +110,7 @@ async function useCommand(options = {}) {
         const docPath = path.join(aiDocsDir, `${alias}.md`);
         if (fs.existsSync(docPath)) {
           relatedDocs[`${alias}.md`] = fs.readFileSync(docPath, 'utf8');
+          loadedDocs.push(`${alias}.md`);
         }
       }
     }
@@ -111,6 +119,7 @@ async function useCommand(options = {}) {
     const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
     if (fs.existsSync(contractsPath)) {
       relatedDocs['api-contracts.md'] = fs.readFileSync(contractsPath, 'utf8');
+      loadedDocs.push('api-contracts.md');
     }
   }
 
@@ -119,7 +128,8 @@ async function useCommand(options = {}) {
     taskDescription: taskDescription || '',
     overviewContent,
     relatedDocs,
-    template: selectedScenario.template
+    template: selectedScenario.template,
+    language
   });
 
   // 5. 敏感信息过滤
@@ -141,7 +151,10 @@ async function useCommand(options = {}) {
     matchedScenario,
     confidence,
     scenarioName: selectedScenario.name,
-    compactInfo
+    compactInfo,
+    matchMethod,
+    aiReason,
+    loadedDocs
   };
 }
 

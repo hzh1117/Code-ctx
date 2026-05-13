@@ -1,4 +1,6 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
 
 module.exports = function(rootDir) {
@@ -15,11 +17,22 @@ module.exports = function(rootDir) {
 
   router.put('/', (req, res) => {
     try {
-      const fs = require('fs');
-      const path = require('path');
       const configPath = path.join(rootDir, 'code-ctx.config.js');
       const newConfig = req.body;
-      
+
+      if (!newConfig || typeof newConfig !== 'object') {
+        return res.status(400).json({ error: '配置必须是一个对象' });
+      }
+
+      // Backup before writing
+      if (fs.existsSync(configPath)) {
+        try {
+          fs.copyFileSync(configPath, configPath + '.bak');
+        } catch (backupErr) {
+          console.warn('配置备份失败:', backupErr.message);
+        }
+      }
+
       fs.writeFileSync(configPath, `module.exports = ${JSON.stringify(newConfig, null, 2)};\n`);
       res.json({ success: true });
     } catch (err) {

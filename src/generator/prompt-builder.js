@@ -1,20 +1,56 @@
 const { renderTemplate, loadTemplate } = require('../template/engine');
 
-function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template }) {
+const LABELS = {
+  zh: {
+    part1: '【第一部分：项目上下文】',
+    readPrompt: '请先阅读以下项目文档，建立上下文，读完回复"已就绪"：',
+    overview: '=== 系统总览 ===',
+    projectRelation: '=== 项目关系 ===',
+    part2: '【第二部分：任务模板】',
+    taskHint: '（请根据以下任务描述执行开发）',
+    otherDocs: '其他子项目文档摘要（供参考）：',
+    projectName: '项目名称',
+    projectType: '项目类型',
+    projectPath: '项目路径',
+    dirStructure: '目录结构',
+    keyFiles: '关键文件'
+  },
+  en: {
+    part1: '[Part 1: Project Context]',
+    readPrompt: 'Please read the following project documents to establish context, reply "Ready" when done:',
+    overview: '=== System Overview ===',
+    projectRelation: '=== Project Relations ===',
+    part2: '[Part 2: Task Template]',
+    taskHint: '(Please implement based on the following task description)',
+    otherDocs: 'Other sub-project document summaries (for reference):',
+    projectName: 'Project Name',
+    projectType: 'Project Type',
+    projectPath: 'Project Path',
+    dirStructure: 'Directory Structure',
+    keyFiles: 'Key Files'
+  }
+};
+
+function getLabels(language) {
+  return LABELS[language] || LABELS.zh;
+}
+
+function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template, language }) {
+  const labels = getLabels(language);
   const parts = [];
 
-  parts.push('【第一部分：项目上下文】');
-  parts.push('请先阅读以下项目文档，建立上下文，读完回复"已就绪"：');
+  parts.push(labels.part1);
+  parts.push(labels.readPrompt);
   parts.push('');
 
   if (overviewContent) {
-    parts.push('=== 系统总览 ===');
+    parts.push(labels.overview);
     parts.push(overviewContent);
     parts.push('');
   }
 
   if (projectContext) {
-    parts.push('=== 项目关系 ===');
+    parts.push(labels.projectRelation);
     parts.push(projectContext);
     parts.push('');
   }
@@ -27,8 +63,8 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
     }
   }
 
-  parts.push('【第二部分：任务模板】');
-  parts.push('（请根据以下任务描述执行开发）');
+  parts.push(labels.part2);
+  parts.push(labels.taskHint);
   parts.push('');
 
   if (template) {
@@ -44,7 +80,9 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
   return parts.join('\n');
 }
 
-function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs }) {
+function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs, language }) {
+  const labels = getLabels(language);
+
   if (type === 'overview') {
     const configObj = config || {};
     const projectSummaries = (configObj.projects || []).map(p => {
@@ -54,7 +92,7 @@ function buildInitPrompt({ project, scanResult, type, config, generatedDocs, pro
       return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
     }).join('\n');
 
-    const tpl = loadTemplate('scan-prompt-overview.md');
+    const tpl = loadTemplate('scan-prompt-overview.md', language);
     return renderTemplate(tpl, {
       projectName: configObj.projectName || '',
       projectList: (configObj.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n'),
@@ -68,18 +106,18 @@ function buildInitPrompt({ project, scanResult, type, config, generatedDocs, pro
     const projectSections = projectList.map(p => {
       const result = results[p.alias] || {};
       return `## ${p.alias}
-项目名称：${p.name}
-项目类型：${p.type}
-项目路径：${p.path}
+${labels.projectName}：${p.name}
+${labels.projectType}：${p.type}
+${labels.projectPath}：${p.path}
 
-目录结构：
+${labels.dirStructure}：
 ${result.tree || ''}
 
-关键文件：
+${labels.keyFiles}：
 ${(result.keyFiles || []).join('\n')}`;
     }).join('\n\n---\n\n');
 
-    const tpl = loadTemplate('scan-prompt-one-shot.md');
+    const tpl = loadTemplate('scan-prompt-one-shot.md', language);
     return renderTemplate(tpl, { projectSections });
   }
 
@@ -88,7 +126,7 @@ ${(result.keyFiles || []).join('\n')}`;
 
   let otherDocsSection = '';
   if (otherDocs && Object.keys(otherDocs).length > 0) {
-    otherDocsSection = '其他子项目文档摘要（供参考）：';
+    otherDocsSection = labels.otherDocs;
     for (const [alias, doc] of Object.entries(otherDocs)) {
       const lines = doc.split('\n');
       const summary = lines.slice(0, 15).join('\n');
@@ -96,7 +134,7 @@ ${(result.keyFiles || []).join('\n')}`;
     }
   }
 
-  const tpl = loadTemplate('scan-prompt.md');
+  const tpl = loadTemplate('scan-prompt.md', language);
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',
     projectType: projectObj.type || '',
@@ -107,4 +145,4 @@ ${(result.keyFiles || []).join('\n')}`;
   });
 }
 
-module.exports = { buildUsePrompt, buildInitPrompt };
+module.exports = { buildUsePrompt, buildInitPrompt, getLabels };

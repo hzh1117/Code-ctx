@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const { readFileUTF8 } = require('./file-reader');
+
 const DEFAULT_PATTERNS = [
   { pattern: /(password\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
   { pattern: /(secret\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
@@ -8,7 +12,8 @@ const DEFAULT_PATTERNS = [
   { pattern: /AKIA[0-9A-Z]{16}/g, replacement: '[FILTERED]' },
   { pattern: /Bearer\s+[A-Za-z0-9\-._~+\/]{20,}/gi, replacement: 'Bearer [FILTERED]' },
   { pattern: /[?&](key|token|secret|api_key|access_token)=([^&\s]{8,})/gi, replacement: (match, p1) => match[0] + p1 + '=[FILTERED]' },
-  { pattern: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/gi, replacement: '$1://[FILTERED]' }
+  { pattern: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/gi, replacement: '$1://[FILTERED]' },
+  { pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1\s+PRIVATE\s+KEY-----/g, replacement: '[FILTERED SSH PRIVATE KEY]' }
 ];
 
 const DETECTION_PATTERNS = [
@@ -21,7 +26,8 @@ const DETECTION_PATTERNS = [
   { regex: /AKIA[0-9A-Z]{16}/, name: 'aws_access_key' },
   { regex: /Bearer\s+[A-Za-z0-9\-._~+\/]{20,}/i, name: 'bearer_token' },
   { regex: /[?&](key|token|secret|api_key|access_token)=([^&\s]{8,})/i, name: 'url_key_param' },
-  { regex: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/i, name: 'connection_string' }
+  { regex: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/i, name: 'connection_string' },
+  { regex: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/i, name: 'ssh_private_key' }
 ];
 
 function filterSensitive(content, customPatterns = []) {
@@ -41,4 +47,25 @@ function filterSensitive(content, customPatterns = []) {
   return { content: result, count };
 }
 
-module.exports = { filterSensitive, DETECTION_PATTERNS };
+function scanDirectory(dir) {
+  const warnings = [];
+  if (!fs.existsSync(dir)) return warnings;
+
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+
+  for (const file of files) {
+    try {
+      const content = readFileUTF8(path.join(dir, file));
+      for (const { regex, name } of DETECTION_PATTERNS) {
+        if (regex.test(content)) {
+          warnings.push({ file, field: name });
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+  return warnings;
+}
+
+module.exports = { filterSensitive, DETECTION_PATTERNS, scanDirectory };

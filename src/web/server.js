@@ -1,11 +1,16 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { localhostOnly, tokenAuth } = require('./middleware/security');
 
 function createServer(rootDir) {
   const app = express();
 
   app.use(express.json());
+
+  // Security middleware
+  app.use('/api', localhostOnly);
+  app.use('/api', tokenAuth);
 
   // API 路由
   app.use('/api/config', require('./api/config')(rootDir));

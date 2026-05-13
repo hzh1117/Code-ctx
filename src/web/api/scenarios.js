@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
+const { filterSensitive } = require('../../utils/sensitive-filter');
 
 module.exports = function(rootDir) {
   const router = express.Router();
@@ -54,11 +55,12 @@ module.exports = function(rootDir) {
   router.post('/generate-prompt', (req, res) => {
     try {
       const { task, scenario } = req.body;
+      const safeTask = filterSensitive(task || '').content;
       const config = loadProjectConfig(rootDir);
       
       res.json({ 
         success: true, 
-        prompt: `任务: ${task}\n场景: ${scenario || '默认'}` 
+        prompt: `任务: ${safeTask}\n场景: ${scenario || '默认'}` 
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

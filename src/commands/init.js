@@ -4,10 +4,10 @@ const { detectProjects } = require('../scanner/project-detector');
 const { scanProject, estimateTokens } = require('../scanner/file-scanner');
 const { getAIConfig } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
-const { filterSensitive, DETECTION_PATTERNS } = require('../utils/sensitive-filter');
-const { readFileUTF8 } = require('../utils/file-reader');
+const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
+const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
 
 function loadInitState(outputDir) {
   const statePath = path.join(outputDir, STATE_FILES.INIT_STATE);
@@ -26,28 +26,11 @@ function saveInitState(outputDir, state) {
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
-function detectSensitiveInDir(dir) {
-  const warnings = [];
-  if (!fs.existsSync(dir)) return warnings;
-
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
-
-  for (const file of files) {
-    try {
-      const content = readFileUTF8(path.join(dir, file));
-      for (const { regex, name } of DETECTION_PATTERNS) {
-        if (regex.test(content)) {
-          warnings.push({ file, field: name });
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-  return warnings;
-}
-
 async function initCommand(rootDir, options = {}) {
+  if (!fs.existsSync(rootDir)) {
+    throw new Error(`目录不存在: ${rootDir}`);
+  }
+
   console.log('🔍 扫描项目结构...');
 
   const projects = detectProjects(rootDir);
@@ -86,6 +69,7 @@ async function initCommand(rootDir, options = {}) {
   saveInitState(outputDir, state);
 
   // 生成配置文件
+  const defaultExcludeDirs = ['node_modules', '.git', 'dist', 'build', 'ai-docs'];
   const config = {
     projectName: path.basename(rootDir),
     outputDir: './ai-docs',
@@ -96,7 +80,7 @@ async function initCommand(rootDir, options = {}) {
       type: p.type,
       label: p.name
     })),
-    excludeDirs: ['node_modules', '.git', 'dist', 'build', 'ai-docs'],
+    excludeDirs: defaultExcludeDirs,
     gitTrack: true
   };
 
@@ -171,41 +155,64 @@ async function initCommand(rootDir, options = {}) {
           saveInitState(outputDir, state);
         } else {
           // BATCH: 逐个生成
-          for (const project of projects) {
-            if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
+          if (strategy === 'BATCH_MINIMAL') {
+            // BATCH_MINIMAL: 可并行生成（不需要其他子项目文档作为上下文）
+            const pendingProjects = projects.filter(p =>
+              !(state.projects[p.alias]?.status === 'completed' && !options.force)
+            );
 
-            console.log(`\n生成 ${project.alias}.md...`);
-            try {
-              let projectPrompt;
-              if (strategy === 'BATCH_WITH_CONTEXT') {
-                // 带其他子项目摘要
+            console.log(`\n并行生成 ${pendingProjects.length} 个子项目文档...`);
+            const results = await Promise.allSettled(
+              pendingProjects.map(async (project) => {
+                const projectPrompt = buildInitPrompt({
+                  project,
+                  scanResult: scanResults[project.alias]
+                });
+                const doc = await generateWithAI(projectPrompt, aiConfig);
+                const safeDoc = filterSensitive(doc).content;
+                fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
+                return { alias: project.alias, doc: safeDoc };
+              })
+            );
+
+            for (const result of results) {
+              if (result.status === 'fulfilled') {
+                generatedDocs[result.value.alias] = result.value.doc;
+                state.projects[result.value.alias] = { status: 'completed' };
+              } else {
+                console.error(`  ⚠️ 生成失败:`, result.reason?.message);
+                failedDocs.push({ error: result.reason?.message });
+              }
+            }
+            saveInitState(outputDir, state);
+          } else {
+            // BATCH_WITH_CONTEXT: 串行生成（需要其他子项目文档作为上下文）
+            for (const project of projects) {
+              if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
+
+              console.log(`\n生成 ${project.alias}.md...`);
+              try {
                 const otherDocs = Object.fromEntries(
                   Object.entries(generatedDocs).filter(([k]) => k !== project.alias)
                 );
-                projectPrompt = buildInitPrompt({
+                const projectPrompt = buildInitPrompt({
                   project,
                   scanResult: scanResults[project.alias],
                   otherDocs
                 });
-              } else {
-                // BATCH_MINIMAL: 不带其他子项目内容
-                projectPrompt = buildInitPrompt({
-                  project,
-                  scanResult: scanResults[project.alias]
-                });
-              }
 
-              const doc = await generateWithAI(projectPrompt, aiConfig);
-              const safeDoc = filterSensitive(doc).content;
-              fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
-              generatedDocs[project.alias] = safeDoc;
-              state.projects[project.alias] = { status: 'completed' };
-              saveInitState(outputDir, state);
-            } catch (err) {
-              console.error(`  ⚠️ ${project.alias}.md 生成失败:`, err.message);
-              failedDocs.push({ alias: project.alias, error: err.message });
-              state.projects[project.alias] = { status: 'failed', error: err.message };
-              saveInitState(outputDir, state);
+                const doc = await generateWithAI(projectPrompt, aiConfig);
+                const safeDoc = filterSensitive(doc).content;
+                fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
+                generatedDocs[project.alias] = safeDoc;
+                state.projects[project.alias] = { status: 'completed' };
+                saveInitState(outputDir, state);
+              } catch (err) {
+                console.error(`  ⚠️ ${project.alias}.md 生成失败:`, err.message);
+                failedDocs.push({ alias: project.alias, error: err.message });
+                state.projects[project.alias] = { status: 'failed', error: err.message };
+                saveInitState(outputDir, state);
+              }
             }
           }
         }
@@ -230,7 +237,7 @@ async function initCommand(rootDir, options = {}) {
   }
 
   // 敏感信息检查
-  const sensitiveWarnings = detectSensitiveInDir(outputDir);
+  const sensitiveWarnings = scanDirectory(outputDir);
   if (sensitiveWarnings.length > 0) {
     console.log('\n⚠️ 检测到 ai-docs/ 中可能包含敏感信息：');
     sensitiveWarnings.forEach(w => {
@@ -246,8 +253,10 @@ async function initCommand(rootDir, options = {}) {
 
   // 写入 .last-scan.json 供 update 命令使用
   const lastScanPath = path.join(outputDir, STATE_FILES.LAST_SCAN);
+  const commitHash = hasGitRepo(rootDir) ? getCurrentCommitHash(rootDir) : null;
   fs.writeFileSync(lastScanPath, JSON.stringify({
     timestamp: Date.now(),
+    lastCommitHash: commitHash,
     projects: projects.map(p => p.alias)
   }, null, 2));
 

@@ -1,11 +1,12 @@
 const https = require('https');
 const http = require('http');
+const { AI_CLIENT } = require('../utils/constants');
 
-const DEFAULT_TIMEOUT = 180000; // 180 秒超时
-const MAX_RETRIES = 3; // 最多重试 3 次
-const RETRYABLE_ERRORS = ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ENOTFOUND'];
-const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
-const BASE_RETRY_DELAY = 2000;
+const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
+const MAX_RETRIES = AI_CLIENT.MAX_RETRIES;
+const RETRYABLE_ERRORS = AI_CLIENT.RETRYABLE_ERRORS;
+const RETRYABLE_STATUS_CODES = AI_CLIENT.RETRYABLE_STATUS_CODES;
+const BASE_RETRY_DELAY = AI_CLIENT.BASE_RETRY_DELAY;
 
 function getRetryDelay(retries, res) {
   const retryAfter = res?.headers?.['retry-after'];
@@ -63,12 +64,14 @@ async function callOpenAI(prompt, options, retries = 0) {
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            reject(new Error(json.error.message));
+            reject(new Error(`[${res.statusCode}] ${json.error.message}`));
+          } else if (!json.choices || !json.choices[0]) {
+            reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
           } else {
             resolve(json.choices[0].message.content);
           }
         } catch (e) {
-          reject(new Error(`解析响应失败: ${data}`));
+          reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
         }
       });
     });
@@ -156,12 +159,14 @@ async function callAnthropic(prompt, options, retries = 0) {
         try {
           const json = JSON.parse(data);
           if (json.error) {
-            reject(new Error(json.error.message));
+            reject(new Error(`[${res.statusCode}] ${json.error.message}`));
+          } else if (!json.content || !json.content[0]) {
+            reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
           } else {
             resolve(json.content[0].text);
           }
         } catch (e) {
-          reject(new Error(`解析响应失败: ${data}`));
+          reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
         }
       });
     });

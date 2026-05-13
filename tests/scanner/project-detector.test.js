@@ -45,7 +45,7 @@ describe('detectProjects', () => {
     const projectDir = path.join(testDir, 'vue3-admin');
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', '@element-plus': '^2.0.0' }
+      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
     }));
 
     const projects = detectProjects(testDir);

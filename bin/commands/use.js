@@ -3,6 +3,7 @@ const { input, confirm, select } = require('@inquirer/prompts');
 const { useCommand } = require('../../src/commands/use');
 const { writeToClipboard } = require('../../src/utils/clipboard');
 const { addTask } = require('../../src/utils/task-history');
+const { getAIConfig } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
@@ -49,15 +50,23 @@ const use = new Command('use')
   .argument('[task]', '任务描述')
   .option('-s, --scenario <id>', '指定场景 ID（不指定则自动匹配）')
   .option('-n, --non-interactive', '非交互模式，跳过占位符填写，直接复制到剪贴板')
+  .option('--no-ai-match', '跳过 AI 辅助场景匹配，仅使用关键词匹配')
+  .option('-l, --language <lang>', 'Prompt 语言 (zh/en)', 'zh')
   .option('--stdout', '输出到 stdout 而非剪贴板')
   .option('--out <file>', '输出到指定文件')
   .action(async (task, options) => {
     try {
       const rootDir = process.cwd();
+      const aiConfig = getAIConfig(rootDir);
+      const language = options.language || 'zh';
+
       let result = await useCommand({
         taskDescription: task,
         scenario: options.scenario,
-        rootDir
+        rootDir,
+        aiConfig,
+        noAiMatch: !!options.noAiMatch,
+        language
       });
 
       // 低置信度：让用户手动选择场景
@@ -74,13 +83,24 @@ const use = new Command('use')
         result = await useCommand({
           taskDescription: task,
           scenario: selectedId,
-          rootDir
+          rootDir,
+          aiConfig,
+          noAiMatch: !!options.noAiMatch,
+          language
         });
       }
 
       if (!options.scenario && !result.lowConfidenceScenarios) {
-        console.log(`✓ 识别为：场景 ${result.matchedScenario}（${result.scenarioName}）置信度 ${result.confidence}%`);
-        if (result.confidence < 100) {
+        const methodTag = result.matchMethod === 'ai' ? ' (AI 辅助)' : '';
+        console.log(`✓ 识别为：场景 ${result.matchedScenario}（${result.scenarioName}）置信度 ${result.confidence}%${methodTag}`);
+        if (result.aiReason) {
+          console.log(`  AI 判断理由：${result.aiReason}`);
+        }
+        if (result.loadedDocs && result.loadedDocs.length > 0) {
+          console.log('  已加载文档：');
+          result.loadedDocs.forEach(doc => console.log(`    ✓ ${doc}`));
+        }
+        if (result.confidence < 100 && result.matchMethod === 'keyword') {
           console.log('  不对？使用 -s 参数指定场景，如：code-ctx use -s B "任务描述"');
         }
       }
@@ -101,7 +121,9 @@ const use = new Command('use')
           scenario: result.matchedScenario,
           projects: result.relatedProjects || []
         });
-      } catch {}
+      } catch (err) {
+        console.warn(`⚠ 记录任务历史失败: ${err.message}`);
+      }
 
       if (!options.nonInteractive) {
         console.log('\n提示：粘贴后记得补充具体需求细节');

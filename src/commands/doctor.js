@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { DETECTION_PATTERNS } = require('../utils/sensitive-filter');
+const { DETECTION_PATTERNS, scanDirectory } = require('../utils/sensitive-filter');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadConfigWithVM } = require('../utils/config');
@@ -8,6 +8,7 @@ const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
+const { defaultRegistry } = require('../adapters');
 
 function checkSectionIntegrity(aiDocsDir) {
   const issues = [];
@@ -169,8 +170,8 @@ function checkDocsVsActual(rootDir) {
           message: `${project.alias}.md 目录结构与实际不符（匹配 ${Math.round(dirMentionRate * 100)}%）`
         });
       }
-    } catch {
-      // 扫描失败，跳过
+    } catch (err) {
+      console.warn(`  ⚠ 扫描 ${project.alias} 失败: ${err.message}`);
     }
   }
 
@@ -179,71 +180,57 @@ function checkDocsVsActual(rootDir) {
 
 function extractRoutesFromCode(projectDir, projectType) {
   const routes = [];
+  const { globSync } = require('glob');
 
   try {
-    if (projectType === 'java-backend') {
-      // Java: 提取 @RequestMapping, @GetMapping, @PostMapping 等
-      const { globSync } = require('glob');
-      const controllerFiles = globSync('**/controller/**/*.java', { cwd: projectDir, absolute: true });
+    // Use adapter scanPatterns to find relevant files
+    const patterns = defaultRegistry.getScanPatterns(projectType);
+    if (patterns.length === 0) return routes;
 
-      for (const file of controllerFiles) {
-        const content = readFileUTF8(file);
+    const files = [];
+    for (const pattern of patterns) {
+      const matches = globSync(pattern, { cwd: projectDir, absolute: true, nodir: true });
+      files.push(...matches);
+    }
+    const uniqueFiles = [...new Set(files)];
+
+    for (const file of uniqueFiles) {
+      const content = readFileUTF8(file);
+      const basename = path.basename(file);
+
+      // Java: @RequestMapping, @GetMapping, etc.
+      if (basename.endsWith('.java')) {
         const classMapping = content.match(/@RequestMapping\(["']([^"']+)["']\)/)?.[1] || '';
-
         const methodMappings = content.matchAll(/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*(?:\(\s*)?(?:["']([^"']+)["'])?/g);
         for (const match of methodMappings) {
           const method = match[1].replace('Mapping', '').toUpperCase();
           const subPath = match[2] || '';
           const fullPath = (classMapping + '/' + subPath).replace(/\/+/g, '/');
-          routes.push({ method: method === 'REQUEST' ? 'GET' : method, path: fullPath, file: path.basename(file) });
+          routes.push({ method: method === 'REQUEST' ? 'GET' : method, path: fullPath, file: basename });
         }
       }
-    } else if (projectType === 'node-backend') {
-      // Node.js: 提取 router.get/post 等
-      const { globSync } = require('glob');
-      const routeFiles = globSync('routes/*.js', { cwd: projectDir, absolute: true });
 
-      for (const file of routeFiles) {
-        const content = readFileUTF8(file);
+      // Node.js: router.get/post etc.
+      if (basename.endsWith('.js') || basename.endsWith('.ts')) {
         const matches = content.matchAll(/router\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
-          routes.push({ method: match[1].toUpperCase(), path: match[2], file: path.basename(file) });
+          routes.push({ method: match[1].toUpperCase(), path: match[2], file: basename });
         }
       }
-    } else if (projectType === 'python-backend') {
-      // Python Django/Flask: 提取 url patterns
-      const { globSync } = require('glob');
-      const urlFiles = globSync('**/urls.py', { cwd: projectDir, absolute: true });
 
-      for (const file of urlFiles) {
-        const content = readFileUTF8(file);
+      // Python: path() in urls.py
+      if (basename === 'urls.py') {
         const matches = content.matchAll(/path\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
-          routes.push({ method: 'ANY', path: '/' + match[1], file: path.basename(file) });
+          routes.push({ method: 'ANY', path: '/' + match[1], file: basename });
         }
       }
     }
-  } catch {
+  } catch (err) {
     // 解析失败
   }
 
   return routes;
-}
-
-function checkSensitiveInfo(aiDocsDir) {
-  const warnings = [];
-  if (!fs.existsSync(aiDocsDir)) return warnings;
-
-  const files = fs.readdirSync(aiDocsDir).filter(f => f.endsWith('.md'));
-  for (const file of files) {
-    const content = readFileUTF8(path.join(aiDocsDir, file));
-    for (const { regex, name } of DETECTION_PATTERNS) {
-      if (regex.test(content)) {
-        warnings.push({ file, field: name, message: `${file} 可能包含敏感信息 (${name})` });
-      }
-    }
-  }
-  return warnings;
 }
 
 async function doctorCommand(rootDir, options = {}) {
@@ -340,10 +327,10 @@ async function doctorCommand(rootDir, options = {}) {
 
   // 7. 敏感信息检查
   console.log('\n🔒 检查敏感信息...');
-  const sensitiveWarnings = checkSensitiveInfo(aiDocsDir);
+  const sensitiveWarnings = scanDirectory(aiDocsDir);
   for (const w of sensitiveWarnings) {
-    warnings.push(w);
-    console.log(`  ⚠️ ${w.message}`);
+    warnings.push({ ...w, message: `${w.file} 可能包含敏感信息 (${w.field})` });
+    console.log(`  ⚠️ ${w.file} 可能包含敏感信息 (${w.field})`);
   }
 
   // 8. 输出统计
@@ -445,8 +432,8 @@ async function doctorFix(rootDir, options = {}) {
             reason = `文档过期（仅匹配 ${Math.round(mentionRate * 100)}%）`;
           }
         }
-      } catch {
-        // 扫描失败
+      } catch (err) {
+        // 扫描失败，跳过
       }
     }
 

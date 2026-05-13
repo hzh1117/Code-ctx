@@ -8,7 +8,9 @@
   },
   "scripts": {
     "test": "jest",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "dashboard": "concurrently \"npm run api\" \"cd web && npm run dev\"",
+    "api": "node -e \"const { startServer } = require('./src/web/server'); startServer(process.cwd(), 3456);\""
   },
   "keywords": [
     "cli",
@@ -26,6 +28,8 @@
     "chardet": "^1.6.0",
     "clipboardy": "^3.0.0",
     "commander": "^11.0.0",
+    "concurrently": "^9.2.1",
+    "express": "^5.2.1",
     "glob": "^10.0.0",
     "iconv-lite": "^0.6.3"
   },

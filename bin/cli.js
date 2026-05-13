@@ -16,6 +16,7 @@ program.addCommand(require('./commands/update'));
 program.addCommand(require('./commands/fix'));
 program.addCommand(require('./commands/status'));
 program.addCommand(require('./commands/doctor'));
+program.addCommand(require('./commands/dashboard'));
 
 program
   .command('help')

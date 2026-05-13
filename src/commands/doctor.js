@@ -6,6 +6,7 @@ const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
+const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
 function checkSectionIntegrity(aiDocsDir) {
@@ -22,7 +23,7 @@ function checkSectionIntegrity(aiDocsDir) {
   // 检查已有文档的章节完整性
   const files = fs.readdirSync(aiDocsDir).filter(f => f.endsWith('.md'));
   for (const file of files) {
-    const content = fs.readFileSync(path.join(aiDocsDir, file), 'utf8');
+    const content = readFileUTF8(path.join(aiDocsDir, file));
     const lines = content.split('\n');
 
     // 检查是否有实质内容（不只是标题）
@@ -137,7 +138,7 @@ function checkDocsVsActual(rootDir) {
       if (!fs.existsSync(projectDir)) continue;
 
       const scanResult = scanProject(projectDir, project.type);
-      const docContent = fs.readFileSync(docPath, 'utf8');
+      const docContent = readFileUTF8(docPath);
 
       // 检查关键文件是否在文档中被提及
       const keyFileNames = scanResult.keyFiles
@@ -191,7 +192,7 @@ function extractRoutesFromCode(projectDir, projectType) {
       const controllerFiles = globSync('**/controller/**/*.java', { cwd: projectDir, absolute: true });
 
       for (const file of controllerFiles) {
-        const content = fs.readFileSync(file, 'utf8');
+        const content = readFileUTF8(file);
         const classMapping = content.match(/@RequestMapping\(["']([^"']+)["']\)/)?.[1] || '';
 
         const methodMappings = content.matchAll(/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*(?:\(\s*)?(?:["']([^"']+)["'])?/g);
@@ -208,7 +209,7 @@ function extractRoutesFromCode(projectDir, projectType) {
       const routeFiles = globSync('routes/*.js', { cwd: projectDir, absolute: true });
 
       for (const file of routeFiles) {
-        const content = fs.readFileSync(file, 'utf8');
+        const content = readFileUTF8(file);
         const matches = content.matchAll(/router\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
           routes.push({ method: match[1].toUpperCase(), path: match[2], file: path.basename(file) });
@@ -220,7 +221,7 @@ function extractRoutesFromCode(projectDir, projectType) {
       const urlFiles = globSync('**/urls.py', { cwd: projectDir, absolute: true });
 
       for (const file of urlFiles) {
-        const content = fs.readFileSync(file, 'utf8');
+        const content = readFileUTF8(file);
         const matches = content.matchAll(/path\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
           routes.push({ method: 'ANY', path: '/' + match[1], file: path.basename(file) });
@@ -240,7 +241,7 @@ function checkSensitiveInfo(aiDocsDir) {
 
   const files = fs.readdirSync(aiDocsDir).filter(f => f.endsWith('.md'));
   for (const file of files) {
-    const content = fs.readFileSync(path.join(aiDocsDir, file), 'utf8');
+    const content = readFileUTF8(path.join(aiDocsDir, file));
     for (const { regex, name } of DETECTION_PATTERNS) {
       if (regex.test(content)) {
         warnings.push({ file, field: name, message: `${file} 可能包含敏感信息 (${name})` });
@@ -327,7 +328,7 @@ async function doctorCommand(rootDir, options = {}) {
         // 检查 api-contracts.md 是否记录了这些路由
         const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
         if (fs.existsSync(contractsPath)) {
-          const contractsContent = fs.readFileSync(contractsPath, 'utf8');
+          const contractsContent = readFileUTF8(contractsPath);
           const unrecorded = routes.filter(r => !contractsContent.includes(r.path));
           if (unrecorded.length > 0) {
             warnings.push({
@@ -440,7 +441,7 @@ async function doctorFix(rootDir, options = {}) {
       try {
         if (fs.existsSync(projectDir)) {
           const scanResult = scanProject(projectDir, project.type);
-          const docContent = fs.readFileSync(docPath, 'utf8');
+          const docContent = readFileUTF8(docPath);
           const keyFileNames = scanResult.keyFiles
             .map(f => path.basename(f))
             .filter(name => !['package.json', 'pom.xml', 'build.gradle'].includes(name));
@@ -492,7 +493,7 @@ async function doctorFix(rootDir, options = {}) {
       for (const project of projects) {
         const docPath = path.join(aiDocsDir, `${project.alias}.md`);
         if (fs.existsSync(docPath)) {
-          generatedDocs[project.alias] = fs.readFileSync(docPath, 'utf8');
+          generatedDocs[project.alias] = readFileUTF8(docPath);
         }
       }
 

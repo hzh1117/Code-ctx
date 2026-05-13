@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { extractSection, replaceSection, listSections } = require('../core/section');
+const { readFileUTF8 } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
 
 function getFileHash(filePath) {
@@ -33,7 +34,7 @@ function findRelatedDoc(rootDir, changedFile) {
   const docs = fs.readdirSync(aiDocsDir).filter(f => f.endsWith('.md'));
   for (const doc of docs) {
     if (doc === 'OVERVIEW.md') continue;
-    const docContent = fs.readFileSync(path.join(aiDocsDir, doc), 'utf8');
+    const docContent = readFileUTF8(path.join(aiDocsDir, doc));
     const dirName = path.dirname(changedFile).split(path.sep)[0];
     if (docContent.includes(dirName)) {
       return { name: doc, content: docContent };
@@ -95,7 +96,7 @@ function buildSectionUpdatePrompts(rootDir, changedFiles) {
  * @param {Array<{sectionName: string, newContent: string}>} updates
  */
 function applySectionUpdates(docPath, updates) {
-  let content = fs.readFileSync(docPath, 'utf8');
+  let content = readFileUTF8(docPath);
   for (const { sectionName, newContent } of updates) {
     content = replaceSection(content, sectionName, newContent);
   }

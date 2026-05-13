@@ -5,6 +5,7 @@ const { scanProject, estimateTokens } = require('../scanner/file-scanner');
 const { getAIConfig } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive, DETECTION_PATTERNS } = require('../utils/sensitive-filter');
+const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
 const STRATEGY_THRESHOLDS = {
@@ -36,11 +37,15 @@ function detectSensitiveInDir(dir) {
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
 
   for (const file of files) {
-    const content = fs.readFileSync(path.join(dir, file), 'utf8');
-    for (const { regex, name } of DETECTION_PATTERNS) {
-      if (regex.test(content)) {
-        warnings.push({ file, field: name });
+    try {
+      const content = readFileUTF8(path.join(dir, file));
+      for (const { regex, name } of DETECTION_PATTERNS) {
+        if (regex.test(content)) {
+          warnings.push({ file, field: name });
+        }
       }
+    } catch {
+      continue;
     }
   }
   return warnings;

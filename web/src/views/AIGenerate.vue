@@ -215,13 +215,21 @@ export default {
         this.generating = false;
       }
     },
-    copyPrompt() {
-      navigator.clipboard.writeText(this.generatedPrompt);
-      this.showToast('已复制到剪贴板', 'success');
+    async copyPrompt() {
+      try {
+        await navigator.clipboard.writeText(this.generatedPrompt);
+        this.showToast('已复制到剪贴板', 'success');
+      } catch {
+        this.showToast('复制失败，请手动复制', 'error');
+      }
     },
-    copyResponse() {
-      navigator.clipboard.writeText(this.aiResponse);
-      this.showToast('已复制响应到剪贴板', 'success');
+    async copyResponse() {
+      try {
+        await navigator.clipboard.writeText(this.aiResponse);
+        this.showToast('已复制响应到剪贴板', 'success');
+      } catch {
+        this.showToast('复制失败，请手动复制', 'error');
+      }
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };

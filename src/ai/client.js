@@ -132,7 +132,9 @@ async function callAnthropic(prompt, options, retries = 0) {
       }
     };
 
-    const req = https.request(url, {
+    const protocol = url.protocol === 'https:' ? https : http;
+
+    const req = protocol.request(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

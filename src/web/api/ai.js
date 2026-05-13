@@ -143,8 +143,9 @@ module.exports = function(rootDir) {
   });
 
 function updateEnvValue(content, key, value) {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (content.includes(key + '=')) {
-    return content.replace(new RegExp(`${key}=.*`, 'g'), `${key}=${value}`);
+    return content.replace(new RegExp(`${escapedKey}=.*`, 'g'), `${key}=${value}`);
   } else {
     if (content && !content.endsWith('\n')) {
       content += '\n';

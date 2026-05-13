@@ -15,7 +15,8 @@ function loadEnvConfig(rootDir) {
   envContent.split('\n').forEach(line => {
     const [key, ...valueParts] = line.split('=');
     if (key && !key.startsWith('#')) {
-      config[key.trim()] = valueParts.join('=').trim();
+      const rawValue = valueParts.join('=').trim();
+      config[key.trim()] = rawValue.replace(/^["']|["']$/g, '');
     }
   });
   
@@ -114,15 +115,11 @@ function getAIConfig(rootDir) {
   // 如果项目目录没有配置，尝试读取工具目录的配置
   if (!envConfig.ANTHROPIC_AUTH_TOKEN && !envConfig.ANTHROPIC_API_KEY && !envConfig.OPENAI_API_KEY) {
     const toolDir = getToolDirectory();
-    console.log('工具目录:', toolDir);
-    
     if (toolDir && toolDir !== rootDir) {
       const toolEnvConfig = loadEnvConfig(toolDir);
-      console.log('工具目录配置:', toolEnvConfig);
       
       if (toolEnvConfig.ANTHROPIC_AUTH_TOKEN || toolEnvConfig.ANTHROPIC_API_KEY || toolEnvConfig.OPENAI_API_KEY) {
         envConfig = { ...toolEnvConfig, ...envConfig };
-        console.log('合并后的配置:', envConfig);
       }
     }
   }
@@ -231,8 +228,8 @@ function saveAIConfig(rootDir, aiConfig) {
 
   const legacyProvider = providerFromLegacy(aiConfig, protocol);
   const providers = {
-    openai: protocol === 'openai' ? normalizeProviderConfig({ ...openai, ...legacyProvider }, 'openai') : openai,
-    anthropic: protocol === 'anthropic' ? normalizeProviderConfig({ ...anthropic, ...legacyProvider }, 'anthropic') : anthropic
+    openai: (!aiConfig.openai && protocol === 'openai') ? normalizeProviderConfig({ ...openai, ...legacyProvider }, 'openai') : openai,
+    anthropic: (!aiConfig.anthropic && protocol === 'anthropic') ? normalizeProviderConfig({ ...anthropic, ...legacyProvider }, 'anthropic') : anthropic
   };
 
   const nextConfig = {

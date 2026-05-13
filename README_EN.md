@@ -191,18 +191,26 @@ code-ctx status
 
 ### `code-ctx doctor`
 
-Check document health status.
+Check document health status, supports auto-fix.
 
 ```bash
 code-ctx doctor              # Basic check
-code-ctx doctor --strict     # Strict mode (parse code to compare routes)
+code-ctx doctor --strict     # Strict mode (parse code routes)
+code-ctx doctor --fix        # Auto-fix documents (calls AI)
+code-ctx doctor --fix --force  # Force regenerate all documents
 ```
 
 **Check Items:**
-- Whether required chapters are complete
-- OVERVIEW consistency with configuration
-- API endpoint count statistics
+- Configuration vs actual directory consistency (unconfigured sub-projects)
+- Document completeness (content volume, required sections)
+- Document vs code consistency (key file mention rate, directory structure match)
 - Whether passwords, keys, or other sensitive information are included
+- API route record completeness (strict mode)
+
+**Auto-Fix (`--fix`):**
+- Detects outdated documents (key file mention rate < 30%)
+- Regenerates missing or outdated sub-project documents
+- Regenerates OVERVIEW.md
 
 ### `code-ctx dashboard`
 
@@ -383,7 +391,8 @@ code-ctx fix web --dry-run  # Only generate prompt, don't call AI
 ### Q: How to check if documents leak sensitive information?
 
 ```bash
-code-ctx doctor
+code-ctx doctor             # Check document health
+code-ctx doctor --fix       # Auto-fix outdated/missing documents
 ```
 
 ### Q: Is multi-person collaboration supported?

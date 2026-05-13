@@ -191,18 +191,26 @@ code-ctx status
 
 ### `code-ctx doctor`
 
-检查文档健康状态。
+检查文档健康状态，支持自动修复。
 
 ```bash
 code-ctx doctor              # 基本检查
-code-ctx doctor --strict     # 严格模式（解析代码对比路由）
+code-ctx doctor --strict     # 严格模式（解析代码路由）
+code-ctx doctor --fix        # 自动修复文档（调用 AI）
+code-ctx doctor --fix --force  # 强制重新生成所有文档
 ```
 
 **检查项目：**
-- 必要章节是否完整
-- OVERVIEW 与配置的一致性
-- API 接口数量统计
+- 配置与实际目录的一致性（未配置的子项目）
+- 文档完整性（内容量、必要章节）
+- 文档与代码的一致性（关键文件提及率、目录结构匹配）
 - 是否包含密码、密钥等敏感信息
+- API 路由记录完整性（严格模式）
+
+**自动修复（`--fix`）：**
+- 检测过期文档（关键文件提及率 < 30%）
+- 重新生成缺失或过期的子项目文档
+- 重新生成 OVERVIEW.md
 
 ### `code-ctx dashboard`
 
@@ -383,7 +391,8 @@ code-ctx fix web --dry-run  # 只生成 prompt，不调用 AI
 ### Q: 如何检查文档是否泄露敏感信息？
 
 ```bash
-code-ctx doctor
+code-ctx doctor             # 检查文档健康
+code-ctx doctor --fix       # 自动修复过期/缺失的文档
 ```
 
 ### Q: 支持多人协作吗？

@@ -12,10 +12,14 @@ Code-ctx 是一个 CLI 工具，帮助 AI 编程助手（如 Claude、ChatGPT、
 ## 特性
 
 - 🔍 **智能项目探测** - 自动识别 8 种项目类型（Vue、React、Java、Go 等）
-- 📝 **场景化模板** - 根据开发场景（新功能、修 Bug、重构等）生成定制 prompt
-- 🔄 **增量更新** - 只更新变化的文件，保持文档最新
-- 🏥 **健康检查** - 检测文档完整性和敏感信息泄露
-- 🖥️ **Web 管理** - 可视化配置和管理
+- 🧠 **智能场景匹配** - 描述任务自动匹配最佳开发场景，无需手动选择
+- 📝 **场景化模板** - 8 种开发场景（新功能、修 Bug、重构等）生成定制 prompt
+- 📄 **文档自动注入** - 自动加载 OVERVIEW 和相关子项目文档，AI 无需手动指定
+- 🔄 **增量更新** - 只更新变化的文件，生成增量更新 prompt
+- 🏥 **健康检查** - 检测文档完整性、OVERVIEW 一致性和敏感信息泄露
+- 💾 **容错机制** - init 中断后可续跑，自动跳过已完成的子项目
+- 🖥️ **Web 管理** - 可视化配置、场景模板、文档状态管理
+- 📋 **剪贴板降级** - 超大内容写入失败时自动降级到文件输出
 - 🔒 **安全优先** - 自动过滤敏感信息（密码、密钥等）
 - 🤖 **AI API 集成** - 兼容 OpenAI 和 Anthropic 协议，支持 DeepSeek、Kimi、MiniMax 等
 
@@ -41,19 +45,32 @@ code-ctx init
 - 扫描项目结构
 - 检测子项目类型
 - 生成 `ai-docs/` 目录和配置文件
+- 自动检查敏感信息泄露
+
+支持选项：
+- `--skip-ai` - 跳过 AI 文档生成，只扫描项目结构
+- `--force` - 强制重新生成，忽略已完成状态
 
 ### 2. 生成 Prompt
 
 ```bash
-# 手动选择场景
-code-ctx use
-
-# 或直接描述任务
+# 智能模式：描述任务，自动匹配场景
 code-ctx use "新增用户登录功能"
 
-# 指定场景
+# 手动指定场景
 code-ctx use -s B "商户后台新增优惠券管理"
+
+# 输出到文件
+code-ctx use "任务描述" --out prompt.md
+
+# 输出到终端
+code-ctx use "任务描述" --stdout
 ```
+
+智能模式会：
+1. 分析任务描述，自动匹配最佳场景（A-H）
+2. 加载 OVERVIEW.md 和相关子项目文档
+3. 组装完整的 prompt 并复制到剪贴板
 
 ### 3. 粘贴到 AI 工具
 
@@ -61,16 +78,16 @@ code-ctx use -s B "商户后台新增优惠券管理"
 
 ## 命令列表
 
-| 命令 | 说明 |
-|------|------|
-| `code-ctx init` | 初始化项目 |
-| `code-ctx use [task]` | 生成开发 prompt |
-| `code-ctx update` | 检测变化，更新文档 |
-| `code-ctx fix <alias>` | 重新生成指定子项目的文档 |
-| `code-ctx status` | 查看文档状态 |
-| `code-ctx doctor` | 检查文档健康 |
-| `code-ctx dashboard` | 打开 Web 管理页面 |
-| `code-ctx help` | 显示帮助信息 |
+| 命令 | 说明 | 选项 |
+|------|------|------|
+| `code-ctx init` | 初始化项目 | `--skip-ai`, `--force` |
+| `code-ctx use [task]` | 生成开发 prompt | `-s <场景>`, `--stdout`, `--out <文件>` |
+| `code-ctx update` | 检测变化，更新文档 | `--dry-run`, `--stdout` |
+| `code-ctx fix <alias>` | 重新生成指定子项目的文档 | `--dry-run` |
+| `code-ctx status` | 查看文档状态 | |
+| `code-ctx doctor` | 检查文档健康 | `--strict` |
+| `code-ctx dashboard` | 打开 Web 管理页面 | `-p <端口>` |
+| `code-ctx help` | 显示帮助信息 | |
 
 ## 支持的项目类型
 
@@ -184,16 +201,19 @@ code-ctx use "任务描述"
 # 启动 Web 界面
 code-ctx dashboard
 
+# 指定端口
+code-ctx dashboard -p 8080
+
 # 自动打开 http://localhost:3456
 ```
 
 功能：
-- 可视化配置管理
-- 场景模板编辑
-- 敏感字段管理
-- Prompt 预览和生成
-- AI 配置和测试
-- AI 文档生成
+- **配置管理** (`/`) - 可视化编辑项目配置
+- **AI 配置** (`/ai`) - 配置大模型 API 连接
+- **AI 生成** (`/ai-generate`) - 选择场景生成 prompt 并调用 AI
+- **子项目** (`/projects`) - 查看检测到的子项目列表
+- **场景模板** (`/scenarios`) - 查看 A-H 场景模板
+- **文档状态** (`/status`) - 查看 ai-docs 各文档状态
 
 ## AI API 集成
 
@@ -275,11 +295,14 @@ code-ctx dashboard
 ### Q: 如何更新文档？
 
 ```bash
-# 自动检测变化并更新
+# 自动检测变化并生成增量更新 prompt
 code-ctx update
 
-# 强制重新生成某个子项目的文档
+# 强制重新生成某个子项目的文档（调用 AI）
 code-ctx fix web
+
+# 只生成 prompt，不调用 AI
+code-ctx fix web --dry-run
 ```
 
 ### Q: 如何检查文档是否泄露敏感信息？
@@ -290,7 +313,29 @@ code-ctx doctor
 
 会检测：
 - 必要章节是否完整
+- OVERVIEW 与配置的一致性
+- API 接口数量统计
 - 是否包含密码、密钥等敏感信息
+
+### Q: init 中断了怎么办？
+
+重新运行 `code-ctx init`，已完成的子项目会自动跳过：
+
+```bash
+# 正常续跑
+code-ctx init
+
+# 强制全部重新生成
+code-ctx init --force
+```
+
+### Q: 剪贴板写入失败怎么办？
+
+工具会自动降级到文件输出（`.ai-prompt.md`），也可以主动使用文件输出：
+
+```bash
+code-ctx use "任务描述" --out prompt.md
+```
 
 ### Q: 如何自定义场景模板？
 
@@ -338,17 +383,18 @@ code-ctx dashboard
 code-ctx/
 ├── bin/              # CLI 入口
 │   ├── cli.js
-│   └── commands/     # 命令实现
+│   └── commands/     # 命令定义
 ├── src/              # 核心代码
-│   ├── commands/     # 业务逻辑
-│   ├── scanner/      # 项目扫描
+│   ├── commands/     # 命令实现
+│   ├── scanner/      # 项目探测、文件扫描
+│   ├── generator/    # prompt 组装器
 │   ├── template/     # 模板引擎
 │   ├── matcher/      # 场景匹配
-│   ├── ai/           # AI 调用
+│   ├── ai/           # AI 调用封装
 │   ├── web/          # Web 服务
-│   └── utils/        # 工具函数
-├── templates/        # 内置模板
-├── web/              # 前端代码
+│   └── utils/        # 工具函数（编码、剪贴板、敏感过滤等）
+├── templates/        # 内置场景模板
+├── web/              # 前端代码（Vue 3）
 └── tests/            # 测试文件
 ```
 

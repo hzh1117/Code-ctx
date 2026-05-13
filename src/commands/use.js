@@ -123,13 +123,13 @@ async function useCommand(options = {}) {
   });
 
   // 5. 敏感信息过滤
-  prompt = filterSensitive(prompt);
+  prompt = filterSensitive(prompt).content;
 
   // 6. 精简模式：超过阈值时自动压缩
   let compactInfo = null;
   if (prompt.length > COMPACT_THRESHOLD) {
     const result = compactPrompt(prompt, taskDescription, selectedScenario.template, overviewContent, relatedDocs);
-    prompt = filterSensitive(result.prompt);
+    prompt = filterSensitive(result.prompt).content;
     compactInfo = {
       originalLength: result.originalLength,
       compactLength: result.compactLength

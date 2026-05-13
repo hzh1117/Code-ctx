@@ -466,7 +466,7 @@ async function doctorFix(rootDir, options = {}) {
       const scanResult = scanProject(projectDir, project.type);
       const prompt = buildInitPrompt({ project, scanResult });
       const doc = await generateWithAI(prompt, aiConfig);
-      const safeDoc = filterSensitive(doc);
+      const safeDoc = filterSensitive(doc).content;
       fs.writeFileSync(docPath, safeDoc);
       console.log(`    ✓ 已重新生成 ${project.alias}.md`);
       fixedCount++;
@@ -490,7 +490,7 @@ async function doctorFix(rootDir, options = {}) {
 
       const overviewPrompt = buildInitPrompt({ type: 'overview', config, generatedDocs });
       const overview = await generateWithAI(overviewPrompt, aiConfig);
-      fs.writeFileSync(overviewPath, filterSensitive(overview));
+      fs.writeFileSync(overviewPath, filterSensitive(overview).content);
       console.log('    ✓ 已生成 OVERVIEW.md');
       fixedCount++;
     } catch (err) {

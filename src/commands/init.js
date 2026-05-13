@@ -152,7 +152,7 @@ async function initCommand(rootDir, options = {}) {
             type: 'one-shot'
           });
           const allDocs = await generateWithAI(allPrompt, aiConfig);
-          const safeDocs = filterSensitive(allDocs);
+          const safeDocs = filterSensitive(allDocs).content;
 
           // 拆分各子项目文档
           for (const project of projects) {
@@ -196,7 +196,7 @@ async function initCommand(rootDir, options = {}) {
               }
 
               const doc = await generateWithAI(projectPrompt, aiConfig);
-              const safeDoc = filterSensitive(doc);
+              const safeDoc = filterSensitive(doc).content;
               fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
               generatedDocs[project.alias] = safeDoc;
               state.projects[project.alias] = { status: 'completed' };
@@ -220,7 +220,7 @@ async function initCommand(rootDir, options = {}) {
             generatedDocs
           });
           const overview = await generateWithAI(overviewPrompt, aiConfig);
-          fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), filterSensitive(overview));
+          fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), filterSensitive(overview).content);
           console.log(`\n✓ 成功生成 ${successCount} 个子项目文档 + OVERVIEW.md`);
         }
       }

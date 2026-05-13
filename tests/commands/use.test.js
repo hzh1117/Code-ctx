@@ -157,7 +157,7 @@ describe('useCommand', () => {
 
       expect(result.prompt).not.toContain('abc123');
       expect(result.prompt).not.toContain('secret_token_value');
-      expect(result.prompt).toContain('[REDACTED]');
+      expect(result.prompt).toContain('[FILTERED]');
     });
   });
 

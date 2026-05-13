@@ -37,7 +37,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
     console.log(`正在重新生成 ${projectAlias}.md...`);
     try {
       const doc = await generateWithAI(prompt, aiConfig);
-      const safeDoc = filterSensitive(doc);
+      const safeDoc = filterSensitive(doc).content;
 
       const docDir = path.join(rootDir, config.outputDir || 'ai-docs');
       if (!fs.existsSync(docDir)) {

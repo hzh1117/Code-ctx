@@ -1,8 +1,20 @@
 const https = require('https');
 const http = require('http');
 
-const DEFAULT_TIMEOUT = 60000; // 60 秒超时
-const MAX_RETRIES = 2; // 最多重试 2 次
+const DEFAULT_TIMEOUT = 180000; // 180 秒超时
+const MAX_RETRIES = 3; // 最多重试 3 次
+const RETRYABLE_ERRORS = ['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ENOTFOUND'];
+const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+const BASE_RETRY_DELAY = 2000;
+
+function getRetryDelay(retries, res) {
+  const retryAfter = res?.headers?.['retry-after'];
+  if (retryAfter) {
+    const parsed = parseInt(retryAfter, 10);
+    if (!isNaN(parsed)) return parsed * 1000;
+  }
+  return BASE_RETRY_DELAY * Math.pow(2, retries) + Math.random() * 1000;
+}
 
 async function callOpenAI(prompt, options, retries = 0) {
   const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
@@ -17,6 +29,19 @@ async function callOpenAI(prompt, options, retries = 0) {
   });
 
   return new Promise((resolve, reject) => {
+    let retried = false;
+    const doRetry = (reason, res) => {
+      if (retried) return;
+      retried = true;
+      if (retries < MAX_RETRIES) {
+        const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
+        console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+      } else {
+        reject(new Error(reason));
+      }
+    };
+
     const req = protocol.request(url, {
       method: 'POST',
       headers: {
@@ -28,6 +53,13 @@ async function callOpenAI(prompt, options, retries = 0) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
+          retried = true;
+          const delay = getRetryDelay(retries, res);
+          console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
+          setTimeout(() => callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+          return;
+        }
         try {
           const json = JSON.parse(data);
           if (json.error) {
@@ -44,18 +76,17 @@ async function callOpenAI(prompt, options, retries = 0) {
     req.on('timeout', () => {
       req.destroy();
       if (retries < MAX_RETRIES) {
-        console.log(`请求超时，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
-        callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject);
+        doRetry(`请求超时 (${timeout}ms)`);
       } else {
         reject(new Error(`请求超时 (${timeout}ms)`));
       }
     });
 
     req.on('error', (err) => {
-      if (retries < MAX_RETRIES && err.code === 'ETIMEDOUT') {
-        console.log(`连接失败，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
-        callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject);
-      } else {
+      const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
+      if (retries < MAX_RETRIES && isRetryable) {
+        doRetry(`连接失败 (${err.code || err.message})`);
+      } else if (!retried) {
         reject(err);
       }
     });
@@ -88,6 +119,19 @@ async function callAnthropic(prompt, options, retries = 0) {
   });
 
   return new Promise((resolve, reject) => {
+    let retried = false;
+    const doRetry = (reason, res) => {
+      if (retried) return;
+      retried = true;
+      if (retries < MAX_RETRIES) {
+        const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
+        console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
+        setTimeout(() => callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+      } else {
+        reject(new Error(reason));
+      }
+    };
+
     const req = https.request(url, {
       method: 'POST',
       headers: {
@@ -100,6 +144,13 @@ async function callAnthropic(prompt, options, retries = 0) {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
+          retried = true;
+          const delay = getRetryDelay(retries, res);
+          console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
+          setTimeout(() => callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+          return;
+        }
         try {
           const json = JSON.parse(data);
           if (json.error) {
@@ -116,18 +167,17 @@ async function callAnthropic(prompt, options, retries = 0) {
     req.on('timeout', () => {
       req.destroy();
       if (retries < MAX_RETRIES) {
-        console.log(`请求超时，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
-        callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject);
+        doRetry(`请求超时 (${timeout}ms)`);
       } else {
         reject(new Error(`请求超时 (${timeout}ms)`));
       }
     });
 
     req.on('error', (err) => {
-      if (retries < MAX_RETRIES && err.code === 'ETIMEDOUT') {
-        console.log(`连接失败，正在重试 (${retries + 1}/${MAX_RETRIES})...`);
-        callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject);
-      } else {
+      const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
+      if (retries < MAX_RETRIES && isRetryable) {
+        doRetry(`连接失败 (${err.code || err.message})`);
+      } else if (!retried) {
         reject(err);
       }
     });

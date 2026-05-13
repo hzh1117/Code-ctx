@@ -56,21 +56,39 @@ async function initCommand(rootDir, options = {}) {
         console.log('\n⚠️ 未配置 API Key，请先在 .env 文件中配置');
         console.log('然后运行: code-ctx use "生成项目文档"');
       } else {
-        // 生成 OVERVIEW.md
-        console.log('\n生成 OVERVIEW.md...');
-        const overviewPrompt = generateOverviewPrompt(config, scanResults);
-        const overview = await generateWithAI(overviewPrompt, aiConfig);
-        fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), overview);
-        
-        // 生成各子项目文档
+        // 生成各子项目文档（OVERVIEW 依赖它们，必须先生成）
+        const generatedDocs = {};
+        const failedDocs = [];
         for (const project of projects) {
-          console.log(`生成 ${project.alias}.md...`);
-          const projectPrompt = generateProjectPrompt(project, scanResults[project.alias]);
-          const doc = await generateWithAI(projectPrompt, aiConfig);
-          fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
+          console.log(`\n生成 ${project.alias}.md...`);
+          try {
+            const projectPrompt = generateProjectPrompt(project, scanResults[project.alias]);
+            const doc = await generateWithAI(projectPrompt, aiConfig);
+            fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
+            generatedDocs[project.alias] = doc;
+          } catch (err) {
+            console.error(`  ⚠️ ${project.alias}.md 生成失败:`);
+            console.error(err);
+            failedDocs.push({ alias: project.alias, error: err.message });
+          }
         }
-        
-        console.log('\n✓ 文档生成完成！');
+
+        if (failedDocs.length > 0) {
+          console.log(`\n⚠️ ${failedDocs.length} 个子项目文档生成失败:`);
+          failedDocs.forEach(f => console.log(`  - ${f.alias}: ${f.error}`));
+        }
+
+        const successCount = Object.keys(generatedDocs).length;
+        if (successCount > 0) {
+          // 生成 OVERVIEW.md（最后生成，因为它依赖所有子项目文档）
+          console.log('\n生成 OVERVIEW.md...');
+          const overviewPrompt = generateOverviewPrompt(config, scanResults, generatedDocs);
+          const overview = await generateWithAI(overviewPrompt, aiConfig);
+          fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), overview);
+          console.log(`\n✓ 成功生成 ${successCount} 个子项目文档 + OVERVIEW.md`);
+        } else {
+          console.log('\n⚠️ 所有子项目文档均生成失败，跳过 OVERVIEW.md');
+        }
       }
     } catch (err) {
       console.error('\n❌ 文档生成失败:', err.message);
@@ -88,16 +106,26 @@ async function initCommand(rootDir, options = {}) {
   return { projects, config };
 }
 
-function generateOverviewPrompt(config, scanResults) {
+function generateOverviewPrompt(config, scanResults, generatedDocs) {
+  const projectSummaries = config.projects.map(p => {
+    const doc = generatedDocs[p.alias] || '';
+    const lines = doc.split('\n');
+    const summary = lines.slice(0, 20).join('\n');
+    return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
+  }).join('\n');
+
   return `请为以下项目生成一个总览文档（OVERVIEW.md）。
 
 项目名称：${config.projectName}
 子项目列表：
 ${config.projects.map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n')}
 
+已生成的子项目文档摘要：
+${projectSummaries}
+
 请生成以下内容：
 1. 项目概述（一句话描述）
-2. 子项目列表及其职责
+2. 子项目列表及其职责（基于上方摘要）
 3. 技术栈说明
 4. 项目关系图（哪个前端调用哪个后端）
 

@@ -17,7 +17,7 @@ describe('updateCommand', () => {
   test('should detect changed files', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     const relativePath = path.relative(testDir, path.join(testDir, 'src/index.js'));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan'), JSON.stringify({
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
       timestamp: new Date().toISOString(),
       files: { [relativePath]: 'abc123' }
     }));
@@ -35,7 +35,7 @@ describe('updateCommand', () => {
     const hash = require('crypto').createHash('md5').update('content').digest('hex');
     const relativePath = path.relative(testDir, filePath);
     
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan'), JSON.stringify({
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
       timestamp: new Date().toISOString(),
       files: { [relativePath]: hash }
     }));
@@ -50,7 +50,7 @@ describe('updateCommand', () => {
     
     await updateCommand(testDir, { dryRun: false });
     
-    const lastScanPath = path.join(testDir, 'ai-docs/.last-scan');
+    const lastScanPath = path.join(testDir, 'ai-docs/.last-scan.json');
     expect(fs.existsSync(lastScanPath)).toBe(true);
   });
 

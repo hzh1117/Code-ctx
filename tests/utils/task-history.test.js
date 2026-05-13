@@ -4,7 +4,7 @@ const path = require('path');
 
 describe('task-history', () => {
   const testDir = path.join(__dirname, '../fixtures/history-test');
-  const historyPath = path.join(testDir, '.task-history.jsonl');
+  const historyPath = path.join(testDir, 'ai-docs', '.task-history.jsonl');
   
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });

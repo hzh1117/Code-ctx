@@ -3,7 +3,7 @@ const path = require('path');
 const { DETECTION_PATTERNS } = require('../utils/sensitive-filter');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
-const { getAIConfig } = require('../utils/config');
+const { getAIConfig, loadConfigWithVM } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
@@ -59,12 +59,7 @@ function checkDocsVsCode(rootDir) {
 
   let config;
   try {
-    const configContent = fs.readFileSync(configPath, 'utf8');
-    // 使用 vm 模块安全执行配置文件
-    const vm = require('vm');
-    const sandbox = { module: { exports: {} }, exports: {} };
-    vm.runInNewContext(configContent, sandbox, { filename: configPath });
-    config = sandbox.module.exports;
+    config = loadConfigWithVM(configPath);
   } catch {
     issues.push({ type: 'config-error', message: 'code-ctx.config.js 解析失败' });
     return issues;
@@ -120,7 +115,7 @@ function checkDocsVsActual(rootDir) {
 
   let config;
   try {
-    config = require(configPath);
+    config = loadConfigWithVM(configPath);
   } catch {
     return issues;
   }
@@ -396,11 +391,7 @@ async function doctorFix(rootDir, options = {}) {
 
   let config;
   try {
-    const configContent = fs.readFileSync(configPath, 'utf8');
-    const vm = require('vm');
-    const sandbox = { module: { exports: {} }, exports: {} };
-    vm.runInNewContext(configContent, sandbox, { filename: configPath });
-    config = sandbox.module.exports;
+    config = loadConfigWithVM(configPath);
   } catch {
     console.log('❌ code-ctx.config.js 解析失败');
     return;

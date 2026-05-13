@@ -5,8 +5,9 @@ const { matchScenario } = require('../matcher/scenario-matcher');
 const { buildUsePrompt } = require('../generator/prompt-builder');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { extractSection } = require('../core/section');
+const { PROMPT_MAX_CHARS } = require('../utils/constants');
 
-const COMPACT_THRESHOLD = 8000;
+const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
 const LOW_CONFIDENCE_THRESHOLD = 50;
 
 function compactPrompt(prompt, taskDescription, template, overviewContent, relatedDocs) {

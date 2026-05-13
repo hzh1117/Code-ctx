@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { extractSection, replaceSection, listSections } = require('../core/section');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
+const { STATE_FILES } = require('../utils/constants');
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
@@ -104,7 +105,7 @@ function applySectionUpdates(docPath, updates) {
 }
 
 async function updateCommand(rootDir, options = {}) {
-  const lastScanPath = path.join(rootDir, 'ai-docs/.last-scan.json');
+  const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 
   let lastScan = { timestamp: null, files: {} };
   if (fs.existsSync(lastScanPath)) {

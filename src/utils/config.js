@@ -45,6 +45,21 @@ function loadProjectConfig(rootDir) {
   return module.exports;
 }
 
+function loadConfigWithVM(configPath) {
+  const code = fs.readFileSync(configPath, 'utf8');
+  const module = { exports: {} };
+  const sandbox = {
+    module,
+    exports: module.exports,
+    require,
+    process,
+    __dirname: path.dirname(configPath),
+    __filename: configPath
+  };
+  vm.runInNewContext(code, sandbox, { filename: configPath });
+  return module.exports;
+}
+
 const DEFAULT_PROVIDER_CONFIG = {
   openai: {
     baseUrl: 'https://api.openai.com/v1',
@@ -250,4 +265,4 @@ function saveAIConfig(rootDir, aiConfig) {
   return nextConfig.ai;
 }
 
-module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, saveAIConfig, getAIProviders };
+module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, loadConfigWithVM, saveAIConfig, getAIProviders };

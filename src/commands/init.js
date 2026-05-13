@@ -7,14 +7,10 @@ const { generateWithAI } = require('../ai/client');
 const { filterSensitive, DETECTION_PATTERNS } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
-
-const STRATEGY_THRESHOLDS = {
-  ONE_SHOT_MAX: 60000,
-  BATCH_WITH_CONTEXT_MAX: 200000
-};
+const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 
 function loadInitState(outputDir) {
-  const statePath = path.join(outputDir, '.init-state.json');
+  const statePath = path.join(outputDir, STATE_FILES.INIT_STATE);
   if (fs.existsSync(statePath)) {
     try {
       return JSON.parse(fs.readFileSync(statePath, 'utf8'));
@@ -26,7 +22,7 @@ function loadInitState(outputDir) {
 }
 
 function saveInitState(outputDir, state) {
-  const statePath = path.join(outputDir, '.init-state.json');
+  const statePath = path.join(outputDir, STATE_FILES.INIT_STATE);
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
@@ -130,9 +126,9 @@ async function initCommand(rootDir, options = {}) {
 
     // 选择策略
     let strategy;
-    if (totalTokens < STRATEGY_THRESHOLDS.ONE_SHOT_MAX) {
+    if (totalTokens < TOKEN_THRESHOLDS.ONE_SHOT) {
       strategy = 'ONE_SHOT';
-    } else if (totalTokens <= STRATEGY_THRESHOLDS.BATCH_WITH_CONTEXT_MAX) {
+    } else if (totalTokens <= TOKEN_THRESHOLDS.BATCH) {
       strategy = 'BATCH_WITH_CONTEXT';
     } else {
       strategy = 'BATCH_MINIMAL';
@@ -249,7 +245,7 @@ async function initCommand(rootDir, options = {}) {
   saveInitState(outputDir, state);
 
   // 写入 .last-scan.json 供 update 命令使用
-  const lastScanPath = path.join(outputDir, '.last-scan.json');
+  const lastScanPath = path.join(outputDir, STATE_FILES.LAST_SCAN);
   fs.writeFileSync(lastScanPath, JSON.stringify({
     timestamp: Date.now(),
     projects: projects.map(p => p.alias)

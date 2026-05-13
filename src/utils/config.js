@@ -114,10 +114,15 @@ function getAIConfig(rootDir) {
   // 如果项目目录没有配置，尝试读取工具目录的配置
   if (!envConfig.ANTHROPIC_AUTH_TOKEN && !envConfig.ANTHROPIC_API_KEY && !envConfig.OPENAI_API_KEY) {
     const toolDir = getToolDirectory();
+    console.log('工具目录:', toolDir);
+    
     if (toolDir && toolDir !== rootDir) {
       const toolEnvConfig = loadEnvConfig(toolDir);
+      console.log('工具目录配置:', toolEnvConfig);
+      
       if (toolEnvConfig.ANTHROPIC_AUTH_TOKEN || toolEnvConfig.ANTHROPIC_API_KEY || toolEnvConfig.OPENAI_API_KEY) {
         envConfig = { ...toolEnvConfig, ...envConfig };
+        console.log('合并后的配置:', envConfig);
       }
     }
   }

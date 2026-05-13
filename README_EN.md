@@ -63,7 +63,12 @@ cd web && npm install && npm run build && cd ..
 
 # Link globally
 npm link
+
+# Start Web dashboard (optional)
+code-ctx dashboard
 ```
+
+Access `http://localhost:3456` for visual configuration, AI generation, document status management, and more.
 
 ### Verify
 
@@ -271,23 +276,6 @@ code-ctx use "Task description" --stdout | claude
 code-ctx use "Task description"
 # Open browser, Ctrl+V to paste
 ```
-
-## Web Dashboard
-
-```bash
-code-ctx dashboard
-```
-
-Access `http://localhost:3456`:
-
-- **Configuration** — Visual project config editing
-- **AI Config** — Tab-based OpenAI/Anthropic setup with connection testing
-- **AI Generate** — Split-pane: scenario selection + prompt generation + AI calls
-- **Sub-projects** — Card view of detected sub-projects
-- **Scenario Templates** — Browse and preview all 8 scenario templates
-- **Document Status** — Table view of document health (OK / Needs Update / Missing)
-
-Design: Terminal industrial aesthetic, dark/light theme, Outfit + JetBrains Mono fonts, CSS variables.
 
 ## Architecture
 

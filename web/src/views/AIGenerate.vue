@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page page-generate">
     <header class="page-header">
       <div>
         <h1 class="page-title">AI 生成</h1>
@@ -8,134 +8,93 @@
     </header>
 
     <div class="generate-layout">
-      <!-- Input Section -->
-      <div class="input-section">
+      <div class="input-col">
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               生成配置
             </h2>
           </div>
-
           <div class="form-stack">
             <div class="input-group">
-              <label class="input-label">选择场景</label>
+              <label class="input-label">scenario</label>
               <select v-model="selectedScenario" class="input">
-                <option v-for="s in scenarios" :key="s.id" :value="s.id">
-                  {{ s.id }} - {{ s.name }}
-                </option>
+                <option v-for="s in scenarios" :key="s.id" :value="s.id">{{ s.id }} - {{ s.name }}</option>
               </select>
             </div>
-
             <div class="input-group">
-              <label class="input-label">
-                任务描述
-                <span class="required">*</span>
-              </label>
-              <textarea 
-                v-model="taskDescription" 
-                class="input textarea" 
-                placeholder="描述你要开发的功能，例如：新增用户登录功能，支持手机号和邮箱登录"
-                rows="4"
+              <label class="input-label">task <span class="required">*</span></label>
+              <textarea
+                v-model="taskDescription"
+                class="input textarea"
+                placeholder="描述你要开发的功能..."
+                rows="5"
               ></textarea>
             </div>
-
-            <button 
-              class="btn btn-primary btn-generate" 
-              @click="generate" 
-              :disabled="generating || !taskDescription"
-            >
-              <svg v-if="!generating" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              <div v-else class="btn-spinner"></div>
+            <button class="btn btn-primary btn-generate" @click="generate" :disabled="generating || !taskDescription">
+              <span v-if="generating" class="btn-spinner"></span>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               {{ generating ? '生成中...' : '生成 Prompt' }}
             </button>
           </div>
         </div>
 
-        <!-- Generated Prompt -->
-        <transition name="slide-fade">
-          <div v-if="generatedPrompt" class="card">
-            <div class="card-header">
-              <h2 class="card-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
-                生成的 Prompt
-              </h2>
-              <button class="btn btn-secondary btn-sm" @click="copyPrompt">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
+        <div v-if="generatedPrompt" class="card prompt-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Generated Prompt
+            </h2>
+            <button class="btn btn-secondary btn-sm" @click="copyPrompt">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              复制
+            </button>
+          </div>
+          <div class="code-block prompt-block">{{ generatedPrompt }}</div>
+        </div>
+      </div>
+
+      <div class="output-col">
+        <div class="card output-card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              AI 响应
+            </h2>
+            <div class="response-meta" v-if="aiResponse">
+              <span class="badge badge-success">done</span>
+              <button class="btn btn-secondary btn-sm" @click="copyResponse">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 复制
               </button>
             </div>
-            <div class="prompt-content">
-              <pre>{{ generatedPrompt }}</pre>
-            </div>
-          </div>
-        </transition>
-      </div>
-
-      <!-- Output Section -->
-      <div class="output-section">
-        <div class="card card-output">
-          <div class="card-header">
-            <h2 class="card-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              AI 响应
-            </h2>
-            <div class="response-actions" v-if="aiResponse">
-              <span class="badge badge-success">已完成</span>
-              <button class="btn btn-secondary btn-sm" @click="copyResponse">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-                复制响应
-              </button>
-            </div>
           </div>
 
-          <div v-if="aiResponse" class="response-content">
-            <div class="response-text">{{ aiResponse }}</div>
+          <div v-if="aiResponse" class="response-body">
+            <pre class="response-text">{{ aiResponse }}</pre>
           </div>
 
           <div v-else-if="generating" class="response-loading">
-            <div class="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
+            <div class="loading-dots">
+              <span></span><span></span><span></span>
             </div>
-            <p>AI 正在思考中...</p>
+            <span class="mono-dim">processing...</span>
           </div>
 
-          <div v-else class="empty-state">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            <h3>等待生成</h3>
-            <p>配置场景和任务描述后，点击生成按钮</p>
+          <div v-else class="response-empty">
+            <div class="term-prompt-line">
+              <span class="term-prompt">&gt;</span>
+              <span class="term-placeholder">等待任务输入...</span>
+              <span class="cursor-blink"></span>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <transition name="fade">
-      <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">
+    <transition name="page-fade">
+      <div v-if="toast.show" :class="['global-toast', `toast-${toast.type}`]">
         {{ toast.message }}
       </div>
     </transition>
@@ -154,11 +113,7 @@ export default {
       generatedPrompt: '',
       aiResponse: '',
       generating: false,
-      toast: {
-        show: false,
-        message: '',
-        type: 'success'
-      }
+      toast: { show: false, message: '', type: 'success' }
     };
   },
   async mounted() {
@@ -171,38 +126,22 @@ export default {
         this.scenarios = res.data;
       } catch (err) {
         this.scenarios = [
-          { id: 'A', name: '新增功能' },
-          { id: 'B', name: '后台功能' },
-          { id: 'C', name: '平台功能' },
-          { id: 'D', name: '数据模型' },
-          { id: 'E', name: '修改功能' },
-          { id: 'F', name: '排查 Bug' },
-          { id: 'G', name: '后端改动' },
-          { id: 'H', name: '跨端功能' }
+          { id: 'A', name: '新增功能' }, { id: 'B', name: '后台功能' },
+          { id: 'C', name: '平台功能' }, { id: 'D', name: '数据模型' },
+          { id: 'E', name: '修改功能' }, { id: 'F', name: '排查 Bug' },
+          { id: 'G', name: '后端改动' }, { id: 'H', name: '跨端功能' }
         ];
       }
     },
     async generate() {
-      if (!this.taskDescription) {
-        this.showToast('请输入任务描述', 'error');
-        return;
-      }
-
+      if (!this.taskDescription) { this.showToast('请输入任务描述', 'error'); return; }
       this.generating = true;
       this.generatedPrompt = '';
       this.aiResponse = '';
-
       try {
-        const promptRes = await axios.post('/api/generate-prompt', {
-          scenario: this.selectedScenario,
-          task: this.taskDescription
-        });
+        const promptRes = await axios.post('/api/generate-prompt', { scenario: this.selectedScenario, task: this.taskDescription });
         this.generatedPrompt = promptRes.data.prompt;
-
-        const aiRes = await axios.post('/api/ai/generate', {
-          prompt: this.generatedPrompt
-        });
-
+        const aiRes = await axios.post('/api/ai/generate', { prompt: this.generatedPrompt });
         if (aiRes.data.success) {
           this.aiResponse = aiRes.data.content;
           this.showToast('生成完成', 'success');
@@ -216,260 +155,185 @@ export default {
       }
     },
     async copyPrompt() {
-      try {
-        await navigator.clipboard.writeText(this.generatedPrompt);
-        this.showToast('已复制到剪贴板', 'success');
-      } catch {
-        this.showToast('复制失败，请手动复制', 'error');
-      }
+      try { await navigator.clipboard.writeText(this.generatedPrompt); this.showToast('已复制', 'success'); }
+      catch { this.showToast('复制失败', 'error'); }
     },
     async copyResponse() {
-      try {
-        await navigator.clipboard.writeText(this.aiResponse);
-        this.showToast('已复制响应到剪贴板', 'success');
-      } catch {
-        this.showToast('复制失败，请手动复制', 'error');
-      }
+      try { await navigator.clipboard.writeText(this.aiResponse); this.showToast('已复制', 'success'); }
+      catch { this.showToast('复制失败', 'error'); }
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => {
-        this.toast.show = false;
-      }, 3000);
+      setTimeout(() => { this.toast.show = false; }, 3000);
     }
   }
 };
 </script>
 
 <style scoped>
-.page {
-  height: calc(100vh - 64px);
-  animation: fadeIn 0.4s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.page-desc {
-  font-size: 14px;
-  color: var(--text-muted);
+.page-generate {
+  height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
 }
 
 .generate-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  height: calc(100% - 80px);
-}
-
-.input-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.output-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.card {
-  display: flex;
-  flex-direction: column;
-}
-
-.card-output {
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
   flex: 1;
+  min-height: 0;
 }
 
-.form-stack {
+.input-col {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-/* Textarea */
-.textarea {
-  min-height: 120px;
-  resize: vertical;
-  line-height: 1.6;
-}
-
-/* Generate Button */
-.btn-generate {
-  width: 100%;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.btn-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  border-top-color: var(--bg-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Prompt Content */
-.prompt-content {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  max-height: 300px;
+  gap: 16px;
   overflow-y: auto;
 }
 
-.prompt-content pre {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
+.output-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-/* Response */
-.response-actions {
+.output-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.prompt-card {
+  flex-shrink: 0;
+}
+
+.prompt-block {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.btn-generate {
+  width: 100%;
+  padding: 10px;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-dim);
+  border-top-color: var(--accent-text);
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+  display: inline-block;
+}
+
+.response-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.response-content {
+.response-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px;
 }
 
 .response-text {
-  font-size: 14px;
-  line-height: 1.8;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
   color: var(--text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* Loading */
 .response-loading {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  gap: 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 4px;
 }
 
-.response-loading p {
-  font-size: 14px;
+.loading-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.mono-dim {
+  font-family: var(--font-mono);
+  font-size: 12px;
   color: var(--text-muted);
 }
 
-.typing-indicator {
+.response-empty {
+  flex: 1;
   display: flex;
-  gap: 6px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 20px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 4px;
 }
 
-.typing-indicator span {
-  width: 8px;
-  height: 8px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  animation: bounce 1.4s infinite ease-in-out;
+.term-prompt-line {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
 }
 
-.typing-indicator span:nth-child(1) {
-  animation-delay: -0.32s;
+.term-prompt {
+  color: var(--accent);
+  margin-right: 8px;
 }
 
-.typing-indicator span:nth-child(2) {
-  animation-delay: -0.16s;
+.term-placeholder {
+  color: var(--text-muted);
 }
 
-@keyframes bounce {
-  0%, 80%, 100% {
-    transform: scale(0);
-    opacity: 0.5;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-  }
+.textarea {
+  min-height: 100px;
+  resize: vertical;
 }
 
-/* Slide Fade Transition */
-.slide-fade-enter-active {
-  transition: all 0.3s ease;
-}
-
-.slide-fade-leave-active {
-  transition: all 0.2s ease;
-}
-
-.slide-fade-enter-from {
-  transform: translateY(20px);
-  opacity: 0;
-}
-
-.slide-fade-leave-to {
-  transform: translateY(-10px);
-  opacity: 0;
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.required {
-  color: var(--danger);
-}
+.required { color: var(--danger); }
 
 @media (max-width: 768px) {
-  .page {
+  .page-generate {
     height: auto;
   }
-
   .generate-layout {
     grid-template-columns: 1fr;
     height: auto;
-  }
-
-  .response-actions {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 </style>

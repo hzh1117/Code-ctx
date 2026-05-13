@@ -12,182 +12,106 @@
       <span>加载配置中...</span>
     </div>
 
-    <div v-else class="ai-config-content">
-      <!-- 连接状态 -->
-      <div :class="['status-card', testResult?.success ? 'success' : '']">
-        <div class="status-icon">
-          <svg v-if="!testResult" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 6v6l4 2" />
-          </svg>
-          <svg v-else-if="testResult.success" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="15" y1="9" x2="9" y2="15" />
-            <line x1="9" y1="9" x2="15" y2="15" />
-          </svg>
-        </div>
-        <div class="status-info">
-          <div class="status-title">
-            {{ testResult ? (testResult.success ? '连接成功' : '连接失败') : '未测试' }}
-          </div>
-          <div class="status-desc">
-            {{ testResult ? (testResult.success ? 'API 服务正常响应' : testResult.error) : '点击"测试连接"检查 API 配置' }}
+    <div v-else class="ai-content">
+      <div class="status-bar">
+        <div class="status-segments">
+          <div class="status-seg" :class="{ active: !testResult, success: testResult?.success, fail: testResult && !testResult.success }">
+            <span class="seg-dot"></span>
+            <span class="seg-label">{{ testResult ? (testResult.success ? 'connected' : 'failed') : 'untested' }}</span>
           </div>
         </div>
-        <button class="btn btn-secondary" @click="testConnection" :disabled="testing">
-          {{ testing ? '测试中...' : '测试连接' }}
+        <div class="status-detail" v-if="testResult && !testResult.success">
+          <span class="mono-dim">{{ testResult.error }}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" @click="testConnection" :disabled="testing">
+          {{ testing ? 'testing...' : '测试连接' }}
         </button>
       </div>
 
-      <!-- API 配置 -->
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L2 7L12 12L22 7L12 2Z" />
-              <path d="M2 17L12 22L22 17" />
-              <path d="M2 12L12 17L22 12" />
-            </svg>
-            API 配置
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            协议配置
           </h2>
-        </div>
-
-        <div class="form-grid">
-          <div class="input-group">
-            <label class="input-label">当前启用协议</label>
-            <select v-model="config.protocol" class="input">
-              <option value="openai">OpenAI 兼容</option>
-              <option value="anthropic">Anthropic</option>
-            </select>
-            <span class="input-hint">
-              测试连接和 AI 生成会使用当前启用协议
-            </span>
+          <div class="protocol-tabs">
+            <button
+              :class="['tab-btn', { active: activeTab === 'openai' }]"
+              @click="activeTab = 'openai'"
+            >OpenAI 兼容</button>
+            <button
+              :class="['tab-btn', { active: activeTab === 'anthropic' }]"
+              @click="activeTab = 'anthropic'"
+            >Anthropic</button>
           </div>
         </div>
 
-        <div class="provider-grid">
-          <section class="provider-panel">
-            <div class="provider-header">
-              <div>
-                <h3 class="provider-title">OpenAI 兼容协议</h3>
-                <p class="provider-desc">适用于 OpenAI、DeepSeek、Kimi、MiniMax 等兼容 /chat/completions 的服务</p>
-              </div>
-              <span :class="['badge', config.protocol === 'openai' ? 'badge-success' : 'badge-warning']">
-                {{ config.protocol === 'openai' ? '当前启用' : '备用配置' }}
-              </span>
-            </div>
-
-            <div class="form-stack">
-              <div class="input-group">
-                <label class="input-label">API 地址</label>
-                <input 
-                  v-model="config.providers.openai.baseUrl" 
-                  class="input" 
-                  placeholder="https://api.openai.com/v1"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">模型名称</label>
-                <input 
-                  v-model="config.providers.openai.model" 
-                  class="input" 
-                  placeholder="gpt-4o-mini / deepseek-chat"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">最大 Tokens</label>
-                <input 
-                  v-model.number="config.providers.openai.maxTokens" 
-                  type="number" 
-                  class="input" 
-                  placeholder="4096"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">API Key</label>
-                <div class="input-with-action">
-                  <input 
-                    :type="showOpenAIKey ? 'text' : 'password'" 
-                    v-model="apiKeys.openai" 
-                    class="input"
-                    :placeholder="keyPlaceholders.openai"
-                  />
-                  <button class="btn btn-secondary btn-sm" @click="showOpenAIKey = !showOpenAIKey">
-                    {{ showOpenAIKey ? '隐藏' : '显示' }}
-                  </button>
-                </div>
-                <span class="input-hint">保存到 .env 的 OPENAI_API_KEY</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="provider-panel">
-            <div class="provider-header">
-              <div>
-                <h3 class="provider-title">Anthropic 协议</h3>
-                <p class="provider-desc">适用于 Claude Messages API 和 Anthropic 兼容服务</p>
-              </div>
-              <span :class="['badge', config.protocol === 'anthropic' ? 'badge-success' : 'badge-warning']">
-                {{ config.protocol === 'anthropic' ? '当前启用' : '备用配置' }}
-              </span>
-            </div>
-
-            <div class="form-stack">
-              <div class="input-group">
-                <label class="input-label">API 地址</label>
-                <input 
-                  v-model="config.providers.anthropic.baseUrl" 
-                  class="input" 
-                  placeholder="https://api.anthropic.com"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">模型名称</label>
-                <input 
-                  v-model="config.providers.anthropic.model" 
-                  class="input" 
-                  placeholder="claude-sonnet-4-5-20250929"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">最大 Tokens</label>
-                <input 
-                  v-model.number="config.providers.anthropic.maxTokens" 
-                  type="number" 
-                  class="input" 
-                  placeholder="4096"
-                />
-              </div>
-
-              <div class="input-group">
-                <label class="input-label">API Key</label>
-                <div class="input-with-action">
-                  <input 
-                    :type="showAnthropicKey ? 'text' : 'password'" 
-                    v-model="apiKeys.anthropic" 
-                    class="input"
-                    :placeholder="keyPlaceholders.anthropic"
-                  />
-                  <button class="btn btn-secondary btn-sm" @click="showAnthropicKey = !showAnthropicKey">
-                    {{ showAnthropicKey ? '隐藏' : '显示' }}
-                  </button>
-                </div>
-                <span class="input-hint">保存到 .env 的 ANTHROPIC_API_KEY</span>
-              </div>
-            </div>
-          </section>
+        <div class="active-badge" v-if="config.protocol === activeTab">
+          <span class="active-dot"></span>
+          <span class="mono-sm">当前启用</span>
         </div>
 
-        <div class="form-actions">
+        <div v-show="activeTab === 'openai'" class="form-stack">
+          <div class="input-group">
+            <label class="input-label">base_url</label>
+            <input v-model="config.providers.openai.baseUrl" class="input" placeholder="https://api.openai.com/v1" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">model</label>
+            <input v-model="config.providers.openai.model" class="input" placeholder="gpt-4o-mini" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">max_tokens</label>
+            <input v-model.number="config.providers.openai.maxTokens" type="number" class="input" placeholder="4096" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">api_key</label>
+            <div class="input-with-action">
+              <input :type="showOpenAIKey ? 'text' : 'password'" v-model="apiKeys.openai" class="input" :placeholder="keyPlaceholders.openai" />
+              <button class="btn btn-secondary btn-sm" @click="showOpenAIKey = !showOpenAIKey">
+                {{ showOpenAIKey ? '隐藏' : '显示' }}
+              </button>
+            </div>
+            <span class="input-hint">保存到 .env 的 OPENAI_API_KEY</span>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" @click="setProtocol('openai')" :disabled="config.protocol === 'openai'">
+              {{ config.protocol === 'openai' ? '已启用' : '设为启用' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-show="activeTab === 'anthropic'" class="form-stack">
+          <div class="input-group">
+            <label class="input-label">base_url</label>
+            <input v-model="config.providers.anthropic.baseUrl" class="input" placeholder="https://api.anthropic.com" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">model</label>
+            <input v-model="config.providers.anthropic.model" class="input" placeholder="claude-sonnet-4-5-20250929" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">max_tokens</label>
+            <input v-model.number="config.providers.anthropic.maxTokens" type="number" class="input" placeholder="4096" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">api_key</label>
+            <div class="input-with-action">
+              <input :type="showAnthropicKey ? 'text' : 'password'" v-model="apiKeys.anthropic" class="input" :placeholder="keyPlaceholders.anthropic" />
+              <button class="btn btn-secondary btn-sm" @click="showAnthropicKey = !showAnthropicKey">
+                {{ showAnthropicKey ? '隐藏' : '显示' }}
+              </button>
+            </div>
+            <span class="input-hint">保存到 .env 的 ANTHROPIC_API_KEY</span>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" @click="setProtocol('anthropic')" :disabled="config.protocol === 'anthropic'">
+              {{ config.protocol === 'anthropic' ? '已启用' : '设为启用' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="card-footer">
           <button class="btn btn-primary" @click="saveAll" :disabled="saving">
             {{ saving ? '保存中...' : '保存配置' }}
           </button>
@@ -195,8 +119,8 @@
       </div>
     </div>
 
-    <transition name="fade">
-      <div v-if="toast.show" :class="['toast', `toast-${toast.type}`]">
+    <transition name="page-fade">
+      <div v-if="toast.show" :class="['global-toast', `toast-${toast.type}`]">
         {{ toast.message }}
       </div>
     </transition>
@@ -211,43 +135,30 @@ export default {
     return {
       config: {},
       defaultProviders: {
-        openai: {
-          baseUrl: 'https://api.openai.com/v1',
-          model: 'gpt-4',
-          maxTokens: 4096
-        },
-        anthropic: {
-          baseUrl: 'https://api.anthropic.com',
-          model: 'claude-3-5-sonnet-20241022',
-          maxTokens: 4096
-        }
+        openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4', maxTokens: 4096 },
+        anthropic: { baseUrl: 'https://api.anthropic.com', model: 'claude-3-5-sonnet-20241022', maxTokens: 4096 }
       },
       loading: true,
       testing: false,
       saving: false,
       testResult: null,
+      activeTab: 'openai',
       showOpenAIKey: false,
       showAnthropicKey: false,
-      apiKeys: {
-        openai: '',
-        anthropic: ''
-      },
-      toast: {
-        show: false,
-        message: '',
-        type: 'success'
-      }
+      apiKeys: { openai: '', anthropic: '' },
+      toast: { show: false, message: '', type: 'success' }
     };
   },
   async mounted() {
     await this.loadConfig();
+    this.activeTab = this.config.protocol || 'openai';
   },
   computed: {
     keyPlaceholders() {
       const keys = this.config.keys || {};
       return {
-        openai: keys.openai?.apiKey ? `已配置: ${keys.openai.apiKey}` : '输入 OpenAI 兼容 API Key',
-        anthropic: keys.anthropic?.apiKey ? `已配置: ${keys.anthropic.apiKey}` : '输入 Anthropic API Key'
+        openai: keys.openai?.apiKey ? `已配置: ${keys.openai.apiKey}` : '输入 API Key',
+        anthropic: keys.anthropic?.apiKey ? `已配置: ${keys.anthropic.apiKey}` : '输入 API Key'
       };
     }
   },
@@ -258,14 +169,8 @@ export default {
         ...data,
         protocol: data.protocol || 'openai',
         providers: {
-          openai: {
-            ...this.defaultProviders.openai,
-            ...(providers.openai || {})
-          },
-          anthropic: {
-            ...this.defaultProviders.anthropic,
-            ...(providers.anthropic || {})
-          }
+          openai: { ...this.defaultProviders.openai, ...(providers.openai || {}) },
+          anthropic: { ...this.defaultProviders.anthropic, ...(providers.anthropic || {}) }
         }
       };
     },
@@ -279,17 +184,16 @@ export default {
         this.loading = false;
       }
     },
+    setProtocol(p) {
+      this.config.protocol = p;
+    },
     async testConnection() {
       this.testing = true;
       this.testResult = null;
       try {
         const res = await axios.post('/api/ai/test');
         this.testResult = res.data;
-        if (res.data.success) {
-          this.showToast('连接成功', 'success');
-        } else {
-          this.showToast('连接失败: ' + res.data.error, 'error');
-        }
+        this.showToast(res.data.success ? '连接成功' : '连接失败: ' + res.data.error, res.data.success ? 'success' : 'error');
       } catch (err) {
         this.testResult = { success: false, error: err.message };
         this.showToast('测试失败: ' + err.message, 'error');
@@ -304,7 +208,6 @@ export default {
         await axios.post('/api/ai/save-key', { apiKey, protocol });
         this.apiKeys[protocol] = '';
       } catch (err) {
-        console.error('保存 API Key 失败:', err);
         throw err;
       }
     },
@@ -316,7 +219,6 @@ export default {
           openai: this.config.providers.openai,
           anthropic: this.config.providers.anthropic
         });
-        // 保存 API Key
         await this.saveApiKey('openai');
         await this.saveApiKey('anthropic');
         await this.loadConfig();
@@ -329,147 +231,137 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => {
-        this.toast.show = false;
-      }, 3000);
+      setTimeout(() => { this.toast.show = false; }, 3000);
     }
   }
 };
 </script>
 
 <style scoped>
-.page {
-  max-width: 900px;
-  animation: fadeIn 0.4s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.page-desc {
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-.ai-config-content {
+.ai-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-/* Status Card */
-.status-card {
+.status-bar {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 20px 24px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  transition: all var(--transition-normal);
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
-.status-card.success {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 20px var(--accent-primary)22;
+.status-segments {
+  display: flex;
+  gap: 2px;
 }
 
-.status-icon {
-  width: 48px;
-  height: 48px;
+.status-seg {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: var(--bg-primary);
-  border-radius: 12px;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  transition: all 120ms;
 }
 
-.status-card.success .status-icon {
-  color: var(--accent-primary);
-  background: var(--accent-primary)11;
+.status-seg.active {
+  color: var(--text-secondary);
+  border-color: var(--border-active);
 }
 
-.status-info {
+.status-seg.success {
+  color: var(--success);
+  border-color: var(--success-border);
+  background: var(--success-dim);
+}
+
+.status-seg.fail {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-dim);
+}
+
+.seg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.seg-label {
+  text-transform: lowercase;
+}
+
+.status-detail {
   flex: 1;
+  font-size: 12px;
+  overflow: hidden;
 }
 
-.status-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.status-desc {
-  font-size: 13px;
+.mono-dim {
+  font-family: var(--font-mono);
   color: var(--text-muted);
+  font-size: 12px;
 }
 
-/* Form */
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-}
-
-.provider-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.provider-panel {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 20px;
-  background: var(--bg-primary);
-}
-
-.provider-header {
+.protocol-tabs {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 2px;
+  background: var(--bg-base);
+  border-radius: 4px;
+  padding: 2px;
+  border: 1px solid var(--border);
 }
 
-.provider-title {
-  font-size: 16px;
+.tab-btn {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all 80ms;
+}
+
+.tab-btn:hover {
   color: var(--text-primary);
-  margin-bottom: 4px;
 }
 
-.provider-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-muted);
+.tab-btn.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-.input-hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin-top: 4px;
+.active-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  margin-bottom: 12px;
+}
+
+.active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.mono-sm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--success);
 }
 
 .input-with-action {
@@ -481,36 +373,17 @@ export default {
   flex: 1;
 }
 
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border-color);
+  padding-top: 8px;
 }
 
-@media (max-width: 768px) {
-  .status-card {
-    flex-direction: column;
-    text-align: center;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .provider-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .provider-header {
-    flex-direction: column;
-  }
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
 }
 </style>

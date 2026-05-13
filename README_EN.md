@@ -22,7 +22,7 @@ Code-ctx is a CLI tool that helps AI programming assistants (such as Claude, Cha
 - 🔄 **Incremental Updates** - Only updates changed files, generates incremental update prompts
 - 🏥 **Health Check + Auto-Fix** - Detects document completeness and consistency, supports `--fix` to auto-repair outdated documents
 - 💾 **Fault Tolerance** - Can resume after init interruption, automatically skips completed sub-projects
-- 🖥️ **Web Management** - Visual configuration, scenario templates, document status management
+- 🖥️ **Web Management** - Terminal industrial UI with dark/light theme toggle, visual configuration, scenario templates, document status management
 - 📋 **Clipboard Fallback** - Automatically falls back to file output when writing large content fails
 - 🔒 **Security First** - Automatically filters sensitive information (passwords, keys, etc.)
 - 🤖 **AI API Integration** - Compatible with OpenAI and Anthropic protocols, supports DeepSeek, Kimi, MiniMax, etc.
@@ -223,12 +223,20 @@ code-ctx dashboard -p 8080   # Specify port
 ```
 
 Visit `http://localhost:3456`, features include:
-- **Configuration Management** (`/`) - Visual edit project configuration
-- **AI Configuration** (`/ai`) - Configure large model API connections
-- **AI Generation** (`/ai-generate`) - Select scenario to generate prompt and call AI
-- **Sub-projects** (`/projects`) - View detected sub-project list
-- **Scenario Templates** (`/scenarios`) - View A-H scenario templates
-- **Document Status** (`/status`) - View ai-docs document status
+
+**Interface Highlights:**
+- Terminal industrial design with high information density, tailored for developer workflows
+- Dark/light theme toggle with preference saved to localStorage
+- Outfit + JetBrains Mono font pairing, monospace for all technical values
+- All colors managed via CSS variables, flash-free theme switching
+
+**Pages:**
+- **Configuration** (`/`) - Visual project config editing with table-based sub-project list
+- **AI Config** (`/ai`) - Tab-based OpenAI/Anthropic protocol config with real-time connection status
+- **AI Generate** (`/ai-generate`) - Split-pane layout for scenario selection, prompt generation, and AI calls
+- **Sub-projects** (`/projects`) - Card-based view of detected sub-projects
+- **Scenario Templates** (`/scenarios`) - Left sidebar scenario list + right panel template preview
+- **Document Status** (`/status`) - Table view of document health (OK / Needs Update / Missing)
 
 ---
 
@@ -450,7 +458,12 @@ code-ctx/
 │   └── utils/          # Utility functions
 ├── templates/          # Built-in scenario templates (scenarios.json)
 ├── web/                # Frontend code (Vue 3 + Vite)
-│   ├── src/views/      # Pages: config, AI config, AI generation, sub-projects, scenarios, status
+│   ├── src/
+│   │   ├── components/ # Shared components (Sidebar)
+│   │   ├── composables/ # Composables (useTheme for theme toggle)
+│   │   ├── views/      # Pages: config, AI config, AI generation, sub-projects, scenarios, status
+│   │   ├── App.vue     # Root component + global styles + CSS variables
+│   │   └── main.js     # Entry + router config
 │   └── dist/           # Build output
 ├── tests/              # Test files (Jest)
 ├── .env.example        # Environment variable example

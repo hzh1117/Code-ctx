@@ -4,13 +4,17 @@ import App from './App.vue';
 import Config from './views/Config.vue';
 import AIConfig from './views/AIConfig.vue';
 import AIGenerate from './views/AIGenerate.vue';
+import Projects from './views/Projects.vue';
+import Scenarios from './views/Scenarios.vue';
+import Status from './views/Status.vue';
 
 const routes = [
   { path: '/', component: Config },
   { path: '/ai', component: AIConfig },
   { path: '/ai-generate', component: AIGenerate },
-  { path: '/projects', component: { template: '<div>项目管理</div>' } },
-  { path: '/generate', component: { template: '<div>生成上下文</div>' } }
+  { path: '/projects', component: Projects },
+  { path: '/scenarios', component: Scenarios },
+  { path: '/status', component: Status }
 ];
 
 const router = createRouter({

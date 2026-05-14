@@ -18,6 +18,14 @@ function createServer(rootDir) {
   app.use('/api/ai', require('./api/ai')(rootDir));
   app.use('/api', require('./api/scenarios')(rootDir));
 
+  const distPath = path.join(__dirname, '../../web/dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
   return app;
 }
 

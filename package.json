@@ -9,7 +9,9 @@
   "scripts": {
     "test": "jest",
     "lint": "eslint src/",
-    "dashboard": "concurrently \"npm run api\" \"cd web && npm run dev\"",
+    "build:web": "cd web && npm run build",
+    "dashboard": "node bin/cli.js dashboard",
+    "dashboard:dev": "node bin/cli.js dashboard --dev",
     "api": "node -e \"const { startServer } = require('./src/web/server'); startServer(process.cwd(), 3456);\""
   },
   "keywords": [

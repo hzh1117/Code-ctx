@@ -9,15 +9,13 @@ module.exports = function(rootDir) {
   router.get('/', (req, res) => {
     try {
       const config = loadProjectConfig(rootDir);
-      const projects = config.projects || {};
-      
-      const projectList = Object.entries(projects).map(([alias, proj]) => ({
-        alias,
-        name: proj.name || alias,
-        path: proj.path,
-        type: proj.type || 'unknown'
-      }));
-      
+      const rawProjects = config.projects || [];
+      const aiDocsDir = path.join(rootDir, 'ai-docs');
+      const initState = loadInitState(aiDocsDir);
+      const projectList = Array.isArray(rawProjects)
+        ? rawProjects.map(proj => normalizeProject(proj, proj.alias, aiDocsDir, initState))
+        : Object.entries(rawProjects).map(([alias, proj]) => normalizeProject(proj, alias, aiDocsDir, initState));
+
       res.json(projectList);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -26,3 +24,30 @@ module.exports = function(rootDir) {
 
   return router;
 };
+
+function normalizeProject(proj, alias, aiDocsDir, initState) {
+  const projectAlias = proj.alias || alias;
+  const status = initState.projects?.[projectAlias]?.status;
+  return {
+    alias: projectAlias,
+    name: proj.name || proj.label || projectAlias,
+    path: proj.path,
+    type: proj.type || 'unknown',
+    label: proj.label || proj.name || projectAlias,
+    initialized: ['done', 'completed'].includes(status),
+    docFile: fs.existsSync(path.join(aiDocsDir, `${projectAlias}.md`))
+  };
+}
+
+function loadInitState(aiDocsDir) {
+  const statePath = path.join(aiDocsDir, '.init-state.json');
+  if (!fs.existsSync(statePath)) {
+    return { projects: {} };
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  } catch {
+    return { projects: {} };
+  }
+}

@@ -21,9 +21,12 @@
           </div>
           <div class="project-path">{{ project.path }}</div>
           <div class="project-label" v-if="project.label">{{ project.label }}</div>
-          <div class="project-meta" v-if="project.fileCount !== undefined">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>{{ project.fileCount }} files</span>
+          <div class="project-meta">
+            <span :class="['state-dot', project.initialized ? 'state-ok' : 'state-muted']"></span>
+            <span>{{ project.initialized ? '已初始化' : '未初始化' }}</span>
+            <span class="meta-separator"></span>
+            <span :class="['state-dot', project.docFile ? 'state-ok' : 'state-muted']"></span>
+            <span>{{ project.docFile ? '文档已生成' : '暂无文档' }}</span>
           </div>
         </div>
       </div>
@@ -66,7 +69,7 @@ export default {
 <style scoped>
 .projects-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 12px;
 }
 
@@ -110,11 +113,34 @@ export default {
 .project-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+
+.state-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.state-ok {
+  background: var(--success);
+}
+
+.state-muted {
+  background: var(--text-muted);
+}
+
+.meta-separator {
+  width: 1px;
+  height: 12px;
+  background: var(--border);
+  margin: 0 4px;
 }
 </style>

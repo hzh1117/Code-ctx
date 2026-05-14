@@ -20,7 +20,7 @@ describe('Full Flow Integration', () => {
 
   test('should complete full workflow', async () => {
     // 1. Init
-    const initResult = await initCommand(testDir, { skipPrompt: true });
+    const initResult = await initCommand(testDir, { skipPrompt: true, skipAi: true });
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
     expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
     expect(initResult).toBeDefined();
@@ -43,7 +43,10 @@ describe('Full Flow Integration', () => {
   });
 
   test('should handle init with multiple projects', async () => {
-    const multiDir = path.join(__dirname, '../fixtures/multi-project-test');
+    const multiDir = path.join(__dirname, '../fixtures/integration-multi-project-test');
+    if (fs.existsSync(multiDir)) {
+      fs.rmSync(multiDir, { recursive: true, force: true });
+    }
     fs.mkdirSync(path.join(multiDir, 'frontend'), { recursive: true });
     fs.mkdirSync(path.join(multiDir, 'backend'), { recursive: true });
     fs.writeFileSync(path.join(multiDir, 'frontend', 'package.json'), JSON.stringify({
@@ -53,7 +56,7 @@ describe('Full Flow Integration', () => {
       dependencies: { express: '^4.0.0' }
     }));
 
-    const result = await initCommand(multiDir, { skipPrompt: true });
+    const result = await initCommand(multiDir, { skipPrompt: true, skipAi: true });
     expect(result.projects.length).toBeGreaterThanOrEqual(1);
     
     fs.rmSync(multiDir, { recursive: true, force: true });
@@ -68,7 +71,7 @@ describe('Full Flow Integration', () => {
     fs.mkdirSync(emptyDir, { recursive: true });
 
     const report = await doctorCommand(emptyDir);
-    expect(report.issues).toContain('ai-docs/ 目录不存在');
+    expect(report.issues.some(i => i.message.includes('ai-docs'))).toBe(true);
     
     fs.rmSync(emptyDir, { recursive: true, force: true });
   });

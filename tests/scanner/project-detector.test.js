@@ -105,7 +105,7 @@ describe('detectProjects', () => {
     const projectDir = path.join(testDir, 'multi-check');
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', '@element-plus': '^2.0.0' }
+      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
     }));
     fs.writeFileSync(path.join(projectDir, 'manifest.json'), JSON.stringify({}));
 

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 describe('readFileUTF8', () => {
-  const testDir = path.join(__dirname, '../fixtures');
+  const testDir = path.join(__dirname, '../fixtures/file-reader-test');
 
   beforeAll(() => {
     if (!fs.existsSync(testDir)) {

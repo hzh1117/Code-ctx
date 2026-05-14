@@ -62,17 +62,30 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               AI 响应
             </h2>
-            <div class="response-meta" v-if="aiResponse">
-              <span class="badge badge-success">done</span>
-              <button class="btn btn-secondary btn-sm" @click="copyResponse">
+            <div class="response-meta">
+              <span v-if="aiResponse" class="badge badge-success">done</span>
+              <span v-if="responseError" class="badge badge-danger">error</span>
+              <button class="btn btn-secondary btn-sm" @click="copyPrompt" :disabled="!generatedPrompt">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                复制
+                复制 Prompt
+              </button>
+              <button class="btn btn-secondary btn-sm" @click="exportPrompt" :disabled="!generatedPrompt">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                导出 .md
+              </button>
+              <button class="btn btn-secondary btn-sm" @click="copyResponse" :disabled="!aiResponse">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                复制响应
               </button>
             </div>
           </div>
 
           <div v-if="aiResponse" class="response-body">
             <pre class="response-text">{{ aiResponse }}</pre>
+          </div>
+
+          <div v-else-if="responseError" class="response-body response-error">
+            <pre class="response-text">{{ responseError }}</pre>
           </div>
 
           <div v-else-if="generating" class="response-loading">
@@ -112,6 +125,7 @@ export default {
       taskDescription: '',
       generatedPrompt: '',
       aiResponse: '',
+      responseError: '',
       generating: false,
       toast: { show: false, message: '', type: 'success' }
     };
@@ -138,6 +152,7 @@ export default {
       this.generating = true;
       this.generatedPrompt = '';
       this.aiResponse = '';
+      this.responseError = '';
       try {
         const promptRes = await axios.post('/api/generate-prompt', { scenario: this.selectedScenario, task: this.taskDescription });
         this.generatedPrompt = promptRes.data.prompt;
@@ -146,10 +161,12 @@ export default {
           this.aiResponse = aiRes.data.content;
           this.showToast('生成完成', 'success');
         } else {
-          this.showToast('AI 调用失败: ' + aiRes.data.error, 'error');
+          this.responseError = 'AI 调用失败: ' + (aiRes.data.error || '未知错误');
+          this.showToast(this.responseError, 'error');
         }
       } catch (err) {
-        this.showToast('生成失败: ' + err.message, 'error');
+        this.responseError = '生成失败: ' + err.message;
+        this.showToast(this.responseError, 'error');
       } finally {
         this.generating = false;
       }
@@ -161,6 +178,19 @@ export default {
     async copyResponse() {
       try { await navigator.clipboard.writeText(this.aiResponse); this.showToast('已复制', 'success'); }
       catch { this.showToast('复制失败', 'error'); }
+    },
+    exportPrompt() {
+      if (!this.generatedPrompt) return;
+      const blob = new Blob([this.generatedPrompt], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `prompt-${Date.now()}.md`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      this.showToast('已导出', 'success');
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
@@ -232,6 +262,7 @@ export default {
 .response-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -252,6 +283,11 @@ export default {
   color: var(--text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.response-error {
+  border-color: var(--danger-border);
+  background: var(--danger-dim);
 }
 
 .response-loading {

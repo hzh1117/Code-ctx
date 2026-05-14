@@ -62,20 +62,17 @@
           <span class="badge badge-success">{{ config.projects?.length || 0 }}</span>
         </div>
 
-        <div v-if="config.projects?.length" class="projects-table">
-          <div class="table-head">
-            <span class="col-alias">alias</span>
-            <span class="col-path">path</span>
-            <span class="col-type">type</span>
-          </div>
+        <div v-if="config.projects?.length" class="projects-grid">
           <div
             v-for="(project, index) in config.projects"
             :key="index"
-            class="table-row"
+            class="project-item"
           >
-            <span class="col-alias mono-accent">{{ project.alias }}</span>
-            <span class="col-path mono-dim">{{ project.path }}</span>
-            <span class="col-type"><span class="badge badge-neutral">{{ project.type }}</span></span>
+            <div class="project-item-head">
+              <span class="mono-accent">{{ project.alias }}</span>
+              <span class="badge badge-neutral">{{ project.type }}</span>
+            </div>
+            <div class="project-path mono-dim">{{ project.path }}</div>
           </div>
         </div>
 
@@ -188,60 +185,30 @@ export default {
   gap: 16px;
 }
 
-.projects-table {
-  font-family: var(--font-mono);
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.project-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-base);
+}
+
+.project-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.project-path {
+  overflow-wrap: anywhere;
   font-size: 12px;
-}
-
-.table-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 11px;
-  text-transform: lowercase;
-  margin-bottom: 4px;
-}
-
-.table-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  transition: background 80ms;
-}
-
-.table-row:last-child {
-  border-bottom: none;
-}
-
-.table-row:hover {
-  background: var(--bg-hover);
-  margin: 0 -20px;
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.col-alias {
-  width: 100px;
-  flex-shrink: 0;
-}
-
-.col-path {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.col-type {
-  width: 80px;
-  flex-shrink: 0;
-  text-align: right;
 }
 
 .mono-accent {

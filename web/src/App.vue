@@ -130,6 +130,9 @@ export default {
 }
 
 html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden;
 }
@@ -145,8 +148,10 @@ body {
 }
 
 #app {
-  display: flex;
-  height: 100vh;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 100vh;
+  width: 100vw;
   overflow: hidden;
 }
 
@@ -202,10 +207,9 @@ body {
 }
 
 .main-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
+  width: 100%;
   min-width: 0;
+  overflow-y: auto;
 }
 
 /* ── Toast ── */
@@ -235,7 +239,9 @@ body {
 
 /* ── Page Layout ── */
 .page {
-  max-width: 960px;
+  width: 100%;
+  padding: 24px 32px;
+  box-sizing: border-box;
   animation: pageEnter 120ms ease;
 }
 @keyframes pageEnter {
@@ -651,9 +657,14 @@ textarea.input {
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
+  #app {
+    grid-template-columns: 1fr;
+  }
   .main-content {
-    padding: 16px;
     padding-top: 52px;
+  }
+  .page {
+    padding: 16px;
   }
   .form-grid {
     grid-template-columns: 1fr;

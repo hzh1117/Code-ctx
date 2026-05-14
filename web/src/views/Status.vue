@@ -139,16 +139,7 @@ export default {
   min-width: 160px;
 }
 
-.col-size {
-  width: 80px;
-}
-
-.col-time {
-  width: 140px;
-}
-
 .col-health {
-  width: 100px;
   text-align: right;
 }
 

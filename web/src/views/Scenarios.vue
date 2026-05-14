@@ -32,16 +32,24 @@
               <span class="detail-id">{{ selected.id }}</span>
               {{ selected.name }}
             </h2>
-            <button class="btn btn-secondary btn-sm" @click="copyTemplate">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              复制
-            </button>
+            <div class="detail-actions">
+              <button v-if="!editing" class="btn btn-secondary btn-sm" @click="copyTemplate">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                复制
+              </button>
+              <button v-if="!editing" class="btn btn-secondary btn-sm" @click="startEdit">编辑</button>
+              <button v-if="editing" class="btn btn-secondary btn-sm" @click="cancelEdit">取消</button>
+              <button v-if="editing" class="btn btn-primary btn-sm" @click="saveTemplate" :disabled="saving">
+                {{ saving ? '保存中...' : '保存' }}
+              </button>
+            </div>
           </div>
           <p class="detail-desc" v-if="selected.description">{{ selected.description }}</p>
           <div class="detail-projects" v-if="selected.relatedProjects?.length">
             <span v-for="p in selected.relatedProjects" :key="p" class="badge badge-neutral">{{ p }}</span>
           </div>
-          <div class="code-block">{{ selected.template }}</div>
+          <textarea v-if="editing" v-model="editingTemplate" class="input template-editor"></textarea>
+          <div v-else class="code-block">{{ selected.template }}</div>
         </div>
       </div>
 
@@ -71,7 +79,15 @@ import axios from 'axios';
 
 export default {
   data() {
-    return { scenarios: [], selected: null, loading: true, toast: { show: false, message: '', type: 'success' } };
+    return {
+      scenarios: [],
+      selected: null,
+      loading: true,
+      editing: false,
+      saving: false,
+      editingTemplate: '',
+      toast: { show: false, message: '', type: 'success' }
+    };
   },
   async mounted() {
     try {
@@ -85,15 +101,41 @@ export default {
     }
   },
   methods: {
+    startEdit() {
+      this.editing = true;
+      this.editingTemplate = this.selected?.template || '';
+    },
+    cancelEdit() {
+      this.editing = false;
+      this.editingTemplate = '';
+    },
+    async saveTemplate() {
+      if (!this.selected) return;
+      this.saving = true;
+      try {
+        await axios.put(`/api/scenarios/${this.selected.id}`, { template: this.editingTemplate });
+        this.selected.template = this.editingTemplate;
+        const index = this.scenarios.findIndex(s => s.id === this.selected.id);
+        if (index >= 0) this.scenarios.splice(index, 1, { ...this.selected });
+        this.cancelEdit();
+        this.showToast('模板已保存', 'success');
+      } catch (err) {
+        this.showToast('保存失败: ' + err.message, 'error');
+      } finally {
+        this.saving = false;
+      }
+    },
     async copyTemplate() {
       try {
         await navigator.clipboard.writeText(this.selected.template);
-        this.toast = { show: true, message: '已复制', type: 'success' };
-        setTimeout(() => { this.toast.show = false; }, 3000);
+        this.showToast('已复制', 'success');
       } catch {
-        this.toast = { show: true, message: '复制失败', type: 'error' };
-        setTimeout(() => { this.toast.show = false; }, 3000);
+        this.showToast('复制失败', 'error');
       }
+    },
+    showToast(message, type = 'success') {
+      this.toast = { show: true, message, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
     }
   }
 };
@@ -172,6 +214,12 @@ export default {
   min-height: 0;
 }
 
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .detail-id {
   font-family: var(--font-mono);
   color: var(--accent);
@@ -194,6 +242,12 @@ export default {
 .code-block {
   max-height: 400px;
   overflow-y: auto;
+}
+
+.template-editor {
+  min-height: 420px;
+  font-family: var(--font-mono);
+  line-height: 1.7;
 }
 
 @media (max-width: 768px) {

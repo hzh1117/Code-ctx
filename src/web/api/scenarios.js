@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
 const { filterSensitive } = require('../../utils/sensitive-filter');
-const { getScenarios } = require('../../template/engine');
+const { getScenarios, clearCache } = require('../../template/engine');
 const { buildUsePrompt } = require('../../generator/prompt-builder');
 const { matchScenario } = require('../../matcher/scenario-matcher');
 const { listSections } = require('../../core/section');
@@ -23,6 +23,30 @@ module.exports = function(rootDir) {
         template: s.template || ''
       }));
       res.json(scenarioList);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.put('/scenarios/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { template } = req.body || {};
+      if (typeof template !== 'string') {
+        return res.status(400).json({ error: 'template 必须是字符串' });
+      }
+
+      const scenariosPath = path.join(__dirname, '../../../templates/scenarios.json');
+      const scenarios = JSON.parse(fs.readFileSync(scenariosPath, 'utf8'));
+      const scenario = scenarios.find(s => s.id === id);
+      if (!scenario) {
+        return res.status(404).json({ error: `未找到场景: ${id}` });
+      }
+
+      scenario.template = template;
+      fs.writeFileSync(scenariosPath, JSON.stringify(scenarios, null, 2) + '\n');
+      clearCache();
+      res.json({ success: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

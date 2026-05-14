@@ -1,27 +1,27 @@
-name: Feature request
-description: Suggest an improvement or new capability
+name: Feature request / 功能建议
+description: Suggest an improvement or new capability / 建议改进或新增能力
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: What workflow or limitation should this solve?
+      label: Problem / 问题
+      description: What workflow or limitation should this solve? / 这个功能要解决什么流程或限制？
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed solution
-      description: What should Code-ctx do?
+      label: Proposed solution / 建议方案
+      description: What should Code-ctx do? / 你希望 Code-ctx 怎么做？
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
+      label: Alternatives considered / 考虑过的替代方案
   - type: textarea
     id: context
     attributes:
-      label: Additional context
+      label: Additional context / 其他信息

@@ -1,5 +1,5 @@
-name: Bug report
-description: Report a reproducible problem in Code-ctx
+name: Bug report / Bug 反馈
+description: Report a reproducible problem in Code-ctx / 反馈可复现的问题
 title: "[Bug]: "
 labels: ["bug"]
 body:
@@ -7,49 +7,51 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug. Please remove secrets, private code, and API keys before submitting.
+
+        感谢反馈问题。提交前请移除密钥、私有代码和 API Key。
   - type: textarea
     id: summary
     attributes:
-      label: Summary
-      description: What went wrong?
-      placeholder: Describe the bug clearly.
+      label: Summary / 问题摘要
+      description: What went wrong? / 出现了什么问题？
+      placeholder: Describe the bug clearly. / 请清晰描述这个 bug。
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Reproduction steps
-      description: List the smallest steps that reproduce the issue.
+      label: Reproduction steps / 复现步骤
+      description: List the smallest steps that reproduce the issue. / 请提供最小复现步骤。
       placeholder: |
-        1. Run `code-ctx ...`
-        2. Open ...
-        3. See ...
+        1. Run `code-ctx ...` / 运行 `code-ctx ...`
+        2. Open ... / 打开 ...
+        3. See ... / 看到 ...
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected behavior
+      label: Expected behavior / 预期行为
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: Actual behavior
-      description: Include logs or screenshots when useful.
+      label: Actual behavior / 实际行为
+      description: Include logs or screenshots when useful. / 如有必要，请附上日志或截图。
     validations:
       required: true
   - type: input
     id: node
     attributes:
-      label: Node.js version
+      label: Node.js version / Node.js 版本
       placeholder: "v20.12.0"
   - type: input
     id: os
     attributes:
-      label: Operating system
+      label: Operating system / 操作系统
       placeholder: "Windows 11, macOS 15, Ubuntu 24.04"
   - type: textarea
     id: extra
     attributes:
-      label: Additional context
+      label: Additional context / 其他信息

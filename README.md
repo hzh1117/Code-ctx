@@ -7,6 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
 [English](README_EN.md) | 中文
 
@@ -52,8 +53,8 @@ Code-ctx 是一个 CLI 工具，解决 AI 编程助手与代码库之间的"上�
 
 ```bash
 # 克隆项目
-git clone https://gitee.com/yo-yo-lu-mingming/code-ctx.git
-cd code-ctx
+git clone https://github.com/hzh1117/Code-ctx.git
+cd Code-ctx
 
 # 安装依赖
 npm install
@@ -170,7 +171,7 @@ code-ctx dashboard --dir D:/workspace/your-project  # 指定要管理的项目�
 | 类型 | 检测方式 |
 |------|----------|
 | Vue 2 管理后台 | `package.json` 含 `vue` + `element-ui` |
-| Vue 3 管理后台 | `package.json` 含 `vue` + `@element-plus` |
+| Vue 3 管理后台 | `package.json` 含 `vue` + `element-plus` |
 | React | `package.json` 含 `react` |
 | Next.js | `package.json` 含 `next` |
 | uni-app 小程序 | `package.json` 含 `uni-app` 或 `manifest.json` |
@@ -198,10 +199,10 @@ code-ctx dashboard --dir D:/workspace/your-project  # 指定要管理的项目�
 
 ```env
 # Anthropic API Key（Claude 或兼容服务）
-ANTHROPIC_API_KEY=sk-ant-xxx
+ANTHROPIC_API_KEY=<your-anthropic-api-key>
 
 # OpenAI 兼容 API Key（DeepSeek、Kimi、MiniMax 等）
-OPENAI_API_KEY=sk-xxx
+OPENAI_API_KEY=<your-openai-compatible-api-key>
 
 # 可选：覆盖默认服务地址
 # OPENAI_BASE_URL=https://api.deepseek.com
@@ -368,14 +369,20 @@ code-ctx doctor --fix    # 自动修复过期文档
 ## 开发
 
 ```bash
-git clone https://gitee.com/yo-yo-lu-mingming/code-ctx.git
-cd code-ctx
+git clone https://github.com/hzh1117/Code-ctx.git
+cd Code-ctx
 npm install
 cd web && npm install && npm run build && cd ..
 npm link
 
 # 运行测试
-npm test
+npm test -- --runInBand
+
+# 构建管理面板
+npm run build:web
+
+# 一次性运行测试和构建
+npm run check
 
 # 启动管理面板
 code-ctx dashboard
@@ -383,13 +390,29 @@ code-ctx dashboard
 
 ## 参与贡献
 
-欢迎贡献！请：
+欢迎贡献！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。基本流程：
 
 1. Fork 本仓库
 2. 创建功能分支（`git checkout -b feature/amazing-feature`）
 3. 提交更改（`git commit -m 'feat: add amazing feature'`）
 4. 推送分支（`git push origin feature/amazing-feature`）
 5. 提交 Pull Request
+
+提交前建议运行：
+
+```bash
+npm run check
+```
+
+## 安全
+
+如果发现安全问题，请不要公开提交 issue。请参考 [SECURITY.md](SECURITY.md) 使用 GitHub 私有漏洞报告或联系维护者。
+
+发布公开仓库前，请确认 `.env`、API Key、私有项目文档、生成的 prompt 文件没有被提交。
+
+## 发布记录
+
+变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 

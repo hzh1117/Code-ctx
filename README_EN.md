@@ -7,6 +7,7 @@
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
 English | [中文](README.md)
 
@@ -53,7 +54,7 @@ Code-ctx is a CLI tool that bridges the gap between your codebase and AI program
 ```bash
 # Clone
 git clone https://github.com/hzh1117/Code-ctx.git
-cd code-ctx
+cd Code-ctx
 
 # Install dependencies
 npm install
@@ -169,7 +170,7 @@ code-ctx dashboard -p 8080   # Custom port
 | Type | Detection Method |
 |------|------------------|
 | Vue 2 Admin | `package.json` has `vue` + `element-ui` |
-| Vue 3 Admin | `package.json` has `vue` + `@element-plus` |
+| Vue 3 Admin | `package.json` has `vue` + `element-plus` |
 | React | `package.json` has `react` |
 | Next.js | `package.json` has `next` |
 | uni-app Mini Program | `package.json` has `uni-app` or `manifest.json` |
@@ -197,10 +198,10 @@ code-ctx dashboard -p 8080   # Custom port
 
 ```env
 # Anthropic API Key (Claude or compatible services)
-ANTHROPIC_API_KEY=sk-ant-xxx
+ANTHROPIC_API_KEY=<your-anthropic-api-key>
 
 # OpenAI Compatible API Key (DeepSeek, Kimi, MiniMax, etc.)
-OPENAI_API_KEY=sk-xxx
+OPENAI_API_KEY=<your-openai-compatible-api-key>
 
 # Optional: Override default endpoints
 # OPENAI_BASE_URL=https://api.deepseek.com
@@ -357,13 +358,19 @@ Create a new adapter in `src/adapters/builtin/` extending `BaseAdapter`.
 
 ```bash
 git clone https://github.com/hzh1117/Code-ctx.git
-cd code-ctx
+cd Code-ctx
 npm install
 cd web && npm install && npm run build && cd ..
 npm link
 
 # Run tests
-npm test
+npm test -- --runInBand
+
+# Build dashboard
+npm run build:web
+
+# Run tests and build
+npm run check
 
 # Start dashboard
 code-ctx dashboard
@@ -371,13 +378,29 @@ code-ctx dashboard
 
 ## Contributing
 
-Contributions welcome! Please:
+Contributions welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md). Basic flow:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+Before submitting:
+
+```bash
+npm run check
+```
+
+## Security
+
+Please do not open public issues for sensitive security reports. See [SECURITY.md](SECURITY.md).
+
+Before publishing a public repository, make sure `.env`, API keys, private project docs, and generated prompt files are not committed.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

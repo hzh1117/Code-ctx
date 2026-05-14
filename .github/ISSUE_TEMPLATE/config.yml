@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/hzh1117/Code-ctx/security/advisories
+    about: Please report sensitive security issues privately.

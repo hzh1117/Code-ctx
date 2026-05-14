@@ -6,9 +6,20 @@
   "bin": {
     "code-ctx": "./bin/cli.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "web/dist",
+    "README.md",
+    "README_EN.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "test": "jest",
     "lint": "eslint src/",
+    "check": "npm test -- --runInBand && npm run build:web",
     "build:web": "cd web && npm run build",
     "dashboard": "node bin/cli.js dashboard",
     "dashboard:dev": "node bin/cli.js dashboard --dev",
@@ -18,9 +29,23 @@
     "cli",
     "ai",
     "context",
-    "developer-tools"
+    "developer-tools",
+    "prompt",
+    "codebase",
+    "claude",
+    "chatgpt",
+    "cursor"
   ],
+  "author": "hzh1117",
   "license": "MIT",
+  "homepage": "https://github.com/hzh1117/Code-ctx#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hzh1117/Code-ctx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hzh1117/Code-ctx/issues"
+  },
   "engines": {
     "node": ">=16.0.0"
   },

@@ -162,6 +162,7 @@ code-ctx doctor --fix --force  # 强制重新生成所有文档
 # dashboard
 code-ctx dashboard           # 默认端口 3456
 code-ctx dashboard -p 8080   # 自定义端口
+code-ctx dashboard --dir D:/workspace/your-project  # 指定要管理的项目目录
 ```
 
 ## 支持的项目类型
@@ -284,6 +285,17 @@ code-ctx dashboard
 ```
 
 访问 `http://localhost:3456`：
+
+Dashboard 读取的是“被管理项目”的 `code-ctx.config.js` 和 `ai-docs/`。可以在项目目录内启动，也可以在任意位置用 `--dir` 指定项目目录：
+
+```bash
+# 方式一：cd 到项目目录运行
+cd D:/workspace/你的项目
+code-ctx dashboard
+
+# 方式二：在任意位置指定项目目录
+code-ctx dashboard --dir D:/workspace/你的项目
+```
 
 - **配置管理** — 可视化编辑项目配置
 - **AI 配置** — Tab 切换 OpenAI/Anthropic 协议，连接状态实时检测

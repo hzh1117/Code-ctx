@@ -76,7 +76,7 @@ async function initCommand(rootDir, options = {}) {
     aiMode: 'clipboard',
     projects: projects.map(p => ({
       alias: p.alias,
-      path: `./${p.name}`,
+      path: p.path,
       type: p.type,
       label: p.name
     })),

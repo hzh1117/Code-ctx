@@ -8,6 +8,10 @@ const RETRYABLE_ERRORS = AI_CLIENT.RETRYABLE_ERRORS;
 const RETRYABLE_STATUS_CODES = AI_CLIENT.RETRYABLE_STATUS_CODES;
 const BASE_RETRY_DELAY = AI_CLIENT.BASE_RETRY_DELAY;
 
+function trimTrailingSlashes(value) {
+  return value.replace(/\/+$/, '');
+}
+
 function getRetryDelay(retries, res) {
   const retryAfter = res?.headers?.['retry-after'];
   if (retryAfter) {
@@ -20,7 +24,8 @@ function getRetryDelay(retries, res) {
 async function callOpenAI(prompt, options, retries = 0) {
   const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
-  const url = new URL(`${baseUrl}/chat/completions`);
+  const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
+  const url = new URL(`${normalizedBaseUrl}/chat/completions`);
   const protocol = url.protocol === 'https:' ? https : http;
 
   const body = JSON.stringify({
@@ -102,17 +107,16 @@ async function callOpenAI(prompt, options, retries = 0) {
 async function callAnthropic(prompt, options, retries = 0) {
   const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
+  const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
+
   // 处理不同的 baseUrl 格式
   let url;
-  if (baseUrl.includes('/v1')) {
+  if (normalizedBaseUrl.includes('/v1')) {
     // 已经包含 /v1，直接拼接 /messages
-    url = new URL(`${baseUrl}/messages`);
-  } else if (baseUrl.endsWith('/')) {
-    // 以 / 结尾，拼接 v1/messages
-    url = new URL(`${baseUrl}v1/messages`);
+    url = new URL(`${normalizedBaseUrl}/messages`);
   } else {
     // 默认拼接 /v1/messages
-    url = new URL(`${baseUrl}/v1/messages`);
+    url = new URL(`${normalizedBaseUrl}/v1/messages`);
   }
 
   const body = JSON.stringify({

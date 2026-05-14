@@ -3,15 +3,15 @@ const path = require('path');
 const { readFileUTF8 } = require('./file-reader');
 
 const DEFAULT_PATTERNS = [
-  { pattern: /(password\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
-  { pattern: /(secret\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
-  { pattern: /(token\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
-  { pattern: /(api[_-]?key\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
-  { pattern: /(private[_-]?key\s*[:=]\s*)["']?[^"'\s]+/gi, replacement: '$1[FILTERED]' },
+  { pattern: /(^|[^?&\w-])(password\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
+  { pattern: /(^|[^?&\w-])(secret\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
+  { pattern: /(^|[^?&\w-])(token\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
+  { pattern: /(^|[^?&\w-])(api[_-]?key\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
+  { pattern: /(^|[^?&\w-])(private[_-]?key\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
   { pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, replacement: '[FILTERED]' },
   { pattern: /AKIA[0-9A-Z]{16}/g, replacement: '[FILTERED]' },
   { pattern: /Bearer\s+[A-Za-z0-9\-._~+\/]{20,}/gi, replacement: 'Bearer [FILTERED]' },
-  { pattern: /[?&](key|token|secret|api_key|access_token)=([^&\s]{8,})/gi, replacement: (match, p1) => match[0] + p1 + '=[FILTERED]' },
+  { pattern: /([?&](?:key|token|secret|api_key|access_token)=)([^&\s]{8,})/gi, replacement: '$1[FILTERED]' },
   { pattern: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/gi, replacement: '$1://[FILTERED]' },
   { pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1\s+PRIVATE\s+KEY-----/g, replacement: '[FILTERED SSH PRIVATE KEY]' }
 ];

@@ -9,23 +9,34 @@ const { PROMPT_MAX_CHARS } = require('../utils/constants');
 
 const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
 const LOW_CONFIDENCE_THRESHOLD = 50;
+const COMPACT_SECTION_IDS = {
+  overview: ['overview'],
+  relatedDocs: ['modules', 'notes']
+};
+
+function extractFirstSection(content, sectionNames) {
+  for (const name of sectionNames) {
+    const section = extractSection(content, name);
+    if (section) return section;
+  }
+  return null;
+}
 
 function compactPrompt(prompt, taskDescription, template, overviewContent, relatedDocs) {
   const originalLength = prompt.length;
 
   let compactOverview = overviewContent;
   if (overviewContent) {
-    const table = extractSection(overviewContent, '改动项目速查表');
-    compactOverview = table || '';
+    compactOverview = extractFirstSection(overviewContent, COMPACT_SECTION_IDS.overview) || '';
   }
 
   const compactRelatedDocs = {};
   for (const [name, content] of Object.entries(relatedDocs)) {
-    const core = extractSection(content, '核心功能模块');
-    const notes = extractSection(content, '开发注意事项');
     const parts = [];
-    if (core) parts.push(core);
-    if (notes) parts.push(notes);
+    for (const sectionName of COMPACT_SECTION_IDS.relatedDocs) {
+      const section = extractSection(content, sectionName);
+      if (section) parts.push(section);
+    }
     if (parts.length > 0) {
       compactRelatedDocs[name] = parts.join('\n\n');
     }

@@ -140,7 +140,7 @@ module.exports = function(rootDir) {
       }
       
       if (protocol === 'anthropic') {
-        envContent = updateEnvValue(envContent, 'ANTHROPIC_AUTH_TOKEN', apiKey);
+        envContent = updateEnvValue(envContent, 'ANTHROPIC_API_KEY', apiKey);
         if (baseUrl) {
           envContent = updateEnvValue(envContent, 'ANTHROPIC_BASE_URL', baseUrl);
         }

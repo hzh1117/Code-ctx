@@ -167,21 +167,21 @@ describe('useCommand', () => {
       const longContent = 'x'.repeat(4000);
       const overviewWithSections = [
         '# 总览',
-        '<!-- section:改动项目速查表 -->',
+        '<!-- section:overview -->',
         '| 项目 | 说明 |',
-        '<!-- /section:改动项目速查表 -->',
+        '<!-- /section:overview -->',
         '<!-- section:其他 -->',
         longContent,
         '<!-- /section:其他 -->'
       ].join('\n');
       const merWithSections = [
         '# 商户端',
-        '<!-- section:核心功能模块 -->',
+        '<!-- section:modules -->',
         '核心功能描述',
-        '<!-- /section:核心功能模块 -->',
-        '<!-- section:开发注意事项 -->',
+        '<!-- /section:modules -->',
+        '<!-- section:notes -->',
         '注意事项',
-        '<!-- /section:开发注意事项 -->',
+        '<!-- /section:notes -->',
         '<!-- section:详细设计 -->',
         longContent,
         '<!-- /section:详细设计 -->'
@@ -202,6 +202,45 @@ describe('useCommand', () => {
       expect(result.prompt).toContain('注意事项');
       expect(result.prompt).not.toContain(longContent);
       expect(result.prompt).toContain('商户后台新增功能');
+    });
+
+    test('should compact using generated template section ids', async () => {
+      const aiDocsDir = path.join(fixturesDir, 'ai-docs');
+      const longContent = 'x'.repeat(4000);
+      const overviewWithSections = [
+        '# 总览',
+        '<!-- section:overview -->',
+        '项目总览核心内容',
+        '<!-- /section:overview -->',
+        '<!-- section:dependencies -->',
+        longContent,
+        '<!-- /section:dependencies -->'
+      ].join('\n');
+      const merWithSections = [
+        '# 商户端',
+        '<!-- section:modules -->',
+        '英文 id 核心模块',
+        '<!-- /section:modules -->',
+        '<!-- section:notes -->',
+        '英文 id 注意事项',
+        '<!-- /section:notes -->',
+        '<!-- section:data -->',
+        longContent,
+        '<!-- /section:data -->'
+      ].join('\n');
+      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), overviewWithSections);
+      fs.writeFileSync(path.join(aiDocsDir, 'mer.md'), merWithSections);
+
+      const result = await useCommand({
+        taskDescription: '商户后台新增功能',
+        rootDir: fixturesDir
+      });
+
+      expect(result.compactInfo).toBeDefined();
+      expect(result.prompt).toContain('项目总览核心内容');
+      expect(result.prompt).toContain('英文 id 核心模块');
+      expect(result.prompt).toContain('英文 id 注意事项');
+      expect(result.prompt).not.toContain(longContent);
     });
 
     test('should not compress when under 8000 chars', async () => {

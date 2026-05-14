@@ -50,8 +50,15 @@ describe('filterSensitive', () => {
   test('should filter URL key parameter', () => {
     const input = 'https://api.example.com/data?token=supersecretvalue123';
     const { content, count } = filterSensitive(input);
-    expect(content).toContain('=[FILTERED]');
+    expect(content).toBe('https://api.example.com/data?token=[FILTERED]');
     expect(content).not.toContain('supersecretvalue123');
+    expect(count).toBe(1);
+  });
+
+  test('should keep URL parameter separator while filtering multiple secret params', () => {
+    const input = 'https://api.example.com/data?token=supersecretvalue123&api_key=anothersecret456&safe=1';
+    const { content, count } = filterSensitive(input);
+    expect(content).toBe('https://api.example.com/data?token=[FILTERED]&api_key=[FILTERED]&safe=1');
     expect(count).toBe(2);
   });
 

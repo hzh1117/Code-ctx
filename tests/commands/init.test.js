@@ -1,4 +1,5 @@
 const { initCommand } = require('../../src/commands/init');
+const { loadConfigWithVM } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
@@ -21,7 +22,7 @@ describe('initCommand', () => {
   test('should create ai-docs directory', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
 
-    await initCommand(testDir, { skipPrompt: true });
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
     expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
@@ -30,7 +31,7 @@ describe('initCommand', () => {
   test('should generate valid config file', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
 
-    await initCommand(testDir, { skipPrompt: true });
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     const configPath = path.join(testDir, 'code-ctx.config.js');
     expect(fs.existsSync(configPath)).toBe(true);
@@ -51,16 +52,30 @@ describe('initCommand', () => {
       dependencies: { react: '^18.0.0' }
     }));
 
-    const result = await initCommand(testDir, { skipPrompt: true, skipAI: true });
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     expect(result.projects.length).toBe(1);
     expect(result.projects[0].type).toBe('react');
   });
 
+  test('should preserve detected project path in generated config', async () => {
+    const subDir = path.join(testDir, 'my-app');
+    fs.mkdirSync(subDir, { recursive: true });
+    fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0' }
+    }));
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    const config = loadConfigWithVM(configPath);
+    expect(config.projects[0].path).toBe(subDir);
+  });
+
   test('should return config with project info', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
 
-    const result = await initCommand(testDir, { skipPrompt: true });
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     expect(result).toHaveProperty('projects');
     expect(result).toHaveProperty('config');
@@ -91,7 +106,7 @@ describe('initCommand enhanced features', () => {
       dependencies: { react: '^18.0.0' }
     }));
 
-    await initCommand(testDir, { skipPrompt: true, skipAI: true });
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     const statePath = path.join(testDir, 'ai-docs', '.init-state.json');
     expect(fs.existsSync(statePath)).toBe(true);
@@ -107,7 +122,7 @@ describe('initCommand enhanced features', () => {
       dependencies: { react: '^18.0.0' }
     }));
 
-    await initCommand(testDir, { skipPrompt: true, skipAI: true });
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     const statePath = path.join(testDir, 'ai-docs', '.init-state.json');
     const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
@@ -115,7 +130,7 @@ describe('initCommand enhanced features', () => {
     state.projects[alias].status = 'completed';
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 
-    const result = await initCommand(testDir, { skipPrompt: true, skipAI: true });
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
     expect(result).toBeDefined();
   });
 
@@ -125,7 +140,7 @@ describe('initCommand enhanced features', () => {
     fs.mkdirSync(aiDocsDir, { recursive: true });
     fs.writeFileSync(path.join(aiDocsDir, 'test.md'), 'password = "secret123"');
 
-    const result = await initCommand(testDir, { skipPrompt: true, skipAI: true });
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
     expect(result).toBeDefined();
     expect(result.warnings.length).toBeGreaterThan(0);
   });

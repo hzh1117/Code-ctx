@@ -59,7 +59,13 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             子项目列表
           </h2>
-          <span class="badge badge-success">{{ config.projects?.length || 0 }}</span>
+          <div class="header-actions">
+            <span class="badge badge-success">{{ config.projects?.length || 0 }}</span>
+            <button class="btn btn-secondary btn-sm" @click="openProjectForm()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加子项目
+            </button>
+          </div>
         </div>
 
         <div v-if="config.projects?.length" class="projects-grid">
@@ -73,6 +79,10 @@
               <span class="badge badge-neutral">{{ project.type }}</span>
             </div>
             <div class="project-path mono-dim">{{ project.path }}</div>
+            <div class="project-actions">
+              <button class="btn btn-secondary btn-sm" @click="openProjectForm(project, index)">编辑</button>
+              <button class="btn btn-danger btn-sm" @click="removeProject(index)">删除</button>
+            </div>
           </div>
         </div>
 
@@ -119,6 +129,37 @@
         {{ toast.message }}
       </div>
     </transition>
+
+    <div v-if="projectDialog.show" class="modal-backdrop" @click.self="closeProjectForm">
+      <div class="modal-card card">
+        <div class="card-header">
+          <h2 class="card-title">{{ projectDialog.index === null ? '添加子项目' : '编辑子项目' }}</h2>
+          <button class="icon-btn" @click="closeProjectForm" aria-label="关闭">×</button>
+        </div>
+        <div class="form-stack">
+          <div class="input-group">
+            <label class="input-label">alias <span class="required">*</span></label>
+            <input v-model.trim="projectDialog.form.alias" class="input" placeholder="web" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">path <span class="required">*</span></label>
+            <input v-model.trim="projectDialog.form.path" class="input" placeholder="./web" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">type <span class="required">*</span></label>
+            <input v-model.trim="projectDialog.form.type" class="input" placeholder="vue3-admin" />
+          </div>
+          <div class="input-group">
+            <label class="input-label">label</label>
+            <input v-model.trim="projectDialog.form.label" class="input" placeholder="前端" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" @click="closeProjectForm">取消</button>
+            <button class="btn btn-primary" @click="saveProject">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -132,6 +173,11 @@ export default {
       loading: true,
       saving: false,
       newDir: '',
+      projectDialog: {
+        show: false,
+        index: null,
+        form: { alias: '', path: '', type: '', label: '' }
+      },
       toast: { show: false, message: '', type: 'success' }
     };
   },
@@ -169,6 +215,43 @@ export default {
     },
     removeDir(index) {
       this.config.excludeDirs.splice(index, 1);
+    },
+    openProjectForm(project = null, index = null) {
+      this.projectDialog = {
+        show: true,
+        index,
+        form: project
+          ? { alias: project.alias || '', path: project.path || '', type: project.type || '', label: project.label || '' }
+          : { alias: '', path: '', type: '', label: '' }
+      };
+    },
+    closeProjectForm() {
+      this.projectDialog.show = false;
+    },
+    saveProject() {
+      const form = { ...this.projectDialog.form };
+      if (!form.alias || !form.path || !form.type) {
+        this.showToast('请填写 alias/path/type', 'error');
+        return;
+      }
+      if (!this.config.projects) this.config.projects = [];
+      const nextProject = {
+        alias: form.alias,
+        path: form.path,
+        type: form.type,
+        label: form.label || form.alias
+      };
+      if (this.projectDialog.index === null) {
+        this.config.projects.push(nextProject);
+      } else {
+        this.config.projects.splice(this.projectDialog.index, 1, nextProject);
+      }
+      this.closeProjectForm();
+      this.save();
+    },
+    removeProject(index) {
+      this.config.projects.splice(index, 1);
+      this.save();
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
@@ -209,6 +292,55 @@ export default {
 .project-path {
   overflow-wrap: anywhere;
   font-size: 12px;
+}
+
+.project-actions,
+.header-actions,
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-actions {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+  padding: 24px;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.modal-actions {
+  justify-content: flex-end;
 }
 
 .mono-accent {

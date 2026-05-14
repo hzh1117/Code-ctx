@@ -3,11 +3,49 @@ const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject, estimateTokens } = require('../scanner/file-scanner');
 const { getAIConfig } = require('../utils/config');
-const { generateWithAI } = require('../ai/client');
+const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
+const { listSections } = require('../core/section');
+
+function getExpectedSectionsFromTemplate(templateName) {
+  const templatePath = path.join(__dirname, '../../templates', templateName);
+  if (!fs.existsSync(templatePath)) return [];
+  const content = fs.readFileSync(templatePath, 'utf8');
+  return listSections(content);
+}
+
+async function generateDocument(prompt, aiConfig, alias) {
+  return generateWithContinuation(prompt, {
+    ...aiConfig,
+    onProgress: ({ attempt, maxAttempts }) => {
+      console.log(`[续写 ${attempt}/${maxAttempts}] ${alias}...`);
+    }
+  });
+}
+
+async function completeMissingSections(doc, expectedSections, aiConfig, alias) {
+  const existing = listSections(doc);
+  const missing = expectedSections.filter(section => !existing.includes(section));
+  if (missing.length === 0) return doc;
+
+  const prompt = [
+    `以上文档缺少以下章节，请补充完整：${missing.join(', ')}`,
+    '',
+    '要求：',
+    '- 只输出缺失章节内容',
+    '- 每个章节必须使用对应的 HTML section 标记包裹',
+    '- 不要重复已经存在的章节',
+    '',
+    '原文档：',
+    doc
+  ].join('\n');
+  const completion = await generateDocument(prompt, aiConfig, alias);
+  const safeCompletion = filterSensitive(completion).content;
+  return `${doc.trim()}\n\n${safeCompletion.trim()}\n`;
+}
 
 function loadInitState(outputDir) {
   const statePath = path.join(outputDir, STATE_FILES.INIT_STATE);
@@ -126,6 +164,8 @@ async function initCommand(rootDir, options = {}) {
         console.log('\n⚠️ 未配置 API Key，请先在 .env 文件中配置');
       } else {
         const failedDocs = [];
+        const projectExpectedSections = getExpectedSectionsFromTemplate('scan-prompt.md');
+        const overviewExpectedSections = getExpectedSectionsFromTemplate('scan-prompt-overview.md');
 
         if (strategy === 'ONE_SHOT') {
           // ONE_SHOT: 所有子项目拼一个 prompt
@@ -135,7 +175,7 @@ async function initCommand(rootDir, options = {}) {
             scanResults,
             type: 'one-shot'
           });
-          const allDocs = await generateWithAI(allPrompt, aiConfig);
+          const allDocs = await generateDocument(allPrompt, aiConfig, 'one-shot');
           const safeDocs = filterSensitive(allDocs).content;
 
           // 拆分各子项目文档
@@ -147,7 +187,10 @@ async function initCommand(rootDir, options = {}) {
             if (!match) {
               console.warn(`  ⚠️ ${project.alias}: 文档拆分失败，标记为待重新生成`);
             }
-            const doc = match ? match[0].trim() : `# ${project.alias}\n\n文档生成中，请稍后重试。`;
+            let doc = match ? match[0].trim() : `# ${project.alias}\n\n文档生成中，请稍后重试。`;
+            if (match) {
+              doc = await completeMissingSections(doc, projectExpectedSections, aiConfig, project.alias);
+            }
             fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
             generatedDocs[project.alias] = doc;
             state.projects[project.alias] = { status: match ? 'completed' : 'needs-regen' };
@@ -168,8 +211,13 @@ async function initCommand(rootDir, options = {}) {
                   project,
                   scanResult: scanResults[project.alias]
                 });
-                const doc = await generateWithAI(projectPrompt, aiConfig);
-                const safeDoc = filterSensitive(doc).content;
+                const doc = await generateDocument(projectPrompt, aiConfig, project.alias);
+                const safeDoc = await completeMissingSections(
+                  filterSensitive(doc).content,
+                  projectExpectedSections,
+                  aiConfig,
+                  project.alias
+                );
                 fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
                 return { alias: project.alias, doc: safeDoc };
               })
@@ -201,8 +249,13 @@ async function initCommand(rootDir, options = {}) {
                   otherDocs
                 });
 
-                const doc = await generateWithAI(projectPrompt, aiConfig);
-                const safeDoc = filterSensitive(doc).content;
+                const doc = await generateDocument(projectPrompt, aiConfig, project.alias);
+                const safeDoc = await completeMissingSections(
+                  filterSensitive(doc).content,
+                  projectExpectedSections,
+                  aiConfig,
+                  project.alias
+                );
                 fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
                 generatedDocs[project.alias] = safeDoc;
                 state.projects[project.alias] = { status: 'completed' };
@@ -226,8 +279,14 @@ async function initCommand(rootDir, options = {}) {
             config,
             generatedDocs
           });
-          const overview = await generateWithAI(overviewPrompt, aiConfig);
-          fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), filterSensitive(overview).content);
+          const overview = await generateDocument(overviewPrompt, aiConfig, 'OVERVIEW');
+          const safeOverview = await completeMissingSections(
+            filterSensitive(overview).content,
+            overviewExpectedSections,
+            aiConfig,
+            'OVERVIEW'
+          );
+          fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), safeOverview);
           console.log(`\n✓ 成功生成 ${successCount} 个子项目文档 + OVERVIEW.md`);
         }
       }

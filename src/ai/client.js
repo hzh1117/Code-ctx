@@ -21,7 +21,7 @@ function getRetryDelay(retries, res) {
   return BASE_RETRY_DELAY * Math.pow(2, retries) + Math.random() * 1000;
 }
 
-async function callOpenAI(prompt, options, retries = 0) {
+async function callOpenAIWithMessages(messages, options, retries = 0) {
   const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
   const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
@@ -31,7 +31,7 @@ async function callOpenAI(prompt, options, retries = 0) {
   const body = JSON.stringify({
     model,
     max_tokens: maxTokens,
-    messages: [{ role: 'user', content: prompt }]
+    messages
   });
 
   return new Promise((resolve, reject) => {
@@ -42,7 +42,7 @@ async function callOpenAI(prompt, options, retries = 0) {
       if (retries < MAX_RETRIES) {
         const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
         console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-        setTimeout(() => callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+        setTimeout(() => callOpenAIWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
       } else {
         reject(new Error(reason));
       }
@@ -63,7 +63,7 @@ async function callOpenAI(prompt, options, retries = 0) {
           retried = true;
           const delay = getRetryDelay(retries, res);
           console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-          setTimeout(() => callOpenAI(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+          setTimeout(() => callOpenAIWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
           return;
         }
         try {
@@ -104,7 +104,11 @@ async function callOpenAI(prompt, options, retries = 0) {
   });
 }
 
-async function callAnthropic(prompt, options, retries = 0) {
+async function callOpenAI(prompt, options, retries = 0) {
+  return callOpenAIWithMessages([{ role: 'user', content: prompt }], options, retries);
+}
+
+async function callAnthropicWithMessages(messages, options, retries = 0) {
   const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
 
   const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
@@ -122,7 +126,7 @@ async function callAnthropic(prompt, options, retries = 0) {
   const body = JSON.stringify({
     model,
     max_tokens: maxTokens,
-    messages: [{ role: 'user', content: prompt }]
+    messages
   });
 
   return new Promise((resolve, reject) => {
@@ -133,7 +137,7 @@ async function callAnthropic(prompt, options, retries = 0) {
       if (retries < MAX_RETRIES) {
         const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
         console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-        setTimeout(() => callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+        setTimeout(() => callAnthropicWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
       } else {
         reject(new Error(reason));
       }
@@ -157,7 +161,7 @@ async function callAnthropic(prompt, options, retries = 0) {
           retried = true;
           const delay = getRetryDelay(retries, res);
           console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-          setTimeout(() => callAnthropic(prompt, options, retries + 1).then(resolve).catch(reject), delay);
+          setTimeout(() => callAnthropicWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
           return;
         }
         try {
@@ -198,6 +202,10 @@ async function callAnthropic(prompt, options, retries = 0) {
   });
 }
 
+async function callAnthropic(prompt, options, retries = 0) {
+  return callAnthropicWithMessages([{ role: 'user', content: prompt }], options, retries);
+}
+
 async function generateWithAI(prompt, options = {}) {
   const {
     apiKey,
@@ -223,4 +231,72 @@ async function generateWithAI(prompt, options = {}) {
   }
 }
 
-module.exports = { generateWithAI, callOpenAI, callAnthropic };
+async function generateFromMessages(messages, options = {}) {
+  const {
+    apiKey,
+    protocol = 'openai',
+    baseUrl = 'https://api.openai.com/v1',
+    model = 'gpt-4',
+    maxTokens = 4096,
+    timeout = DEFAULT_TIMEOUT
+  } = options;
+
+  if (!apiKey) {
+    throw new Error('需要配置 API key');
+  }
+
+  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout };
+
+  if (protocol === 'openai') {
+    return callOpenAIWithMessages(messages, callOptions);
+  } else if (protocol === 'anthropic') {
+    return callAnthropicWithMessages(messages, callOptions);
+  } else {
+    throw new Error(`不支持的协议: ${protocol}`);
+  }
+}
+
+async function generateWithContinuation(prompt, options = {}) {
+  const {
+    systemPrompt,
+    onProgress,
+    maxContinuations = 5
+  } = options;
+
+  const continuationPrompt = `${prompt}\n\n若回答因长度限制被截断，请在截断位置输出 <<<CONTINUE>>> 标记`;
+  const baseMessages = [];
+  if (systemPrompt) {
+    baseMessages.push({ role: 'system', content: systemPrompt });
+  }
+  baseMessages.push({ role: 'user', content: continuationPrompt });
+
+  let messages = [...baseMessages];
+  let content = await generateFromMessages(messages, options);
+  let combined = content.replace(/<<<CONTINUE>>>/g, '');
+  let continuationCount = 0;
+
+  while (content.includes('<<<CONTINUE>>>') && continuationCount < maxContinuations) {
+    continuationCount++;
+    const attempt = continuationCount + 1;
+    if (onProgress) {
+      onProgress({ attempt, maxAttempts: maxContinuations });
+    }
+
+    messages = [
+      ...baseMessages,
+      { role: 'assistant', content },
+      { role: 'user', content: '请从 <<<CONTINUE>>> 处继续，不要重复' }
+    ];
+    content = await generateFromMessages(messages, options);
+    combined += content.replace(/<<<CONTINUE>>>/g, '');
+  }
+
+  return combined;
+}
+
+module.exports = {
+  generateWithAI,
+  generateWithContinuation,
+  callOpenAI,
+  callAnthropic
+};

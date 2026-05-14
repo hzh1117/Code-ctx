@@ -1,5 +1,5 @@
 // Tests depend on real scenarios.json loaded via getScenarios() — acceptable for integration-style testing
-const { useCommand } = require('../../src/commands/use');
+const { useCommand, buildContext } = require('../../src/commands/use');
 const { matchScenario } = require('../../src/matcher/scenario-matcher');
 const path = require('path');
 const fs = require('fs');
@@ -158,6 +158,21 @@ describe('useCommand', () => {
       expect(result.prompt).not.toContain('abc123');
       expect(result.prompt).not.toContain('secret_token_value');
       expect(result.prompt).toContain('[FILTERED]');
+    });
+  });
+
+  describe('buildContext', () => {
+    test('should return the assembled prompt string for CLI and Web reuse', async () => {
+      const prompt = await buildContext('商户后台新增功能', 'B', {
+        rootDir: fixturesDir,
+        noAiMatch: true,
+        language: 'zh'
+      });
+
+      expect(typeof prompt).toBe('string');
+      expect(prompt).toContain('【第一部分：项目上下文】');
+      expect(prompt).toContain('商户端文档');
+      expect(prompt).toContain('【第二部分：任务模板】');
     });
   });
 

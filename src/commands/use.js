@@ -14,6 +14,71 @@ const COMPACT_SECTION_IDS = {
   relatedDocs: ['modules', 'notes']
 };
 
+async function resolveScenario(taskDescription, scenario, aiConfig, noAiMatch, language) {
+  if (!taskDescription && !scenario) {
+    throw new Error('请提供任务描述或指定场景');
+  }
+
+  let matchedScenario = scenario;
+  let confidence = 100;
+  let matchMethod = 'manual';
+  let aiReason = null;
+  let matchedKeyword = null;
+
+  if (!matchedScenario && taskDescription) {
+    const match = await matchScenarioWithAI(taskDescription, aiConfig, { noAiMatch });
+    matchedScenario = match.scenarioId;
+    confidence = match.confidence;
+    matchMethod = match.method;
+    aiReason = match.aiReason || null;
+    matchedKeyword = match.matchedKeyword || null;
+  }
+
+  const scenarios = getScenarios(undefined, language);
+  const selectedScenario = scenarios.find(s => s.id === matchedScenario);
+  if (!selectedScenario) {
+    throw new Error(language === 'en' ? `Scenario not found: ${matchedScenario}` : `未找到场景: ${matchedScenario}`);
+  }
+
+  return { matchedScenario, confidence, matchMethod, aiReason, matchedKeyword, selectedScenario };
+}
+
+function loadContextDocs(rootDir, selectedScenario) {
+  let overviewContent = '';
+  const relatedDocs = {};
+  const loadedDocs = [];
+
+  if (!rootDir) {
+    return { overviewContent, relatedDocs, loadedDocs };
+  }
+
+  const aiDocsDir = path.join(rootDir, 'ai-docs');
+
+  const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
+  if (fs.existsSync(overviewPath)) {
+    overviewContent = fs.readFileSync(overviewPath, 'utf8');
+    loadedDocs.push('OVERVIEW.md');
+  }
+
+  if (selectedScenario.relatedProjects) {
+    for (const alias of selectedScenario.relatedProjects) {
+      const docPath = path.join(aiDocsDir, `${alias}.md`);
+      if (fs.existsSync(docPath)) {
+        relatedDocs[`${alias}.md`] = fs.readFileSync(docPath, 'utf8');
+        loadedDocs.push(`${alias}.md`);
+      }
+    }
+  }
+
+  const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
+  if (fs.existsSync(contractsPath)) {
+    relatedDocs['api-contracts.md'] = fs.readFileSync(contractsPath, 'utf8');
+    loadedDocs.push('api-contracts.md');
+  }
+
+  return { overviewContent, relatedDocs, loadedDocs };
+}
+
 function extractFirstSection(content, sectionNames) {
   for (const name of sectionNames) {
     const section = extractSection(content, name);
@@ -56,83 +121,54 @@ function compactPrompt(prompt, taskDescription, template, overviewContent, relat
   };
 }
 
+async function buildContext(task, scenario, options = {}) {
+  const { rootDir, aiConfig, noAiMatch, language } = options;
+  const resolved = await resolveScenario(task, scenario, aiConfig, noAiMatch, language);
+  const { overviewContent, relatedDocs } = loadContextDocs(rootDir, resolved.selectedScenario);
+
+  let prompt = buildUsePrompt({
+    taskDescription: task || '',
+    overviewContent,
+    relatedDocs,
+    template: resolved.selectedScenario.template,
+    language
+  });
+
+  prompt = filterSensitive(prompt).content;
+
+  if (prompt.length > COMPACT_THRESHOLD) {
+    const result = compactPrompt(prompt, task, resolved.selectedScenario.template, overviewContent, relatedDocs);
+    prompt = filterSensitive(result.prompt).content;
+  }
+
+  return prompt;
+}
+
 async function useCommand(options = {}) {
   const { taskDescription, scenario, rootDir, aiConfig, noAiMatch, language } = options;
 
-  if (!taskDescription && !scenario) {
-    throw new Error('请提供任务描述或指定场景');
-  }
-
   // 1. 确定场景
-  let matchedScenario = scenario;
-  let confidence = 100;
-  let matchMethod = 'manual';
-  let aiReason = null;
+  const resolved = await resolveScenario(taskDescription, scenario, aiConfig, noAiMatch, language);
+  const { matchedScenario, confidence, matchMethod, aiReason, matchedKeyword, selectedScenario } = resolved;
 
-  if (!matchedScenario && taskDescription) {
-    const match = await matchScenarioWithAI(taskDescription, aiConfig, { noAiMatch });
-    matchedScenario = match.scenarioId;
-    confidence = match.confidence;
-    matchMethod = match.method;
-    aiReason = match.aiReason || null;
-
-    // 低置信度：返回所有场景供用户选择
-    if (confidence < LOW_CONFIDENCE_THRESHOLD && matchMethod === 'keyword') {
-      const allScenarios = getScenarios();
-      return {
-        lowConfidenceScenarios: allScenarios.map(s => ({
-          id: s.id,
-          name: s.name,
-          description: s.description
-        })),
-        matchedScenario,
-        confidence,
-        matchedKeyword: match.matchedKeyword,
-        matchMethod
-      };
-    }
-  }
-
-  // 2. 加载场景模板
-  const scenarios = getScenarios(undefined, language);
-  const selectedScenario = scenarios.find(s => s.id === matchedScenario);
-  if (!selectedScenario) {
-    throw new Error(language === 'en' ? `Scenario not found: ${matchedScenario}` : `未找到场景: ${matchedScenario}`);
+  // 低置信度：返回所有场景供用户选择
+  if (confidence < LOW_CONFIDENCE_THRESHOLD && matchMethod === 'keyword') {
+    const allScenarios = getScenarios();
+    return {
+      lowConfidenceScenarios: allScenarios.map(s => ({
+        id: s.id,
+        name: s.name,
+        description: s.description
+      })),
+      matchedScenario,
+      confidence,
+      matchedKeyword,
+      matchMethod
+    };
   }
 
   // 3. 加载项目文档上下文
-  let overviewContent = '';
-  let relatedDocs = {};
-  const loadedDocs = [];
-
-  if (rootDir) {
-    const aiDocsDir = path.join(rootDir, 'ai-docs');
-
-    // 加载 OVERVIEW
-    const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
-    if (fs.existsSync(overviewPath)) {
-      overviewContent = fs.readFileSync(overviewPath, 'utf8');
-      loadedDocs.push('OVERVIEW.md');
-    }
-
-    // 加载相关子项目文档
-    if (selectedScenario.relatedProjects) {
-      for (const alias of selectedScenario.relatedProjects) {
-        const docPath = path.join(aiDocsDir, `${alias}.md`);
-        if (fs.existsSync(docPath)) {
-          relatedDocs[`${alias}.md`] = fs.readFileSync(docPath, 'utf8');
-          loadedDocs.push(`${alias}.md`);
-        }
-      }
-    }
-
-    // 加载接口契约
-    const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
-    if (fs.existsSync(contractsPath)) {
-      relatedDocs['api-contracts.md'] = fs.readFileSync(contractsPath, 'utf8');
-      loadedDocs.push('api-contracts.md');
-    }
-  }
+  const { overviewContent, relatedDocs, loadedDocs } = loadContextDocs(rootDir, selectedScenario);
 
   // 4. 组装 prompt
   let prompt = buildUsePrompt({
@@ -169,4 +205,4 @@ async function useCommand(options = {}) {
   };
 }
 
-module.exports = { useCommand };
+module.exports = { useCommand, buildContext };

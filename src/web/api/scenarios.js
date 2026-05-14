@@ -4,10 +4,10 @@ const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
 const { filterSensitive } = require('../../utils/sensitive-filter');
 const { getScenarios, clearCache } = require('../../template/engine');
-const { buildUsePrompt } = require('../../generator/prompt-builder');
-const { matchScenario } = require('../../matcher/scenario-matcher');
+const { buildContext, useCommand } = require('../../commands/use');
 const { listSections } = require('../../core/section');
 const { updateCommand } = require('../../commands/update');
+const { runDoctor } = require('../../commands/doctor');
 const { getHistory } = require('../../utils/task-history');
 const { STATE_FILES } = require('../../utils/constants');
 
@@ -55,7 +55,7 @@ module.exports = function(rootDir) {
     }
   });
 
-  router.get('/status', (req, res) => {
+  router.get('/status', async (req, res) => {
     try {
       const aiDocsDir = path.join(rootDir, 'ai-docs');
       const result = {
@@ -142,15 +142,19 @@ module.exports = function(rootDir) {
         }
 
         result.docCount = result.documents.filter(doc => doc.exists).length;
-        const hasMissing = result.documents.some(doc => !doc.exists);
-        const hasStale = result.documents.some(doc => doc.stale);
-        if (hasMissing) {
-          result.healthStatus = '缺失文档';
-        } else if (hasStale) {
-          result.healthStatus = '待更新';
-        } else {
-          result.healthStatus = '正常';
-        }
+      }
+
+      const doctorReport = await runDoctor({ rootDir, silent: true });
+      result.doctor = {
+        issueCount: doctorReport.issues.length,
+        warningCount: doctorReport.warnings.length
+      };
+      if (doctorReport.issues.length > 0) {
+        result.healthStatus = '异常';
+      } else if (doctorReport.warnings.length > 0 || result.documents.some(doc => doc.stale)) {
+        result.healthStatus = '警告';
+      } else if (result.exists) {
+        result.healthStatus = '正常';
       }
 
       res.json(result);
@@ -189,54 +193,33 @@ module.exports = function(rootDir) {
     }
   });
 
-  router.post('/generate-prompt', (req, res) => {
+  router.post('/generate-prompt', async (req, res) => {
     try {
       const { task, scenario } = req.body;
       const safeTask = filterSensitive(task || '').content;
-      const config = loadProjectConfig(rootDir);
 
-      const scenarioMatch = matchScenario(safeTask);
-      const matchedScenarioId = scenario || scenarioMatch.scenarioId;
-      const scenarios = getScenarios();
-      const matchedScenario = scenarios.find(s => s.id === matchedScenarioId);
-
-      let template = '';
-      if (matchedScenario) {
-        template = matchedScenario.template || '';
-      }
-
-      // 读取 OVERVIEW.md 作为上下文
-      const overviewPath = path.join(rootDir, 'ai-docs', 'OVERVIEW.md');
-      let overviewContent = '';
-      if (fs.existsSync(overviewPath)) {
-        overviewContent = fs.readFileSync(overviewPath, 'utf8');
-      }
-
-      // 读取相关子项目文档
-      const relatedDocs = {};
-      if (matchedScenario && matchedScenario.relatedProjects) {
-        for (const alias of matchedScenario.relatedProjects) {
-          const docPath = path.join(rootDir, 'ai-docs', `${alias}.md`);
-          if (fs.existsSync(docPath)) {
-            const content = fs.readFileSync(docPath, 'utf8');
-            const lines = content.split('\n');
-            relatedDocs[alias] = lines.slice(0, 30).join('\n');
-          }
-        }
-      }
-
-      const prompt = buildUsePrompt({
+      const result = await useCommand({
         taskDescription: safeTask,
-        overviewContent,
-        relatedDocs,
-        template,
+        scenario,
+        rootDir,
+        noAiMatch: true,
+        language: 'zh'
+      });
+
+      if (result.lowConfidenceScenarios) {
+        return res.json({ success: false, ...result });
+      }
+
+      const prompt = await buildContext(safeTask, result.matchedScenario, {
+        rootDir,
+        noAiMatch: true,
         language: 'zh'
       });
 
       res.json({
         success: true,
-        scenario: matchedScenarioId,
-        scenarioName: matchedScenario ? matchedScenario.name : '未知',
+        scenario: result.matchedScenario,
+        scenarioName: result.scenarioName,
         prompt
       });
     } catch (err) {

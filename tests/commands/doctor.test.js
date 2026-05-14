@@ -1,4 +1,4 @@
-const { doctorCommand, doctorFix } = require('../../src/commands/doctor');
+const { doctorCommand, doctorFix, runDoctor } = require('../../src/commands/doctor');
 const fs = require('fs');
 const path = require('path');
 
@@ -66,6 +66,13 @@ describe('doctorCommand', () => {
     fs.rmSync(path.join(testDir, 'ai-docs'), { recursive: true, force: true });
 
     const report = await doctorCommand(testDir);
+    expect(report.issues.some(i => i.message.includes('ai-docs'))).toBe(true);
+  });
+
+  test('runDoctor should expose doctor report for Web API reuse', async () => {
+    fs.rmSync(path.join(testDir, 'ai-docs'), { recursive: true, force: true });
+
+    const report = await runDoctor({ rootDir: testDir });
     expect(report.issues.some(i => i.message.includes('ai-docs'))).toBe(true);
   });
 

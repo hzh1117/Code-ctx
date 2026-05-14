@@ -488,4 +488,25 @@ async function doctorFix(rootDir, options = {}) {
   console.log(`\n✅ 修复完成，共修复 ${fixedCount} 个文档`);
 }
 
-module.exports = { doctorCommand, doctorFix };
+async function runDoctor(options = {}) {
+  const { rootDir = process.cwd(), silent = false, ...doctorOptions } = options;
+  if (!silent) {
+    return doctorCommand(rootDir, doctorOptions);
+  }
+
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  try {
+    return await doctorCommand(rootDir, doctorOptions);
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+    console.error = originalError;
+  }
+}
+
+module.exports = { doctorCommand, doctorFix, runDoctor };

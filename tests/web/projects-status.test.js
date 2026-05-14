@@ -134,4 +134,18 @@ describe('web project/status api', () => {
       expect.objectContaining({ task: 'one' })
     ]);
   });
+
+  test('GET /api/status derives health status from doctor report', async () => {
+    fs.unlinkSync(path.join(testDir, 'ai-docs/OVERVIEW.md'));
+
+    const res = await requestJson(server, '/api/status');
+
+    expect(res.status).toBe(200);
+    expect(res.body.healthStatus).toBe('异常');
+    expect(res.body.doctor).toEqual(expect.objectContaining({
+      issueCount: expect.any(Number),
+      warningCount: expect.any(Number)
+    }));
+    expect(res.body.doctor.issueCount).toBeGreaterThan(0);
+  });
 });

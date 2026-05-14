@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import App from './App.vue';
+import Dashboard from './views/Dashboard.vue';
 import Config from './views/Config.vue';
 import AIConfig from './views/AIConfig.vue';
 import AIGenerate from './views/AIGenerate.vue';
@@ -9,7 +10,8 @@ import Scenarios from './views/Scenarios.vue';
 import Status from './views/Status.vue';
 
 const routes = [
-  { path: '/', component: Config },
+  { path: '/', component: Dashboard },
+  { path: '/config', component: Config },
   { path: '/ai', component: AIConfig },
   { path: '/ai-generate', component: AIGenerate },
   { path: '/projects', component: Projects },

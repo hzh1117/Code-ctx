@@ -8,6 +8,8 @@ const { buildUsePrompt } = require('../../generator/prompt-builder');
 const { matchScenario } = require('../../matcher/scenario-matcher');
 const { listSections } = require('../../core/section');
 const { updateCommand } = require('../../commands/update');
+const { getHistory } = require('../../utils/task-history');
+const { STATE_FILES } = require('../../utils/constants');
 
 module.exports = function(rootDir) {
   const router = express.Router();
@@ -58,7 +60,12 @@ module.exports = function(rootDir) {
       const aiDocsDir = path.join(rootDir, 'ai-docs');
       const result = {
         exists: fs.existsSync(aiDocsDir),
-        documents: []
+        documents: [],
+        docCount: 0,
+        lastScanTime: null,
+        historyCount: 0,
+        healthStatus: '未初始化',
+        recentHistory: []
       };
 
       if (result.exists) {
@@ -73,6 +80,17 @@ module.exports = function(rootDir) {
 
         const files = fs.readdirSync(aiDocsDir);
         const mdFiles = files.filter(f => f.endsWith('.md'));
+        const lastScanPath = path.join(aiDocsDir, STATE_FILES.LAST_SCAN);
+        if (fs.existsSync(lastScanPath)) {
+          try {
+            const lastScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
+            result.lastScanTime = lastScan.timestamp || null;
+          } catch {}
+        }
+
+        const history = getHistory(rootDir);
+        result.historyCount = history.length;
+        result.recentHistory = history.slice().reverse().slice(0, 5);
 
         // 已存在的文档
         result.documents = mdFiles.map(file => {
@@ -121,6 +139,17 @@ module.exports = function(rootDir) {
               stale: false
             });
           }
+        }
+
+        result.docCount = result.documents.filter(doc => doc.exists).length;
+        const hasMissing = result.documents.some(doc => !doc.exists);
+        const hasStale = result.documents.some(doc => doc.stale);
+        if (hasMissing) {
+          result.healthStatus = '缺失文档';
+        } else if (hasStale) {
+          result.healthStatus = '待更新';
+        } else {
+          result.healthStatus = '正常';
         }
       }
 

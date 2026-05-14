@@ -61,6 +61,14 @@ describe('web project/status api', () => {
       '<!-- /section:modules -->'
     ].join('\n'));
     fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'), '# Overview');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      timestamp: '2026-05-14T08:00:00.000Z',
+      files: {}
+    }));
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.task-history.jsonl'), [
+      JSON.stringify({ timestamp: '2026-05-14T07:00:00.000Z', task: 'one' }),
+      JSON.stringify({ timestamp: '2026-05-14T07:30:00.000Z', task: 'two' })
+    ].join('\n') + '\n');
 
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
@@ -109,5 +117,21 @@ describe('web project/status api', () => {
       exists: true,
       sections: ['overview', 'modules']
     }));
+  });
+
+  test('GET /api/status returns dashboard summary fields', async () => {
+    const res = await requestJson(server, '/api/status');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(expect.objectContaining({
+      docCount: 2,
+      lastScanTime: '2026-05-14T08:00:00.000Z',
+      historyCount: 2,
+      healthStatus: expect.any(String)
+    }));
+    expect(res.body.recentHistory).toEqual([
+      expect.objectContaining({ task: 'two' }),
+      expect.objectContaining({ task: 'one' })
+    ]);
   });
 });

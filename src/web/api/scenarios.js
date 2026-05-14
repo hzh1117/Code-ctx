@@ -7,6 +7,7 @@ const { getScenarios, clearCache } = require('../../template/engine');
 const { buildUsePrompt } = require('../../generator/prompt-builder');
 const { matchScenario } = require('../../matcher/scenario-matcher');
 const { listSections } = require('../../core/section');
+const { updateCommand } = require('../../commands/update');
 
 module.exports = function(rootDir) {
   const router = express.Router();
@@ -126,6 +127,36 @@ module.exports = function(rootDir) {
       res.json(result);
     } catch (err) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/docs/:name', (req, res) => {
+    try {
+      const fileName = path.basename(req.params.name);
+      if (!fileName.endsWith('.md')) {
+        return res.status(400).json({ error: '只支持 Markdown 文档' });
+      }
+
+      const docPath = path.join(rootDir, 'ai-docs', fileName);
+      if (!fs.existsSync(docPath)) {
+        return res.status(404).json({ error: '文档不存在' });
+      }
+
+      res.json({
+        name: fileName,
+        content: fs.readFileSync(docPath, 'utf8')
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/update', async (req, res) => {
+    try {
+      const result = await updateCommand(rootDir, req.body || {});
+      res.json({ success: true, result });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

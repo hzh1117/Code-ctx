@@ -21,6 +21,7 @@
               <th class="col-size">大小</th>
               <th class="col-time">最后更新</th>
               <th class="col-health">状态</th>
+              <th class="col-actions">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -35,6 +36,12 @@
                   <span class="health-icon">{{ healthIcon(doc) }}</span>
                   {{ healthLabel(doc) }}
                 </span>
+              </td>
+              <td class="col-actions">
+                <button class="btn btn-secondary btn-sm" @click="viewDoc(doc)" :disabled="!doc.exists">查看内容</button>
+                <button class="btn btn-secondary btn-sm" @click="triggerUpdate(doc)" :disabled="updating">
+                  {{ updatingDoc === doc.name ? '更新中...' : '触发更新' }}
+                </button>
               </td>
             </tr>
           </tbody>
@@ -53,6 +60,22 @@
         <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
       </div>
     </div>
+
+    <div v-if="viewer.show" class="modal-backdrop" @click.self="closeViewer">
+      <div class="modal-card card">
+        <div class="card-header">
+          <h2 class="card-title">{{ viewer.name }}</h2>
+          <button class="icon-btn" @click="closeViewer" aria-label="关闭">×</button>
+        </div>
+        <pre class="doc-source">{{ viewer.content }}</pre>
+      </div>
+    </div>
+
+    <transition name="page-fade">
+      <div v-if="toast.show" :class="['global-toast', `toast-${toast.type}`]">
+        {{ toast.message }}
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -61,19 +84,59 @@ import axios from 'axios';
 
 export default {
   data() {
-    return { documents: [], loading: true };
+    return {
+      documents: [],
+      loading: true,
+      updating: false,
+      updatingDoc: '',
+      viewer: { show: false, name: '', content: '' },
+      toast: { show: false, message: '', type: 'success' }
+    };
   },
   async mounted() {
-    try {
-      const res = await axios.get('/api/status');
-      this.documents = res.data.documents || [];
-    } catch (err) {
-      console.error('加载失败:', err);
-    } finally {
-      this.loading = false;
-    }
+    await this.loadStatus();
   },
   methods: {
+    async loadStatus() {
+      this.loading = true;
+      try {
+        const res = await axios.get('/api/status');
+        this.documents = res.data.documents || [];
+      } catch (err) {
+        this.showToast('加载失败: ' + err.message, 'error');
+      } finally {
+        this.loading = false;
+      }
+    },
+    async viewDoc(doc) {
+      try {
+        const res = await axios.get(`/api/docs/${encodeURIComponent(doc.name)}`);
+        this.viewer = { show: true, name: res.data.name, content: res.data.content };
+      } catch (err) {
+        this.showToast('读取失败: ' + err.message, 'error');
+      }
+    },
+    closeViewer() {
+      this.viewer.show = false;
+    },
+    async triggerUpdate(doc) {
+      this.updating = true;
+      this.updatingDoc = doc.name;
+      try {
+        await axios.post('/api/update', { docName: doc.name });
+        this.showToast('已触发更新', 'success');
+        await this.loadStatus();
+      } catch (err) {
+        this.showToast('更新失败: ' + err.message, 'error');
+      } finally {
+        this.updating = false;
+        this.updatingDoc = '';
+      }
+    },
+    showToast(message, type = 'success') {
+      this.toast = { show: true, message, type };
+      setTimeout(() => { this.toast.show = false; }, 3000);
+    },
     formatSize(bytes) {
       if (!bytes) return '0 B';
       if (bytes < 1024) return bytes + ' B';
@@ -143,6 +206,15 @@ export default {
   text-align: right;
 }
 
+.col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.col-actions .btn + .btn {
+  margin-left: 8px;
+}
+
 .file-name {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -186,5 +258,50 @@ export default {
 
 .health-icon {
   font-size: 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+  padding: 24px;
+}
+
+.modal-card {
+  width: min(900px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.doc-source {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--code-bg);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 </style>

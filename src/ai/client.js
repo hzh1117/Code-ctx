@@ -8,6 +8,30 @@ const RETRYABLE_ERRORS = AI_CLIENT.RETRYABLE_ERRORS;
 const RETRYABLE_STATUS_CODES = AI_CLIENT.RETRYABLE_STATUS_CODES;
 const BASE_RETRY_DELAY = AI_CLIENT.BASE_RETRY_DELAY;
 
+const DEBUG = process.env.AI_DEBUG === 'true';
+const DEBUG_RESPONSE = process.env.AI_DEBUG_RESPONSE === 'true';
+
+function debugLog(...args) {
+  if (DEBUG) {
+    console.log('[AI-DEBUG]', new Date().toISOString(), ...args);
+  }
+}
+
+function debugResponse(label, data) {
+  if (DEBUG || DEBUG_RESPONSE) {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`[AI-RESPONSE] ${label}`);
+    console.log(`${'='.repeat(60)}`);
+    try {
+      const json = JSON.parse(data);
+      console.log(JSON.stringify(json, null, 2));
+    } catch {
+      console.log(data);
+    }
+    console.log(`${'='.repeat(60)}\n`);
+  }
+}
+
 function trimTrailingSlashes(value) {
   return value.replace(/\/+$/, '');
 }
@@ -34,11 +58,21 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
     messages
   });
 
+  debugLog('OpenAI请求开始', {
+    url: url.toString(),
+    model,
+    maxTokens,
+    timeout,
+    messagesCount: messages.length,
+    retry: retries + 1
+  });
+
   return new Promise((resolve, reject) => {
     let retried = false;
     const doRetry = (reason, res) => {
       if (retried) return;
       retried = true;
+      debugLog('准备重试', { reason, retry: retries + 1 });
       if (retries < MAX_RETRIES) {
         const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
         console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
@@ -56,9 +90,11 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
       },
       timeout
     }, (res) => {
+      debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        debugResponse('OpenAI 响应', data);
         if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
           retried = true;
           const delay = getRetryDelay(retries, res);
@@ -69,19 +105,24 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
         try {
           const json = JSON.parse(data);
           if (json.error) {
+            debugLog('API返回错误', json.error);
             reject(new Error(`[${res.statusCode}] ${json.error.message}`));
           } else if (!json.choices || !json.choices[0]) {
+            debugLog('响应格式异常');
             reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
           } else {
+            debugLog('请求成功', { contentLength: json.choices[0].message.content.length });
             resolve(json.choices[0].message.content);
           }
         } catch (e) {
+          debugLog('解析响应失败', { error: e.message });
           reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
         }
       });
     });
 
     req.on('timeout', () => {
+      debugLog('请求超时', { timeout, retry: retries + 1 });
       req.destroy();
       if (retries < MAX_RETRIES) {
         doRetry(`请求超时 (${timeout}ms)`);
@@ -91,6 +132,7 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
     });
 
     req.on('error', (err) => {
+      debugLog('请求错误', { code: err.code, message: err.message, stack: err.stack });
       const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
       if (retries < MAX_RETRIES && isRetryable) {
         doRetry(`连接失败 (${err.code || err.message})`);
@@ -129,11 +171,21 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
     messages
   });
 
+  debugLog('Anthropic请求开始', {
+    url: url.toString(),
+    model,
+    maxTokens,
+    timeout,
+    messagesCount: messages.length,
+    retry: retries + 1
+  });
+
   return new Promise((resolve, reject) => {
     let retried = false;
     const doRetry = (reason, res) => {
       if (retried) return;
       retried = true;
+      debugLog('准备重试', { reason, retry: retries + 1 });
       if (retries < MAX_RETRIES) {
         const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
         console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
@@ -154,9 +206,11 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
       },
       timeout
     }, (res) => {
+      debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
+        debugResponse('Anthropic 响应', data);
         if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
           retried = true;
           const delay = getRetryDelay(retries, res);
@@ -167,19 +221,24 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
         try {
           const json = JSON.parse(data);
           if (json.error) {
+            debugLog('API返回错误', json.error);
             reject(new Error(`[${res.statusCode}] ${json.error.message}`));
           } else if (!json.content || !json.content[0]) {
+            debugLog('响应格式异常');
             reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
           } else {
+            debugLog('请求成功', { contentLength: json.content[0].text.length });
             resolve(json.content[0].text);
           }
         } catch (e) {
+          debugLog('解析响应失败', { error: e.message });
           reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
         }
       });
     });
 
     req.on('timeout', () => {
+      debugLog('请求超时', { timeout, retry: retries + 1 });
       req.destroy();
       if (retries < MAX_RETRIES) {
         doRetry(`请求超时 (${timeout}ms)`);
@@ -189,6 +248,7 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
     });
 
     req.on('error', (err) => {
+      debugLog('请求错误', { code: err.code, message: err.message, stack: err.stack });
       const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
       if (retries < MAX_RETRIES && isRetryable) {
         doRetry(`连接失败 (${err.code || err.message})`);

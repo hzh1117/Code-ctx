@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); pkgs=d.get\\('packages',{}\\); print\\(f'Total packages: {len\\(pkgs\\)}'\\)\")",
+      "Bash(npm ls *)",
+      "Bash(npm audit *)",
+      "Bash(npm outdated *)",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\('engines:', JSON.stringify\\(pkg.engines\\)\\); console.log\\('files:', JSON.stringify\\(pkg.files\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./node_modules/clipboardy/package.json'\\); console.log\\('clipboardy version:', p.version, 'type:', p.type || 'commonjs'\\)\")",
+      "Bash(node -e \"const p=require\\('./node_modules/chalk/package.json'\\); console.log\\('chalk version:', p.version, 'type:', p.type || 'commonjs'\\)\")",
+      "Bash(node -e \"const p=require\\('./node_modules/express/package.json'\\); console.log\\('express version:', p.version\\)\")"
+    ]
+  }
+}

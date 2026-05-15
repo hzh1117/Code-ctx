@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { AI_CLIENT, PROJECT_LIMITS } = require('./constants');
 
 function loadEnvConfig(rootDir) {
   const envPath = path.join(rootDir, '.env');
@@ -160,13 +161,34 @@ function getAIConfig(rootDir) {
     ? (envConfig.ANTHROPIC_AUTH_TOKEN || envConfig.ANTHROPIC_API_KEY || aiConfig.apiKey || '')
     : (envConfig.OPENAI_API_KEY || aiConfig.apiKey || '');
   
+  // 获取 timeout 配置
+  const timeout = aiConfig.timeout || envConfig.AI_TIMEOUT 
+    ? parseInt(envConfig.AI_TIMEOUT || aiConfig.timeout, 10) 
+    : AI_CLIENT.DEFAULT_TIMEOUT;
+
   return {
     protocol,
     baseUrl: activeProvider.baseUrl,
     model: activeProvider.model,
     maxTokens: activeProvider.maxTokens,
     apiKey,
+    timeout,
     providers
+  };
+}
+
+function getProjectLimits(rootDir) {
+  const envConfig = loadEnvConfig(rootDir);
+  const projectConfig = loadProjectConfig(rootDir);
+  const limits = projectConfig.projectLimits || {};
+  
+  return {
+    maxFiles: limits.maxFiles || envConfig.MAX_FILES_PER_PROJECT 
+      ? parseInt(envConfig.MAX_FILES_PER_PROJECT || limits.maxFiles, 10) 
+      : PROJECT_LIMITS.MAX_FILES_PER_PROJECT,
+    maxTokens: limits.maxTokens || envConfig.MAX_PROJECT_TOKENS 
+      ? parseInt(envConfig.MAX_PROJECT_TOKENS || limits.maxTokens, 10) 
+      : PROJECT_LIMITS.MAX_PROJECT_TOKENS
   };
 }
 
@@ -257,4 +279,4 @@ function saveAIConfig(rootDir, aiConfig) {
   return nextConfig.ai;
 }
 
-module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, loadConfigWithVM, saveAIConfig, getAIProviders };
+module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, loadConfigWithVM, saveAIConfig, getAIProviders, getProjectLimits };

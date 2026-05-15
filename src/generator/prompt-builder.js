@@ -145,4 +145,69 @@ ${(result.keyFiles || []).join('\n')}`;
   });
 }
 
-module.exports = { buildUsePrompt, buildInitPrompt, getLabels };
+function categorizeFiles(keyFiles) {
+  const categories = {
+    controllerFiles: [],
+    serviceFiles: [],
+    entityFiles: [],
+    repositoryFiles: [],
+    configFiles: []
+  };
+  
+  for (const file of keyFiles) {
+    const normalizedPath = file.replace(/\\/g, '/').toLowerCase();
+    
+    if (normalizedPath.includes('/controller/') || normalizedPath.includes('controller.java')) {
+      categories.controllerFiles.push(file);
+    } else if (normalizedPath.includes('/service/') || normalizedPath.includes('service.java')) {
+      categories.serviceFiles.push(file);
+    } else if (normalizedPath.includes('/entity/') || normalizedPath.includes('/model/') || normalizedPath.includes('entity.java')) {
+      categories.entityFiles.push(file);
+    } else if (normalizedPath.includes('/repository/') || normalizedPath.includes('/mapper/') || normalizedPath.includes('repository.java') || normalizedPath.includes('mapper.java')) {
+      categories.repositoryFiles.push(file);
+    } else if (normalizedPath.includes('application.yml') || normalizedPath.includes('application.properties') || normalizedPath.includes('pom.xml') || normalizedPath.includes('build.gradle')) {
+      categories.configFiles.push(file);
+    }
+  }
+  
+  return categories;
+}
+
+function buildApiPrompt({ project, scanResult, language }) {
+  const labels = getLabels(language);
+  const projectObj = project || {};
+  const scanObj = scanResult || {};
+  
+  const categories = categorizeFiles(scanObj.keyFiles || []);
+  
+  const tpl = loadTemplate('java-api-prompt.md', language);
+  return renderTemplate(tpl, {
+    projectName: projectObj.name || '',
+    projectType: projectObj.type || '',
+    projectPath: projectObj.path || '',
+    tree: scanObj.tree || '',
+    controllerFiles: categories.controllerFiles.join('\n') || '未找到 Controller 文件',
+    serviceFiles: categories.serviceFiles.join('\n') || '未找到 Service 文件'
+  });
+}
+
+function buildDatabasePrompt({ project, scanResult, language }) {
+  const labels = getLabels(language);
+  const projectObj = project || {};
+  const scanObj = scanResult || {};
+  
+  const categories = categorizeFiles(scanObj.keyFiles || []);
+  
+  const tpl = loadTemplate('java-database-prompt.md', language);
+  return renderTemplate(tpl, {
+    projectName: projectObj.name || '',
+    projectType: projectObj.type || '',
+    projectPath: projectObj.path || '',
+    tree: scanObj.tree || '',
+    entityFiles: categories.entityFiles.join('\n') || '未找到 Entity/Model 文件',
+    repositoryFiles: categories.repositoryFiles.join('\n') || '未找到 Repository/Mapper 文件',
+    configFiles: categories.configFiles.join('\n') || '未找到配置文件'
+  });
+}
+
+module.exports = { buildUsePrompt, buildInitPrompt, buildApiPrompt, buildDatabasePrompt, getLabels };

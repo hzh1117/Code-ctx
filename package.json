@@ -1,7 +1,7 @@
 {
   "name": "code-ctx",
   "version": "1.0.0",
-  "description": "AI 开发上下文工具",
+  "description": "AI 开发上下文工具，生成可复用的代码库上下文和 AI prompt",
   "main": "src/index.js",
   "bin": {
     "code-ctx": "./bin/cli.js"
@@ -14,7 +14,15 @@
     "README.md",
     "README_EN.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    ".env.example",
+    "docs/AI分阶段实施指令-ai-implementation-instructions.md",
+    "docs/项目完善路线图-project-improvement-roadmap.md",
+    "docs/AI后续执行提示词手册-ai-execution-playbook.md"
   ],
   "scripts": {
     "test": "jest",
@@ -37,7 +45,7 @@
     "cursor"
   ],
   "author": "hzh1117",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "homepage": "https://github.com/hzh1117/Code-ctx#readme",
   "repository": {
     "type": "git",

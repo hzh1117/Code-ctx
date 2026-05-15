@@ -3,6 +3,12 @@ description: Suggest an improvement or new capability / 建议改进或新增能
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Code-ctx is source-available for non-commercial use only. Commercial-use requests require written permission from the maintainer.
+
+        Code-ctx 源码公开但仅允许非商业使用。商业使用请求需要先取得维护者书面授权。
   - type: textarea
     id: problem
     attributes:

@@ -1,5 +1,7 @@
 const https = require('https');
 const http = require('http');
+const net = require('net');
+const dns = require('dns').promises;
 const { AI_CLIENT } = require('../utils/constants');
 
 const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
@@ -10,6 +12,12 @@ const BASE_RETRY_DELAY = AI_CLIENT.BASE_RETRY_DELAY;
 
 const DEBUG = process.env.AI_DEBUG === 'true';
 const DEBUG_RESPONSE = process.env.AI_DEBUG_RESPONSE === 'true';
+const METADATA_HOSTS = new Set([
+  'metadata.google.internal',
+  'metadata',
+  'instance-data',
+  '169.254.169.254'
+]);
 
 function debugLog(...args) {
   if (DEBUG) {
@@ -24,9 +32,22 @@ function debugResponse(label, data) {
     console.log(`${'='.repeat(60)}`);
     try {
       const json = JSON.parse(data);
-      console.log(JSON.stringify(json, null, 2));
+      const summary = {
+        keys: Object.keys(json),
+        contentBlocks: Array.isArray(json.content) ? json.content.length : undefined,
+        choices: Array.isArray(json.choices) ? json.choices.length : undefined,
+        usage: json.usage,
+        error: json.error ? {
+          type: json.error.type,
+          code: json.error.code,
+          status: json.error.status,
+          messageLength: typeof json.error.message === 'string' ? json.error.message.length : undefined
+        } : undefined,
+        rawLength: data.length
+      };
+      console.log(JSON.stringify(summary, null, 2));
     } catch {
-      console.log(data);
+      console.log(JSON.stringify({ rawLength: data.length, parseableJson: false }, null, 2));
     }
     console.log(`${'='.repeat(60)}\n`);
   }
@@ -34,6 +55,158 @@ function debugResponse(label, data) {
 
 function trimTrailingSlashes(value) {
   return value.replace(/\/+$/, '');
+}
+
+function normalizeHostname(hostname) {
+  return String(hostname || '')
+    .trim()
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase();
+}
+
+function isBlockedIPv4(hostname) {
+  const parts = hostname.split('.').map(part => Number(part));
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function isBlockedIPv6(hostname) {
+  const normalized = normalizeHostname(hostname);
+  return (
+    normalized === '::1' ||
+    normalized.startsWith('fc') ||
+    normalized.startsWith('fd') ||
+    normalized.startsWith('fe80:') ||
+    normalized.startsWith('::ffff:127.') ||
+    normalized.startsWith('::ffff:10.') ||
+    normalized.startsWith('::ffff:192.168.') ||
+    normalized.startsWith('::ffff:169.254.')
+  );
+}
+
+function isLocalOrPrivateHost(hostname) {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) return true;
+  if (normalized === 'localhost' || normalized.endsWith('.localhost')) return true;
+  if (METADATA_HOSTS.has(normalized)) return true;
+
+  const ipVersion = net.isIP(normalized);
+  if (ipVersion === 4) return isBlockedIPv4(normalized);
+  if (ipVersion === 6) return isBlockedIPv6(normalized);
+
+  return false;
+}
+
+function validateBaseUrl(baseUrl, options = {}) {
+  const {
+    allowLocalBaseUrl = false,
+    allowInsecureBaseUrl = false
+  } = options;
+
+  if (!baseUrl || typeof baseUrl !== 'string') {
+    throw new Error('AI baseUrl 不能为空');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(trimTrailingSlashes(baseUrl.trim()));
+  } catch {
+    throw new Error('AI baseUrl 不是有效 URL');
+  }
+
+  if (!['https:', 'http:'].includes(parsed.protocol)) {
+    throw new Error('AI baseUrl 仅支持 http 或 https 协议');
+  }
+
+  if (parsed.protocol === 'http:' && !allowInsecureBaseUrl) {
+    throw new Error('AI baseUrl 必须使用 https；如需本地调试，请显式开启不安全 HTTP');
+  }
+
+  if (isLocalOrPrivateHost(parsed.hostname) && !allowLocalBaseUrl) {
+    throw new Error('AI baseUrl 不能指向 localhost、内网或 metadata 地址');
+  }
+
+  return parsed;
+}
+
+async function validateResolvedBaseUrl(parsedUrl, options = {}) {
+  const {
+    allowLocalBaseUrl = false,
+    dnsLookup = dns.lookup
+  } = options;
+
+  if (allowLocalBaseUrl) return;
+
+  const hostname = normalizeHostname(parsedUrl.hostname);
+  if (!hostname || net.isIP(hostname)) return;
+
+  let records;
+  try {
+    records = await dnsLookup(hostname, { all: true });
+  } catch {
+    throw new Error(`AI baseUrl DNS 解析失败: ${hostname}`);
+  }
+
+  const addresses = Array.isArray(records) ? records : [records];
+  const hasBlockedAddress = addresses.some(record => {
+    const address = typeof record === 'string' ? record : record && record.address;
+    return address && isLocalOrPrivateHost(address);
+  });
+
+  if (hasBlockedAddress) {
+    throw new Error('AI baseUrl DNS 解析结果不能指向 localhost、内网或 metadata 地址');
+  }
+}
+
+function createApiError(statusCode, json, fallbackMessage) {
+  const status = statusCode || 'unknown';
+  const error = json && json.error ? json.error : null;
+  const message = error && typeof error.message === 'string' && error.message.trim()
+    ? error.message.trim()
+    : fallbackMessage;
+  const type = error && (error.type || error.code) ? ` (${error.type || error.code})` : '';
+  return new Error(`[${status}] ${message}${type}`);
+}
+
+function normalizeAnthropicMessages(messages) {
+  const system = [];
+  const normalizedMessages = [];
+
+  for (const message of messages || []) {
+    if (!message || !message.role) continue;
+    if (message.role === 'system') {
+      if (typeof message.content === 'string') {
+        system.push(message.content);
+      } else if (Array.isArray(message.content)) {
+        const text = message.content
+          .filter(block => block && block.type === 'text' && typeof block.text === 'string')
+          .map(block => block.text)
+          .join('\n');
+        if (text) system.push(text);
+      }
+      continue;
+    }
+
+    if (message.role === 'user' || message.role === 'assistant') {
+      normalizedMessages.push(message);
+    }
+  }
+
+  return {
+    system: system.join('\n\n'),
+    messages: normalizedMessages
+  };
 }
 
 function getRetryDelay(retries, res) {
@@ -46,10 +219,21 @@ function getRetryDelay(retries, res) {
 }
 
 async function callOpenAIWithMessages(messages, options, retries = 0) {
-  const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
+  const {
+    apiKey,
+    baseUrl,
+    model,
+    maxTokens,
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
+  } = options;
 
-  const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
-  const url = new URL(`${normalizedBaseUrl}/chat/completions`);
+  const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
+  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+  const normalizedBaseUrl = parsedBaseUrl.toString();
+  const url = new URL(`${trimTrailingSlashes(normalizedBaseUrl)}/chat/completions`);
   const protocol = url.protocol === 'https:' ? https : http;
 
   const body = JSON.stringify({
@@ -106,17 +290,22 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
           const json = JSON.parse(data);
           if (json.error) {
             debugLog('API返回错误', json.error);
-            reject(new Error(`[${res.statusCode}] ${json.error.message}`));
+            reject(createApiError(res.statusCode, json, 'OpenAI API 返回错误'));
           } else if (!json.choices || !json.choices[0]) {
             debugLog('响应格式异常');
-            reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
+            reject(new Error(`[${res.statusCode}] OpenAI 响应格式异常`));
           } else {
-            debugLog('请求成功', { contentLength: json.choices[0].message.content.length });
-            resolve(json.choices[0].message.content);
+            const content = json.choices[0].message && json.choices[0].message.content;
+            if (typeof content !== 'string') {
+              reject(new Error(`[${res.statusCode}] OpenAI 响应缺少文本内容`));
+              return;
+            }
+            debugLog('请求成功', { contentLength: content.length });
+            resolve(content);
           }
         } catch (e) {
           debugLog('解析响应失败', { error: e.message });
-          reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
+          reject(new Error(`[${res.statusCode}] OpenAI 响应 JSON 解析失败`));
         }
       });
     });
@@ -151,9 +340,21 @@ async function callOpenAI(prompt, options, retries = 0) {
 }
 
 async function callAnthropicWithMessages(messages, options, retries = 0) {
-  const { apiKey, baseUrl, model, maxTokens, timeout = DEFAULT_TIMEOUT } = options;
+  const {
+    apiKey,
+    baseUrl,
+    model,
+    maxTokens,
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
+  } = options;
 
-  const normalizedBaseUrl = trimTrailingSlashes(baseUrl);
+  const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
+  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+  const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
+  const anthropicPayload = normalizeAnthropicMessages(messages);
 
   // 处理不同的 baseUrl 格式
   let url;
@@ -165,11 +366,15 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
     url = new URL(`${normalizedBaseUrl}/v1/messages`);
   }
 
-  const body = JSON.stringify({
+  const requestBody = {
     model,
     max_tokens: maxTokens,
-    messages
-  });
+    messages: anthropicPayload.messages
+  };
+  if (anthropicPayload.system) {
+    requestBody.system = anthropicPayload.system;
+  }
+  const body = JSON.stringify(requestBody);
 
   debugLog('Anthropic请求开始', {
     url: url.toString(),
@@ -222,17 +427,25 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
           const json = JSON.parse(data);
           if (json.error) {
             debugLog('API返回错误', json.error);
-            reject(new Error(`[${res.statusCode}] ${json.error.message}`));
+            reject(createApiError(res.statusCode, json, 'Anthropic API 返回错误'));
           } else if (!json.content || !json.content[0]) {
             debugLog('响应格式异常');
-            reject(new Error(`[${res.statusCode}] 响应格式异常: ${data.substring(0, 200)}`));
+            reject(new Error(`[${res.statusCode}] Anthropic 响应格式异常`));
           } else {
-            debugLog('请求成功', { contentLength: json.content[0].text.length });
-            resolve(json.content[0].text);
+            const text = json.content
+              .filter(block => block && typeof block.text === 'string')
+              .map(block => block.text)
+              .join('');
+            if (!text) {
+              reject(new Error(`[${res.statusCode}] Anthropic 响应缺少文本内容`));
+              return;
+            }
+            debugLog('请求成功', { contentLength: text.length });
+            resolve(text);
           }
         } catch (e) {
           debugLog('解析响应失败', { error: e.message });
-          reject(new Error(`[${res.statusCode}] 解析响应失败: ${data.substring(0, 200)}`));
+          reject(new Error(`[${res.statusCode}] Anthropic 响应 JSON 解析失败`));
         }
       });
     });
@@ -273,14 +486,17 @@ async function generateWithAI(prompt, options = {}) {
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-4',
     maxTokens = 4096,
-    timeout = DEFAULT_TIMEOUT
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
   } = options;
 
   if (!apiKey) {
     throw new Error('需要配置 API key');
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout };
+  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
 
   if (protocol === 'openai') {
     return callOpenAI(prompt, callOptions);
@@ -298,14 +514,17 @@ async function generateFromMessages(messages, options = {}) {
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-4',
     maxTokens = 4096,
-    timeout = DEFAULT_TIMEOUT
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
   } = options;
 
   if (!apiKey) {
     throw new Error('需要配置 API key');
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout };
+  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
 
   if (protocol === 'openai') {
     return callOpenAIWithMessages(messages, callOptions);
@@ -358,5 +577,8 @@ module.exports = {
   generateWithAI,
   generateWithContinuation,
   callOpenAI,
-  callAnthropic
+  callAnthropic,
+  validateBaseUrl,
+  validateResolvedBaseUrl,
+  normalizeAnthropicMessages
 };

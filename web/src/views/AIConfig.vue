@@ -163,6 +163,9 @@ export default {
     }
   },
   methods: {
+    getErrorMessage(err) {
+      return err?.response?.data?.error || err?.response?.data?.message || err.message || '请求失败';
+    },
     normalizeConfig(data) {
       const providers = data.providers || {};
       return {
@@ -224,7 +227,7 @@ export default {
         await this.loadConfig();
         this.showToast('配置已保存', 'success');
       } catch (err) {
-        this.showToast('保存失败: ' + err.message, 'error');
+        this.showToast('保存失败: ' + this.getErrorMessage(err), 'error');
       } finally {
         this.saving = false;
       }

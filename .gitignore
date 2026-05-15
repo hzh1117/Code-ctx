@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 .ai-prompt.md
+.firecrawl/
 test-api.js
 codecontext-design-v2.md
 docs/plans/
@@ -9,3 +10,8 @@ code-ctx.config.js
 code-ctx-action-plan.md
 docs/
 plans/
+!docs/
+docs/*
+!docs/AI分阶段实施指令-ai-implementation-instructions.md
+!docs/项目完善路线图-project-improvement-roadmap.md
+!docs/AI后续执行提示词手册-ai-execution-playbook.md

@@ -6,9 +6,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Please remove secrets, private code, and API keys before submitting.
+        Thanks for reporting a bug. Please remove secrets, private code, and API keys before submitting. Do not use public issues for sensitive security reports; use the Security advisory flow or SECURITY.md.
 
-        感谢反馈问题。提交前请移除密钥、私有代码和 API Key。
+        感谢反馈问题。提交前请移除密钥、私有代码和 API Key。敏感安全问题不要公开提交，请使用安全公告流程或 SECURITY.md。
   - type: textarea
     id: summary
     attributes:

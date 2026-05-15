@@ -2,10 +2,10 @@
 
 # Code-ctx
 
-**AI Development Context Tool — Let AI Coding Assistants Understand Your Codebase Instantly**
+**AI development context tool for helping AI coding assistants understand your codebase quickly**
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
@@ -15,218 +15,142 @@ English | [中文](README.md)
 
 ---
 
-> **⚠️ Project Status: Active Development** — Core features are functional. APIs may change. Feedback and contributions welcome.
+> **Project status: active development.** The core CLI and local Dashboard are usable, but the audit reports under `docs/` still identify P0 security items and test gaps. Resolve those items before public deployment, team rollout, or commercial-license evaluation.
 
-## What is Code-ctx?
+> **License notice:** This project is source-available for non-commercial use only. Commercial use, SaaS hosting, paid integration, paid support, and redistribution as part of a commercial product are prohibited. See [LICENSE](LICENSE).
 
-Code-ctx is a CLI tool that bridges the gap between your codebase and AI programming assistants. It scans your project, generates structured documentation, and automatically prepares context-aware prompts for tools like Claude, ChatGPT, Cursor, and other AI coding assistants.
+> **Terminology:** Because this project prohibits commercial use, it is not an OSI-defined open source license. Use "source-available / non-commercial use" in public wording. Reference: [Open Source Definition](https://opensource.org/osd).
 
-**The problem:** Every time you start a new AI conversation, you spend 10-15 minutes explaining your project structure, tech stack, and conventions.
+## What Is Code-ctx?
 
-**The solution:** Run `code-ctx init` once, then `code-ctx use "your task"` before each AI session. The AI gets full project context in seconds.
+Code-ctx is a CLI tool for AI-assisted development. It scans a project, generates reusable context documentation under `ai-docs/`, and assembles task-specific prompts for Claude, ChatGPT, Cursor, Claude Code, Open Code, and similar AI coding tools.
 
-## Features
+The problem is simple: every new AI session often starts with repeated explanations of project structure, tech stack, module responsibilities, API contracts, and business context. Code-ctx turns that repeated explanation into updateable, reusable context.
 
-| Feature | Description |
-|---------|-------------|
-| **Smart Project Detection** | Auto-identifies 9 project types (Vue 2/3, React, Next.js, uni-app, Java, Node.js, Go, Python) |
-| **Intelligent Scenario Matching** | Matches task descriptions to 8 development scenarios using keywords + AI fallback |
-| **Scenario-Based Templates** | Generates customized prompts for new features, bug fixes, refactoring, and more |
-| **Document Auto-Injection** | Automatically loads OVERVIEW and related sub-project docs into prompts |
-| **Incremental Updates** | Detects file changes via Git diff or MD5 hash, updates only affected sections |
-| **Health Check + Auto-Fix** | Validates document completeness and consistency, auto-repairs outdated docs |
-| **Fault Tolerance** | Resumes interrupted `init` runs, skips completed sub-projects automatically |
-| **Web Dashboard** | Terminal-industrial UI with dark/light theme, visual config and status management |
-| **Security First** | Auto-filters passwords, API keys, JWT tokens, SSH keys, and connection strings |
-| **AI API Integration** | Compatible with OpenAI and Anthropic protocols (DeepSeek, Kimi, MiniMax, etc.) |
-| **Clipboard Fallback** | Auto-degrades to file output when clipboard write fails |
+## Core Features
+
+| Feature | Current Implementation |
+|---------|------------------------|
+| Project detection | Built-in adapters for Vue 2/3, React, Next.js, uni-app, Java, Node.js, Go, Python, and more |
+| Documentation generation | `code-ctx init` scans projects and writes `ai-docs/` |
+| Prompt generation | `code-ctx use "task"` builds context-aware prompts |
+| Incremental updates | `code-ctx update` detects changes using Git diff or hash fallback |
+| Health checks | `code-ctx doctor` checks documentation completeness and consistency; supports `--fix` |
+| Local Dashboard | Vue 3 + Express dashboard for config, AI generation, projects, and document status |
+| AI protocols | OpenAI-compatible and Anthropic-compatible protocols; works with DeepSeek, Kimi, MiniMax, and similar providers |
+| Sensitive filtering | Basic filtering for passwords, API keys, JWTs, SSH keys, database URLs, and related secrets |
 
 ## Quick Start
 
-### Prerequisites
+### Requirements
 
 - Node.js >= 16.0.0
 - npm >= 8.0.0
-- Git (any version)
+- Git
 
-### Install
+### Install and Build
 
 ```bash
-# Clone
 git clone https://github.com/hzh1117/Code-ctx.git
 cd Code-ctx
-
-# Install dependencies
 npm install
-
-# Build frontend dashboard
 cd web && npm install && npm run build && cd ..
-
-# Link globally
 npm link
-
-# Start Web dashboard (optional)
-code-ctx dashboard
 ```
 
-Access `http://localhost:3456` for visual configuration, AI generation, document status management, and more.
-
-### Verify
-
-```bash
-code-ctx --version
-code-ctx help
-```
-
-## Usage
-
-### First Time: Initialize Your Project
+### Initialize Your Project
 
 ```bash
 cd /path/to/your-project
-
-# Scan project structure, generate ai-docs/
 code-ctx init
-
-# Generate prompt for your task
 code-ctx use "Add user login feature"
-
-# Paste into your AI tool (Claude/ChatGPT/Cursor)
 ```
 
-### Daily Development
+By default, the generated prompt is copied to your clipboard. You can also write it to a file or stdout:
 
 ```bash
-# Smart scenario matching
-code-ctx use "Add coupon export to merchant backend"
-
-# Specify scenario manually
-code-ctx use -s F "Fix login page white screen"
-
-# Output to file for editing
-code-ctx use "Task description" --out .ai-prompt.md
-```
-
-### After Code Changes
-
-```bash
-# Detect changes, generate incremental update prompt
-code-ctx update
-
-# Force regenerate a sub-project's document
-code-ctx fix web
+code-ctx use "Fix login page white screen" --out .ai-prompt.md
+code-ctx use "Add order export" --stdout
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `code-ctx init` | Scan project, generate `ai-docs/` directory |
-| `code-ctx use [task]` | Generate development prompt, copy to clipboard |
-| `code-ctx update` | Detect file changes, generate incremental update prompt |
-| `code-ctx fix <alias>` | Force regenerate specified sub-project document |
-| `code-ctx status` | View document status (size, last modified) |
-| `code-ctx doctor` | Check document health, support `--fix` auto-repair |
-| `code-ctx dashboard` | Start local web management interface |
-| `code-ctx watch` | Watch file changes, auto-trigger incremental updates |
-| `code-ctx hook` | Manage git post-commit hook |
+| `code-ctx init` | Scan the project and generate `ai-docs/` |
+| `code-ctx use [task]` | Generate a development prompt |
+| `code-ctx update` | Detect file changes and generate an incremental update prompt |
+| `code-ctx fix <alias>` | Regenerate documentation for one sub-project |
+| `code-ctx status` | Show `ai-docs/` document update times |
+| `code-ctx doctor` | Check documentation health; supports `--fix` |
+| `code-ctx watch` | Watch file changes and trigger incremental updates |
+| `code-ctx hook` | Manage the Git post-commit hook |
+| `code-ctx dashboard` | Start the local Web Dashboard |
 
-### Command Options
+Common options:
 
 ```bash
-# init
-code-ctx init              # Normal initialization
-code-ctx init --skip-ai    # Scan only, skip AI document generation
-code-ctx init --force      # Force regenerate all, ignore completed status
+code-ctx init --skip-ai
+code-ctx init --force
+code-ctx init -p web
+code-ctx init -p api -d database
 
-# use
-code-ctx use "task"              # Smart match scenario
-code-ctx use -s B "task"         # Manually specify scenario (A-H)
-code-ctx use "task" --stdout     # Output to terminal
-code-ctx use "task" --out p.md   # Output to file
+code-ctx use -s F "Fix AI generation failure"
+code-ctx use --no-ai-match "Add config page"
+code-ctx use -l en "Add dashboard status cache"
 
-# update
-code-ctx update              # Detect changes and generate prompt
-code-ctx update --dry-run    # Detect only, don't update scan records
-code-ctx update --stdout     # Output to terminal
+code-ctx update --dry-run
+code-ctx update --apply
 
-# fix
-code-ctx fix web             # Regenerate web.md
-code-ctx fix web --dry-run   # Generate prompt only, don't call AI
+code-ctx doctor --strict
+code-ctx doctor --fix
+code-ctx doctor --fix --force
 
-# doctor
-code-ctx doctor              # Basic health check
-code-ctx doctor --strict     # Strict mode (parse code routes)
-code-ctx doctor --fix        # Auto-fix outdated/missing documents
-code-ctx doctor --fix --force  # Force regenerate all documents
-
-# dashboard
-code-ctx dashboard           # Default port 3456
-code-ctx dashboard -p 8080   # Custom port
+code-ctx dashboard -p 8080
+code-ctx dashboard --dir D:/workspace/your-project
+code-ctx dashboard --dev
 ```
-
-## Supported Project Types
-
-| Type | Detection Method |
-|------|------------------|
-| Vue 2 Admin | `package.json` has `vue` + `element-ui` |
-| Vue 3 Admin | `package.json` has `vue` + `element-plus` |
-| React | `package.json` has `react` |
-| Next.js | `package.json` has `next` |
-| uni-app Mini Program | `package.json` has `uni-app` or `manifest.json` |
-| Java Backend | `pom.xml` or `build.gradle` |
-| Node.js Backend | `package.json` has `express`/`koa`/`nestjs` |
-| Go Backend | `go.mod` |
-| Python Backend | `requirements.txt` or `pyproject.toml` |
-
-## Scenario Templates
-
-| ID | Scenario | Description | Related Projects |
-|----|----------|-------------|------------------|
-| A | C-end New Features | Add mini-program/H5/frontend pages | mp, api |
-| B | Merchant Backend | Add management features | mer, api |
-| C | Platform Backend | Add operations features | plat, api |
-| D | Data Model Changes | Modify table structure | api |
-| E | Modify Existing | Optimization, refactoring | — |
-| F | Bug Fixing | Locate and fix issues | — |
-| G | Pure Backend | Backend logic adjustments | api |
-| H | Cross-platform | Multi-platform integration | mp, mer, api |
 
 ## Configuration
 
-### Environment Variables (.env)
+### Environment Variables
+
+Copy `.env.example` to `.env` and keep real credentials local:
 
 ```env
-# Anthropic API Key (Claude or compatible services)
-ANTHROPIC_API_KEY=<your-anthropic-api-key>
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
 
-# OpenAI Compatible API Key (DeepSeek, Kimi, MiniMax, etc.)
-OPENAI_API_KEY=<your-openai-compatible-api-key>
-
-# Optional: Override default endpoints
-# OPENAI_BASE_URL=https://api.deepseek.com
-# OPENAI_MODEL=deepseek-chat
-# ANTHROPIC_BASE_URL=https://api.anthropic.com
-# ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+# Optional
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+DASHBOARD_TOKEN=
+AI_TIMEOUT=180000
 ```
 
-### Project Configuration (code-ctx.config.js)
+Never commit `.env`. If a secret appears in logs, screenshots, issues, or pull requests, treat it as compromised and rotate it immediately.
 
-Auto-generated by `init`, or manually edited:
+AI `baseUrl` values accept public HTTPS endpoints by default and reject localhost, private-network, link-local, and metadata addresses. If local model gateways are needed, add an explicit local-development option with tests instead of loosening Dashboard validation.
+
+### `code-ctx.config.js`
+
+`init` generates project config automatically. You can also edit it manually:
 
 ```javascript
 module.exports = {
   projectName: 'my-app',
   outputDir: './ai-docs',
-  aiMode: 'clipboard',           // 'clipboard' | 'api'
+  aiMode: 'clipboard',
   projects: [
-    { alias: 'web', path: './web', type: 'vue2-admin', label: 'Frontend' },
+    { alias: 'web', path: './web', type: 'vue3-admin', label: 'Frontend' },
     { alias: 'api', path: './api', type: 'java-backend', label: 'Backend' }
   ],
   excludeDirs: ['node_modules', '.git', 'dist'],
-  gitTrack: true,                // Include ai-docs/ in git
+  gitTrack: true,
   ai: {
-    protocol: 'openai',          // 'openai' | 'anthropic'
+    protocol: 'openai',
     openai: {
       baseUrl: 'https://api.deepseek.com',
       model: 'deepseek-chat',
@@ -241,162 +165,112 @@ module.exports = {
 };
 ```
 
-## AI API Providers
-
-All providers compatible with OpenAI or Anthropic protocols are supported.
-
-| Provider | Protocol | Base URL | Model Examples |
-|----------|----------|----------|----------------|
-| DeepSeek | OpenAI | `https://api.deepseek.com` | `deepseek-chat` |
-| Kimi | OpenAI | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
-| MiniMax | OpenAI | `https://api.minimax.chat` | `abab6.5-chat` |
-| Zhipu AI | OpenAI | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
-| Baichuan | OpenAI | `https://api.baichuan-ai.com/v1` | `Baichuan4` |
-| Anthropic | Anthropic | `https://api.anthropic.com` | `claude-3-5-sonnet-20241022` |
-
-## Integration with AI Tools
-
-### Claude Code / Cursor / Open Code
-
-```bash
-# Method 1: Clipboard (default)
-code-ctx use "Task description"
-# Paste with Ctrl+V
-
-# Method 2: File output
-code-ctx use "Task description" --out .ai-prompt.md
-# Reference in AI: "Please read .ai-prompt.md"
-
-# Method 3: stdout pipe
-code-ctx use "Task description" --stdout | claude
-```
-
-### Web ChatGPT / Claude
-
-```bash
-code-ctx use "Task description"
-# Open browser, Ctrl+V to paste
-```
-
 ## Web Dashboard
 
 ```bash
 code-ctx dashboard
 ```
 
-Access `http://localhost:3456`:
+The default URL is `http://localhost:3456`. The Dashboard reads the managed project's `code-ctx.config.js` and `ai-docs/`. Start it inside the project directory or pass `--dir`.
 
-- **Configuration** — Visual project config editing
-- **AI Config** — Tab-based OpenAI/Anthropic setup with connection testing
-- **AI Generate** — Split-pane: scenario selection + prompt generation + AI calls
-- **Sub-projects** — Card view of detected sub-projects
-- **Scenario Templates** — Browse and preview all 8 scenario templates
-- **Document Status** — Table view of document health (OK / Needs Update / Missing)
+Current Dashboard pages include:
 
-Design: Terminal industrial aesthetic, dark/light theme, Outfit + JetBrains Mono fonts, CSS variables.
+- Configuration management
+- AI configuration and connection testing
+- Scenario selection and prompt generation
+- Sub-project status
+- Scenario template preview
+- Document status and health-check entry
 
-## Architecture
+The Dashboard is intended for local development and should not be exposed directly to the public internet.
 
-```
-code-ctx/
-├── bin/                    # CLI entry point
-│   ├── cli.js              # Main CLI (Commander.js)
-│   └── commands/           # 9 command definitions
-├── src/                    # Core modules
-│   ├── commands/           # Command implementations
-│   ├── scanner/            # Project detection + file scanning
-│   ├── generator/          # Prompt assembly
-│   ├── template/           # Template engine
-│   ├── matcher/            # Scenario matching (keyword + AI)
-│   ├── ai/                 # AI client (OpenAI + Anthropic)
-│   ├── adapters/           # Project type adapters (9 built-in)
-│   │   └── builtin/        # Vue2, Vue3, React, Next.js, uni-app, Java, Node, Go, Python
-│   ├── core/               # Doc resolver, section parser
-│   ├── web/                # Express API server
-│   └── utils/              # Config, constants, git, sensitive filter, clipboard
-├── templates/              # Built-in scenario templates
-├── web/                    # Frontend (Vue 3 + Vite)
-│   ├── src/
-│   │   ├── components/     # Sidebar
-│   │   ├── composables/    # useTheme
-│   │   ├── views/          # 6 pages
-│   │   ├── App.vue         # Root + CSS variables
-│   │   └── main.js         # Entry + router
-│   └── dist/               # Build output
-└── tests/                  # Jest test suite
+The AI configuration API validates protocol, `baseUrl`, model name, `maxTokens`, and basic API-key format. Key saving rejects newline injection and writes `.env` with `0o600` where the local platform supports it.
+
+The Dashboard API uses Express 5. Treat `req.body` as untrusted input, validate shape, length, and allowed fields explicitly, set a reasonable `limit` on `express.json()`, and use four-argument error middleware `(err, req, res, next)` without returning internal paths or stack traces to clients.
+
+## Project Structure
+
+```text
+codecontext/
+├── bin/                  # CLI entry and command wrappers
+├── src/
+│   ├── commands/         # init/use/update/fix/doctor flows
+│   ├── ai/               # OpenAI + Anthropic native HTTP client
+│   ├── scanner/          # project detection and file scanning
+│   ├── adapters/         # built-in project type adapters
+│   ├── generator/        # prompt builder
+│   ├── matcher/          # scenario matching
+│   ├── template/         # template engine
+│   ├── core/             # sections and document mapping
+│   ├── utils/            # config, Git, filtering, clipboard, etc.
+│   └── web/              # Express Dashboard API
+├── web/                  # Vue 3 Dashboard frontend
+├── templates/            # prompt templates and scenarios
+├── tests/                # Jest tests
+└── docs/                 # analysis reports, repair plans, AI instructions
 ```
 
-### Key Design Patterns
+## Documentation and Roadmap
 
-- **Adapter Pattern** — Extensible project type detection via `BaseAdapter` + `AdapterRegistry`
-- **Strategy Pattern** — Token-based strategy selection (ONE_SHOT / BATCH_WITH_CONTEXT / BATCH_MINIMAL)
-- **Section-Level Updates** — Parses markdown sections for surgical document updates
-- **Fault Tolerance** — State file tracking (`init-state.json`) enables resume after interruption
+The repository includes detailed analysis documents. The published package includes these two actionable entry points:
 
-## FAQ
+- [AI Implementation Instructions](docs/AI分阶段实施指令-ai-implementation-instructions.md)
+- [Project Improvement Roadmap](docs/项目完善路线图-project-improvement-roadmap.md)
+- [AI Execution Playbook](docs/AI后续执行提示词手册-ai-execution-playbook.md)
 
-**Q: What if `init` is interrupted?**
-Re-run it. Completed sub-projects are automatically skipped.
+Full audit reports such as `docs/安全审计报告-security-audit-report.md`, `docs/问题跟踪清单-issue-tracker.md`, and `docs/改进修复计划-repair-plan.md` are maintained inside the repository when present. Use the current repository files as the source of truth.
 
-**Q: Clipboard write fails?**
-Auto-degrades to `.ai-prompt.md`. Or use `--out` explicitly.
+Recommended order:
 
-**Q: How to update documents?**
-```bash
-code-ctx update          # Detect changes
-code-ctx fix web         # Force regenerate
-code-ctx doctor --fix    # Auto-repair outdated docs
-```
-
-**Q: Multi-person collaboration?**
-Commit `ai-docs/` to git. Team members share the same context.
-
-**Q: How to extend project type support?**
-Create a new adapter in `src/adapters/builtin/` extending `BaseAdapter`.
+1. Run `P00` from the [AI Execution Playbook](docs/AI后续执行提示词手册-ai-execution-playbook.md) to confirm the current baseline.
+2. Run `P01-P06` for pre-publication security hardening.
+3. Run `P07-P11` for tests and coverage output.
+4. Run `P12-P15` for AI generation, update, status, and frontend performance.
+5. Run `P16-P20` for architecture cleanup and hard-coded behavior removal.
+6. Run `P21-P24` for release engineering.
+7. Run `P25-P31` as needed for JSON config, plugins, documentation quality, Dashboard improvements, and E2E.
 
 ## Development
 
 ```bash
-git clone https://github.com/hzh1117/Code-ctx.git
-cd Code-ctx
-npm install
-cd web && npm install && npm run build && cd ..
-npm link
-
-# Run tests
 npm test -- --runInBand
-
-# Build dashboard
 npm run build:web
-
-# Run tests and build
 npm run check
-
-# Start dashboard
-code-ctx dashboard
+node bin/cli.js help
+node bin/cli.js dashboard
 ```
+
+For frontend changes, run at least:
+
+```bash
+npm run build:web
+```
+
+For security, path, config, or Web API changes, add matching tests.
+
+## Known Risks
+
+The current audit reports under `docs/` call out these priority risks:
+
+- `loadConfigWithVM()` config execution safety.
+- Command construction in dashboard dev mode and Git utilities.
+- Dashboard config write whitelisting and input validation.
+- AI base URLs and sensitive AI APIs have baseline protection; finer token/IP rate-limit policies and distributed deployment support still need follow-up work.
+- Web API error disclosure and missing rate limiting.
+- Test gaps in `core/`, `web/middleware/`, and `utils/git-utils.js`.
+- Serial AI calls in `init` and `update --apply`.
 
 ## Contributing
 
-Contributions welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md). Basic flow:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Before submitting:
+Read [CONTRIBUTING.md](CONTRIBUTING.md). Before submitting a pull request, run:
 
 ```bash
 npm run check
 ```
 
-## Security
+Do not open public issues for security reports. See [SECURITY.md](SECURITY.md).
 
-Please do not open public issues for sensitive security reports. See [SECURITY.md](SECURITY.md).
-
-Before publishing a public repository, make sure `.env`, API keys, private project docs, and generated prompt files are not committed.
+Maintainers should enable GitHub [private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configuring-private-vulnerability-reporting-for-a-repository) so researchers can submit vulnerabilities through a private workflow.
 
 ## Changelog
 
@@ -404,4 +278,6 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-[MIT](LICENSE) © hzh1117
+[Code-ctx Non-Commercial Source License](LICENSE) © hzh1117. Non-commercial use only.
+
+This is not an OSI-approved open source license. Obtain written permission from the maintainer before commercial use, commercial integration, or SaaS hosting.

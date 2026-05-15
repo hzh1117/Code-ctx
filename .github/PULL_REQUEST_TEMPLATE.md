@@ -9,11 +9,13 @@
 - [ ] Documentation / 文档
 - [ ] Refactor / 重构
 - [ ] Tests / 测试
+- [ ] Security / 安全
 
 ## Verification / 验证
 
 - [ ] `npm run check`
 - [ ] Manual CLI/dashboard check, if applicable / 如适用，已手动验证 CLI 或 Dashboard
+- [ ] No secrets, private project docs, generated prompts, or commercial-use authorization changes are included / 未包含密钥、私有项目文档、生成 prompt 或商业授权变更
 
 ## Notes / 备注
 

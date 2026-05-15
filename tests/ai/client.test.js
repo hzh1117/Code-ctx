@@ -1,5 +1,11 @@
 const http = require('http');
-const { generateWithAI, generateWithContinuation } = require('../../src/ai/client');
+const {
+  generateWithAI,
+  generateWithContinuation,
+  validateBaseUrl,
+  validateResolvedBaseUrl,
+  normalizeAnthropicMessages
+} = require('../../src/ai/client');
 
 describe('generateWithAI', () => {
   test('should throw error without API key', async () => {
@@ -29,7 +35,9 @@ describe('generateWithAI', () => {
         protocol: 'openai',
         baseUrl: `http://127.0.0.1:${port}/v1/`,
         model: 'test-model',
-        maxTokens: 10
+        maxTokens: 10,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
       });
 
       expect(seenPaths).toEqual(['/v1/chat/completions']);
@@ -55,7 +63,9 @@ describe('generateWithAI', () => {
         protocol: 'anthropic',
         baseUrl: `http://127.0.0.1:${port}/v1/`,
         model: 'test-model',
-        maxTokens: 10
+        maxTokens: 10,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
       });
 
       expect(seenPaths).toEqual(['/v1/messages']);
@@ -92,6 +102,8 @@ describe('generateWithAI', () => {
         model: 'test-model',
         maxTokens: 10,
         maxContinuations: 5,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true,
         onProgress: event => progress.push(event)
       });
 
@@ -104,6 +116,92 @@ describe('generateWithAI', () => {
         { role: 'user', content: '请从 <<<CONTINUE>>> 处继续，不要重复' }
       ]);
       expect(progress).toEqual([{ attempt: 2, maxAttempts: 5 }]);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('should reject local and private AI base URLs by default', () => {
+    expect(() => validateBaseUrl('http://127.0.0.1:3000/v1')).toThrow(/https|localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://localhost/v1')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://10.0.0.8/v1')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://169.254.169.254/latest')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should allow explicit local insecure URLs for tests and local debugging', () => {
+    const url = validateBaseUrl('http://127.0.0.1:3000/v1/', {
+      allowLocalBaseUrl: true,
+      allowInsecureBaseUrl: true
+    });
+
+    expect(url.toString()).toBe('http://127.0.0.1:3000/v1');
+  });
+
+  test('should reject hostnames that resolve to private addresses', async () => {
+    const url = validateBaseUrl('https://ai-proxy.example.com/v1');
+
+    await expect(validateResolvedBaseUrl(url, {
+      dnsLookup: async () => [{ address: '10.0.0.5', family: 4 }]
+    })).rejects.toThrow(/DNS|localhost|内网|metadata/);
+  });
+
+  test('should allow public resolved AI base URLs', async () => {
+    const url = validateBaseUrl('https://api.example.com/v1');
+
+    await expect(validateResolvedBaseUrl(url, {
+      dnsLookup: async () => [{ address: '8.8.8.8', family: 4 }]
+    })).resolves.toBeUndefined();
+  });
+
+  test('should normalize Anthropic system messages into top-level system field', () => {
+    const result = normalizeAnthropicMessages([
+      { role: 'system', content: 'Use concise Chinese.' },
+      { role: 'user', content: '你好' },
+      { role: 'assistant', content: '你好，有什么可以帮你？' }
+    ]);
+
+    expect(result).toEqual({
+      system: 'Use concise Chinese.',
+      messages: [
+        { role: 'user', content: '你好' },
+        { role: 'assistant', content: '你好，有什么可以帮你？' }
+      ]
+    });
+  });
+
+  test('should send Anthropic system prompt outside messages', async () => {
+    const requests = [];
+    const server = http.createServer((req, res) => {
+      let body = '';
+      req.setEncoding('utf8');
+      req.on('data', chunk => {
+        body += chunk;
+      });
+      req.on('end', () => {
+        requests.push(JSON.parse(body));
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const { port } = server.address();
+      await generateWithContinuation('write docs', {
+        apiKey: 'key',
+        protocol: 'anthropic',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 10,
+        maxContinuations: 0,
+        systemPrompt: 'You are concise.',
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
+      });
+
+      expect(requests).toHaveLength(1);
+      expect(requests[0].system).toBe('You are concise.');
+      expect(requests[0].messages.every(message => message.role !== 'system')).toBe(true);
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

@@ -2,10 +2,10 @@
 
 # Code-ctx
 
-**AI 开发上下文工具 — 让 AI 编程助手立刻"认识"你的代码库**
+**AI 开发上下文工具，让 AI 编程助手快速理解你的代码库**
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
@@ -15,31 +15,30 @@
 
 ---
 
-> **⚠️ 项目状态：积极开发中** — 核心功能已可用，API 可能变动。欢迎试用和反馈。
+> **项目状态：积极开发中。** 核心 CLI 和本地 Dashboard 已可用，但 `docs/` 审计报告显示仍有 P0 安全项和测试缺口。公开部署、团队推广或商业授权评估前，请先处理安全修复。
+
+> **许可说明：** 本项目源码公开，但仅允许非商业使用。禁止商业使用、SaaS 托管、付费集成、付费支持或作为商业产品的一部分再分发。详见 [LICENSE](LICENSE)。
+
+> **术语说明：** 因本项目禁止商业使用，它不属于 OSI 定义下的开源许可；对外请使用“源码公开 / 非商业使用”表述。参考：[Open Source Definition](https://opensource.org/osd)。
 
 ## 什么是 Code-ctx？
 
-Code-ctx 是一个 CLI 工具，解决 AI 编程助手与代码库之间的"上下文鸿沟"。它扫描项目、生成结构化文档，并自动为 Claude、ChatGPT、Cursor 等 AI 工具准备上下文感知的 prompt。
+Code-ctx 是一个面向 AI 编程协作的 CLI 工具。它扫描项目结构，生成 `ai-docs/` 上下文文档，并根据开发任务自动组装适合 Claude、ChatGPT、Cursor、Claude Code、Open Code 等 AI 工具使用的 prompt。
 
-**痛点：** 每次开启新的 AI 对话，都要花 10-15 分钟解释项目结构、技术栈和开发规范。
+它要解决的问题很直接：每次开启新 AI 对话前，开发者都要重复解释项目结构、技术栈、模块职责、接口约定和业务背景。Code-ctx 把这些信息沉淀成可更新、可复用的上下文。
 
-**方案：** 运行一次 `code-ctx init`，之后每次 AI 对话前执行 `code-ctx use "你的任务"`，AI 秒懂你的项目。
+## 核心能力
 
-## 功能特性
-
-| 功能 | 说明 |
-|------|------|
-| **智能项目探测** | 自动识别 9 种项目类型（Vue 2/3、React、Next.js、uni-app、Java、Node.js、Go、Python） |
-| **智能场景匹配** | 关键词 + AI 双重匹配，将任务描述映射到 8 种开发场景 |
-| **场景化模板** | 新功能、Bug 修复、重构等场景生成定制化 prompt |
-| **文档自动注入** | 自动加载 OVERVIEW 总览和相关子项目文档 |
-| **增量更新** | 通过 Git diff 或 MD5 检测文件变化，仅更新受影响的章节 |
-| **健康检查 + 自动修复** | 检测文档完整性和一致性，支持 `--fix` 自动修复过期文档 |
-| **容错机制** | init 中断后可续跑，自动跳过已完成的子项目 |
-| **Web 管理面板** | 终端工业风 UI，支持明暗主题，可视化配置和状态管理 |
-| **安全优先** | 自动过滤密码、API Key、JWT Token、SSH 密钥、数据库连接串 |
-| **AI API 集成** | 兼容 OpenAI 和 Anthropic 协议，支持 DeepSeek、Kimi、MiniMax 等 |
-| **剪贴板降级** | 超大内容写入失败时自动降级到文件输出 |
+| 能力 | 当前实现 |
+|------|----------|
+| 项目探测 | 内置 Vue 2/3、React、Next.js、uni-app、Java、Node.js、Go、Python 等项目类型适配器 |
+| 文档生成 | `code-ctx init` 扫描项目并生成 `ai-docs/` |
+| Prompt 生成 | `code-ctx use "任务"` 根据场景和文档生成上下文 prompt |
+| 增量更新 | `code-ctx update` 通过 Git diff 或 hash 检测变化 |
+| 健康检查 | `code-ctx doctor` 检查文档完整性和一致性，支持 `--fix` |
+| 本地 Dashboard | Vue 3 + Express，可视化配置、AI 生成、项目和文档状态 |
+| AI 协议 | OpenAI 兼容协议和 Anthropic 协议，支持 DeepSeek、Kimi、MiniMax 等兼容服务 |
+| 安全过滤 | 对密码、API Key、JWT、SSH Key、数据库连接串等敏感信息做基础过滤 |
 
 ## 快速开始
 
@@ -47,187 +46,111 @@ Code-ctx 是一个 CLI 工具，解决 AI 编程助手与代码库之间的"上�
 
 - Node.js >= 16.0.0
 - npm >= 8.0.0
-- Git（任意版本）
+- Git
 
-### 安装
+### 安装和构建
 
 ```bash
-# 克隆项目
 git clone https://github.com/hzh1117/Code-ctx.git
 cd Code-ctx
-
-# 安装依赖
 npm install
-
-# 构建前端
 cd web && npm install && npm run build && cd ..
-
-# 全局链接
 npm link
-
-# 启动 Web 管理面板（可选）
-code-ctx dashboard
 ```
 
-访问 `http://localhost:3456` 可使用可视化配置、AI 生成、文档状态管理等功能。
-
-### 验证安装
-
-```bash
-code-ctx --version
-code-ctx help
-```
-
-## 使用方式
-
-### 首次使用：初始化项目
+### 初始化你的项目
 
 ```bash
 cd /path/to/your-project
-
-# 扫描项目结构，生成 ai-docs/
 code-ctx init
-
-# 根据任务描述生成 prompt
 code-ctx use "新增用户登录功能"
-
-# 打开 AI 工具（Claude/ChatGPT/Cursor），粘贴 prompt
 ```
 
-### 日常开发
+默认会把 prompt 写入剪贴板。也可以输出到文件或终端：
 
 ```bash
-# 智能场景匹配
-code-ctx use "商户后台新增优惠券导出功能"
-
-# 手动指定场景
-code-ctx use -s F "修复登录页面白屏问题"
-
-# 输出到文件（方便编辑后再用）
-code-ctx use "任务描述" --out .ai-prompt.md
-```
-
-### 代码变更后更新文档
-
-```bash
-# 检测变化，生成增量更新 prompt
-code-ctx update
-
-# 强制重新生成某个子项目的文档
-code-ctx fix web
+code-ctx use "修复登录页面白屏问题" --out .ai-prompt.md
+code-ctx use "新增订单导出" --stdout
 ```
 
 ## 命令一览
 
 | 命令 | 说明 |
 |------|------|
-| `code-ctx init` | 扫描项目，生成 `ai-docs/` 目录 |
-| `code-ctx use [task]` | 生成开发 prompt，复制到剪贴板 |
+| `code-ctx init` | 扫描项目，生成 `ai-docs/` |
+| `code-ctx use [task]` | 生成开发 prompt |
 | `code-ctx update` | 检测文件变化，生成增量更新 prompt |
-| `code-ctx fix <alias>` | 强制重新生成指定子项目文档 |
-| `code-ctx status` | 查看文档状态（大小、最后修改时间） |
-| `code-ctx doctor` | 检查文档健康状态，支持 `--fix` 自动修复 |
-| `code-ctx dashboard` | 启动本地 Web 管理界面 |
+| `code-ctx fix <alias>` | 重新生成指定子项目文档 |
+| `code-ctx status` | 查看 `ai-docs/` 文档更新时间 |
+| `code-ctx doctor` | 检查文档健康状态，支持 `--fix` |
 | `code-ctx watch` | 监听文件变化，自动触发增量更新 |
-| `code-ctx hook` | 管理 git post-commit hook |
+| `code-ctx hook` | 管理 Git post-commit hook |
+| `code-ctx dashboard` | 启动本地 Web 管理界面 |
 
-### 命令参数
+常用参数：
 
 ```bash
-# init
-code-ctx init              # 正常初始化
-code-ctx init --skip-ai    # 只扫描，不调用 AI 生成文档
-code-ctx init --force      # 强制全部重新生成
+code-ctx init --skip-ai
+code-ctx init --force
+code-ctx init -p web
+code-ctx init -p api -d database
 
-# use
-code-ctx use "任务描述"              # 智能匹配场景
-code-ctx use -s B "任务描述"         # 手动指定场景（A-H）
-code-ctx use "任务描述" --stdout     # 输出到终端
-code-ctx use "任务描述" --out p.md   # 输出到文件
+code-ctx use -s F "修复 AI 生成失败"
+code-ctx use --no-ai-match "新增配置页"
+code-ctx use -l en "Add dashboard status cache"
 
-# update
-code-ctx update              # 检测变化并生成 prompt
-code-ctx update --dry-run    # 只检测，不更新扫描记录
-code-ctx update --stdout     # 输出到终端
+code-ctx update --dry-run
+code-ctx update --apply
 
-# fix
-code-ctx fix web             # 重新生成 web.md
-code-ctx fix web --dry-run   # 只生成 prompt，不调用 AI
+code-ctx doctor --strict
+code-ctx doctor --fix
+code-ctx doctor --fix --force
 
-# doctor
-code-ctx doctor              # 基本健康检查
-code-ctx doctor --strict     # 严格模式（解析代码路由）
-code-ctx doctor --fix        # 自动修复过期/缺失文档
-code-ctx doctor --fix --force  # 强制重新生成所有文档
-
-# dashboard
-code-ctx dashboard           # 默认端口 3456
-code-ctx dashboard -p 8080   # 自定义端口
-code-ctx dashboard --dir D:/workspace/your-project  # 指定要管理的项目目录
+code-ctx dashboard -p 8080
+code-ctx dashboard --dir D:/workspace/your-project
+code-ctx dashboard --dev
 ```
 
-## 支持的项目类型
+## 配置
 
-| 类型 | 检测方式 |
-|------|----------|
-| Vue 2 管理后台 | `package.json` 含 `vue` + `element-ui` |
-| Vue 3 管理后台 | `package.json` 含 `vue` + `element-plus` |
-| React | `package.json` 含 `react` |
-| Next.js | `package.json` 含 `next` |
-| uni-app 小程序 | `package.json` 含 `uni-app` 或 `manifest.json` |
-| Java 后端 | `pom.xml` 或 `build.gradle` |
-| Node.js 后端 | `package.json` 含 `express`/`koa`/`nestjs` |
-| Go 后端 | `go.mod` |
-| Python 后端 | `requirements.txt` 或 `pyproject.toml` |
+### 环境变量
 
-## 场景模板
-
-| ID | 场景 | 说明 | 关联项目 |
-|----|------|------|----------|
-| A | C 端新功能 | 新增小程序/H5/前端页面 | mp, api |
-| B | 商户后台新功能 | 新增管理功能 | mer, api |
-| C | 平台后台新功能 | 新增运营功能 | plat, api |
-| D | 数据模型变更 | 修改表结构 | api |
-| E | 修改已有功能 | 优化、重构 | — |
-| F | 排查 Bug | 定位和修复问题 | — |
-| G | 纯后端改动 | 后端逻辑调整 | api |
-| H | 跨端功能 | 多端联动 | mp, mer, api |
-
-## 配置说明
-
-### 环境变量（.env）
+复制 `.env.example` 为 `.env`，只在本地保存真实密钥：
 
 ```env
-# Anthropic API Key（Claude 或兼容服务）
-ANTHROPIC_API_KEY=<your-anthropic-api-key>
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
 
-# OpenAI 兼容 API Key（DeepSeek、Kimi、MiniMax 等）
-OPENAI_API_KEY=<your-openai-compatible-api-key>
-
-# 可选：覆盖默认服务地址
-# OPENAI_BASE_URL=https://api.deepseek.com
-# OPENAI_MODEL=deepseek-chat
-# ANTHROPIC_BASE_URL=https://api.anthropic.com
-# ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+# 可选
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+DASHBOARD_TOKEN=
+AI_TIMEOUT=180000
 ```
 
-### 项目配置（code-ctx.config.js）
+不要提交 `.env`。如果密钥曾出现在日志、截图、issue 或 PR 中，视为已泄露并立即轮换。
 
-`init` 命令自动生成，也可手动编辑：
+AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网、link-local 和 metadata 地址。需要对接本机模型网关时，应新增显式本地开发开关并配套测试，不要直接放开 Dashboard 配置校验。
+
+### `code-ctx.config.js`
+
+`init` 会生成项目配置，也可以手动维护：
 
 ```javascript
 module.exports = {
   projectName: 'my-app',
   outputDir: './ai-docs',
-  aiMode: 'clipboard',           // 'clipboard' | 'api'
+  aiMode: 'clipboard',
   projects: [
-    { alias: 'web', path: './web', type: 'vue2-admin', label: '前端' },
+    { alias: 'web', path: './web', type: 'vue3-admin', label: '前端' },
     { alias: 'api', path: './api', type: 'java-backend', label: '后端' }
   ],
   excludeDirs: ['node_modules', '.git', 'dist'],
-  gitTrack: true,                // 将 ai-docs/ 纳入 git
+  gitTrack: true,
   ai: {
-    protocol: 'openai',          // 'openai' | 'anthropic'
+    protocol: 'openai',
     openai: {
       baseUrl: 'https://api.deepseek.com',
       model: 'deepseek-chat',
@@ -242,178 +165,119 @@ module.exports = {
 };
 ```
 
-## AI API 服务商
-
-支持所有兼容 OpenAI 或 Anthropic 协议的大模型。
-
-| 服务商 | 协议 | Base URL | 模型示例 |
-|--------|------|----------|----------|
-| DeepSeek | OpenAI | `https://api.deepseek.com` | `deepseek-chat` |
-| Kimi | OpenAI | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
-| MiniMax | OpenAI | `https://api.minimax.chat` | `abab6.5-chat` |
-| 智谱 AI | OpenAI | `https://open.bigmodel.cn/api/paas/v4` | `glm-4` |
-| 百川 | OpenAI | `https://api.baichuan-ai.com/v1` | `Baichuan4` |
-| Anthropic | Anthropic | `https://api.anthropic.com` | `claude-3-5-sonnet-20241022` |
-
-## 与 AI 工具配合
-
-### Claude Code / Cursor / Open Code
-
-```bash
-# 方式 1：剪贴板（默认）
-code-ctx use "任务描述"
-# 在 AI 工具中 Ctrl+V 粘贴
-
-# 方式 2：文件输出
-code-ctx use "任务描述" --out .ai-prompt.md
-# 在 AI 工具中引用：请阅读 .ai-prompt.md
-
-# 方式 3：stdout 管道
-code-ctx use "任务描述" --stdout | claude
-```
-
-### 网页版 ChatGPT / Claude
-
-```bash
-code-ctx use "任务描述"
-# 打开网页，Ctrl+V 粘贴
-```
-
-## Web 管理面板
+## Web Dashboard
 
 ```bash
 code-ctx dashboard
 ```
 
-访问 `http://localhost:3456`：
+默认访问 `http://localhost:3456`。Dashboard 读取的是被管理项目的 `code-ctx.config.js` 和 `ai-docs/`，可以在项目目录内启动，也可以用 `--dir` 指定项目目录。
 
-Dashboard 读取的是“被管理项目”的 `code-ctx.config.js` 和 `ai-docs/`。可以在项目目录内启动，也可以在任意位置用 `--dir` 指定项目目录：
+Dashboard 当前包含：
 
-```bash
-# 方式一：cd 到项目目录运行
-cd D:/workspace/你的项目
-code-ctx dashboard
+- 配置管理
+- AI 配置和连接测试
+- 场景选择和 prompt 生成
+- 子项目状态
+- 场景模板预览
+- 文档状态和健康检查入口
 
-# 方式二：在任意位置指定项目目录
-code-ctx dashboard --dir D:/workspace/你的项目
+Dashboard 面向本机开发使用，不建议直接暴露到公网。
+
+AI 配置接口会校验协议、baseUrl、模型名、maxTokens 和 API Key 基本格式；保存密钥时拒绝换行注入，并按本机权限能力以 `0o600` 写入 `.env`。
+
+Dashboard API 基于 Express 5。维护 Web API 时请把 `req.body` 视为不可信输入，显式校验类型、长度和允许字段；`express.json()` 应设置合理 `limit`；错误处理中间件应使用 `(err, req, res, next)` 四参数签名并避免向客户端返回内部路径或堆栈。
+
+## 项目结构
+
+```text
+codecontext/
+├── bin/                  # CLI 入口和命令薄壳
+├── src/
+│   ├── commands/         # init/use/update/fix/doctor 等核心流程
+│   ├── ai/               # OpenAI + Anthropic 原生 HTTP 客户端
+│   ├── scanner/          # 项目探测和文件扫描
+│   ├── adapters/         # 内置项目类型适配器
+│   ├── generator/        # prompt 构建
+│   ├── matcher/          # 场景匹配
+│   ├── template/         # 模板引擎
+│   ├── core/             # section 和文档映射
+│   ├── utils/            # 配置、Git、过滤、剪贴板等工具
+│   └── web/              # Express Dashboard API
+├── web/                  # Vue 3 Dashboard 前端
+├── templates/            # Prompt 模板和场景定义
+├── tests/                # Jest 测试
+└── docs/                 # 项目分析、修复计划、AI 实施指令
 ```
 
-- **配置管理** — 可视化编辑项目配置
-- **AI 配置** — Tab 切换 OpenAI/Anthropic 协议，连接状态实时检测
-- **AI 生成** — 左右分栏：场景选择 + prompt 生成 + AI 调用
-- **子项目** — 卡片式展示检测到的子项目
-- **场景模板** — 浏览和预览 8 种场景模板
-- **文档状态** — 表格展示文档健康状态（正常/待更新/缺失）
+## 文档和路线图
 
-设计风格：终端工业风、明暗主题切换、Outfit + JetBrains Mono 字体、CSS 变量管理。
+当前仓库已包含完整分析资料。公开发布包默认包含两份可执行入口文档：
 
-## 架构设计
+- [AI 分阶段实施指令](docs/AI分阶段实施指令-ai-implementation-instructions.md)
+- [项目完善路线图](docs/项目完善路线图-project-improvement-roadmap.md)
+- [后续 AI 执行提示词手册](docs/AI后续执行提示词手册-ai-execution-playbook.md)
 
-```
-code-ctx/
-├── bin/                    # CLI 入口
-│   ├── cli.js              # 主入口（Commander.js）
-│   └── commands/           # 9 个命令定义
-├── src/                    # 核心模块
-│   ├── commands/           # 命令实现
-│   ├── scanner/            # 项目探测 + 文件扫描
-│   ├── generator/          # prompt 组装
-│   ├── template/           # 模板引擎
-│   ├── matcher/            # 场景匹配（关键词 + AI）
-│   ├── ai/                 # AI 客户端（OpenAI + Anthropic）
-│   ├── adapters/           # 项目类型适配器（9 个内置）
-│   │   └── builtin/        # Vue2, Vue3, React, Next.js, uni-app, Java, Node, Go, Python
-│   ├── core/               # 文档解析、章节解析器
-│   ├── web/                # Express API 服务
-│   └── utils/              # 配置、常量、Git、敏感信息过滤、剪贴板
-├── templates/              # 内置场景模板
-├── web/                    # 前端（Vue 3 + Vite）
-│   ├── src/
-│   │   ├── components/     # 侧边栏
-│   │   ├── composables/    # useTheme 主题切换
-│   │   ├── views/          # 6 个页面
-│   │   ├── App.vue         # 根组件 + CSS 变量
-│   │   └── main.js         # 入口 + 路由
-│   └── dist/               # 构建产物
-└── tests/                  # Jest 测试套件
-```
+完整审计报告如 `docs/安全审计报告-security-audit-report.md`、`docs/问题跟踪清单-issue-tracker.md`、`docs/改进修复计划-repair-plan.md` 等用于仓库内维护，请以当前仓库实际文件为准。
 
-### 核心设计模式
+建议执行顺序：
 
-- **适配器模式** — 通过 `BaseAdapter` + `AdapterRegistry` 实现可扩展的项目类型探测
-- **策略模式** — 基于 token 估算的策略选择（ONE_SHOT / BATCH_WITH_CONTEXT / BATCH_MINIMAL）
-- **章节级更新** — 解析 markdown 章节结构，实现精准的文档局部更新
-- **容错机制** — 状态文件追踪（`init-state.json`），支持中断后恢复
-
-## 常见问题
-
-**Q: init 中断了怎么办？**
-重新运行即可，已完成的子项目会自动跳过。
-
-**Q: 剪贴板写入失败？**
-自动降级到 `.ai-prompt.md` 文件输出，也可主动使用 `--out` 参数。
-
-**Q: 如何更新文档？**
-```bash
-code-ctx update          # 检测变化
-code-ctx fix web         # 强制重新生成
-code-ctx doctor --fix    # 自动修复过期文档
-```
-
-**Q: 支持多人协作吗？**
-将 `ai-docs/` 目录提交到 git，团队成员共享同一份上下文文档。
-
-**Q: 如何扩展项目类型支持？**
-在 `src/adapters/builtin/` 下创建新的适配器，继承 `BaseAdapter`。
+1. 先按 [后续 AI 执行提示词手册](docs/AI后续执行提示词手册-ai-execution-playbook.md) 执行 `P00` 做基线复核。
+2. 执行 `P01-P06` 完成公开前安全加固。
+3. 执行 `P07-P11` 补齐测试和覆盖率输出。
+4. 执行 `P12-P15` 优化 AI 生成、update、status 和前端性能。
+5. 执行 `P16-P20` 做架构整理和硬编码清理。
+6. 执行 `P21-P24` 补齐发布工程。
+7. 执行 `P25-P31` 按需建设 JSON 配置、插件系统、文档质量、Dashboard 和 E2E。
 
 ## 开发
 
 ```bash
-git clone https://github.com/hzh1117/Code-ctx.git
-cd Code-ctx
-npm install
-cd web && npm install && npm run build && cd ..
-npm link
-
-# 运行测试
 npm test -- --runInBand
-
-# 构建管理面板
 npm run build:web
-
-# 一次性运行测试和构建
 npm run check
-
-# 启动管理面板
-code-ctx dashboard
+node bin/cli.js help
+node bin/cli.js dashboard
 ```
+
+涉及前端改动时，请至少运行：
+
+```bash
+npm run build:web
+```
+
+涉及安全、路径、配置和 Web API 改动时，请补充相应测试。
+
+## 已知风险
+
+根据 `docs/` 审计报告，当前版本仍需重点处理：
+
+- `loadConfigWithVM()` 配置执行安全。
+- dashboard dev 命令和 Git 工具的命令构造。
+- Dashboard 配置写入白名单和输入验证。
+- AI baseUrl 和敏感 AI API 已有基础防护，后续仍需更细的 token/IP 限流策略和分布式部署方案。
+- Web API 错误信息泄露和速率限制。
+- `core/`、`web/middleware/`、`utils/git-utils.js` 的测试缺口。
+- `init` 和 `update --apply` 的 AI 串行调用性能瓶颈。
 
 ## 参与贡献
 
-欢迎贡献！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。基本流程：
-
-1. Fork 本仓库
-2. 创建功能分支（`git checkout -b feature/amazing-feature`）
-3. 提交更改（`git commit -m 'feat: add amazing feature'`）
-4. 推送分支（`git push origin feature/amazing-feature`）
-5. 提交 Pull Request
-
-提交前建议运行：
+请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。提交 PR 前建议运行：
 
 ```bash
 npm run check
 ```
 
-## 安全
+安全问题请不要公开提交 issue，按 [SECURITY.md](SECURITY.md) 报告。
 
-如果发现安全问题，请不要公开提交 issue。请参考 [SECURITY.md](SECURITY.md) 使用 GitHub 私有漏洞报告或联系维护者。
+维护者建议在 GitHub 仓库设置中开启 [Private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configuring-private-vulnerability-reporting-for-a-repository)，让安全研究者可以通过私有流程提交漏洞。
 
-发布公开仓库前，请确认 `.env`、API Key、私有项目文档、生成的 prompt 文件没有被提交。
+## 变更记录
 
-## 发布记录
-
-变更记录见 [CHANGELOG.md](CHANGELOG.md)。
+见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 
-[MIT](LICENSE) © hzh1117
+[Code-ctx Non-Commercial Source License](LICENSE) © hzh1117。仅允许非商业使用。
+
+这不是 OSI 批准的开源许可证；如需商业使用、商业集成或 SaaS 托管，请先取得维护者书面授权。

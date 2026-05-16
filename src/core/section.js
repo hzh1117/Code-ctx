@@ -37,7 +37,7 @@ function replaceSection(content, sectionName, newContent) {
     'm'
   );
   if (!re.test(content)) return content;
-  return content.replace(re, `$1\n${newContent}\n$2`);
+  return content.replace(re, `$1\n${newContent}$2`);
 }
 
 /**

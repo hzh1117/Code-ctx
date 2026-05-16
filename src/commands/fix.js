@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { scanProject } = require('../scanner/file-scanner');
-const { getAIConfig } = require('../utils/config');
+const { getAIConfig, loadConfigWithVM } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
@@ -13,7 +13,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
     throw new Error('配置文件不存在，请先运行 code-ctx init');
   }
 
-  const config = require(configPath);
+  const config = loadConfigWithVM(configPath);
   const project = (config.projects || []).find(p => p.alias === projectAlias);
 
   if (!project) {

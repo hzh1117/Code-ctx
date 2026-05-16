@@ -6,7 +6,7 @@ const { localhostOnly, tokenAuth } = require('./middleware/security');
 function createServer(rootDir) {
   const app = express();
 
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
 
   // Security middleware
   app.use('/api', localhostOnly);
@@ -25,6 +25,18 @@ function createServer(rootDir) {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Error handling middleware (must be last)
+  app.use((err, req, res, next) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    if (err.type === 'entity.too.large') {
+      return res.status(413).json({ error: '请求体过大' });
+    }
+    console.error('Server error:', err.message);
+    res.status(500).json({ error: '服务器内部错误' });
+  });
 
   return app;
 }

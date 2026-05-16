@@ -11,6 +11,9 @@ const { runDoctor } = require('../../commands/doctor');
 const { getHistory } = require('../../utils/task-history');
 const { STATE_FILES } = require('../../utils/constants');
 
+const MAX_TEMPLATE_LENGTH = 10000;
+const VALID_SCENARIO_ID_PATTERN = /^[A-H]$/;
+
 module.exports = function(rootDir) {
   const router = express.Router();
 
@@ -27,7 +30,8 @@ module.exports = function(rootDir) {
       }));
       res.json(scenarioList);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Scenarios load error:', err.message);
+      res.status(500).json({ error: '场景加载失败' });
     }
   });
 
@@ -35,12 +39,23 @@ module.exports = function(rootDir) {
     try {
       const { id } = req.params;
       const { template } = req.body || {};
+
       if (typeof template !== 'string') {
         return res.status(400).json({ error: 'template 必须是字符串' });
+      }
+      if (template.length > MAX_TEMPLATE_LENGTH) {
+        return res.status(400).json({ error: `template 长度不能超过 ${MAX_TEMPLATE_LENGTH} 字符` });
       }
 
       const scenariosPath = path.join(__dirname, '../../../templates/scenarios.json');
       const scenarios = JSON.parse(fs.readFileSync(scenariosPath, 'utf8'));
+
+      // Validate id: must be A-H or exist in scenarios
+      const isValidId = VALID_SCENARIO_ID_PATTERN.test(id) || scenarios.some(s => s.id === id);
+      if (!isValidId) {
+        return res.status(400).json({ error: `无效的场景 ID: ${id}` });
+      }
+
       const scenario = scenarios.find(s => s.id === id);
       if (!scenario) {
         return res.status(404).json({ error: `未找到场景: ${id}` });
@@ -51,7 +66,8 @@ module.exports = function(rootDir) {
       clearCache();
       res.json({ success: true });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Scenario update error:', err.message);
+      res.status(500).json({ error: '场景更新失败' });
     }
   });
 
@@ -159,7 +175,8 @@ module.exports = function(rootDir) {
 
       res.json(result);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Status error:', err.message);
+      res.status(500).json({ error: '状态查询失败' });
     }
   });
 
@@ -180,16 +197,19 @@ module.exports = function(rootDir) {
         content: fs.readFileSync(docPath, 'utf8')
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Doc read error:', err.message);
+      res.status(500).json({ error: '文档读取失败' });
     }
   });
 
   router.post('/update', async (req, res) => {
     try {
-      const result = await updateCommand(rootDir, req.body || {});
+      const { dryRun } = req.body || {};
+      const result = await updateCommand(rootDir, { dryRun: !!dryRun });
       res.json({ success: true, result });
     } catch (err) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('Update error:', err.message);
+      res.status(500).json({ success: false, error: '更新失败' });
     }
   });
 
@@ -223,7 +243,8 @@ module.exports = function(rootDir) {
         prompt
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Generate prompt error:', err.message);
+      res.status(500).json({ error: 'Prompt 生成失败' });
     }
   });
 

@@ -125,7 +125,8 @@ module.exports = function(rootDir) {
         keys: getKeyInfo(rootDir)
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      console.error('AI config error:', err.message);
+      res.status(500).json({ error: 'AI 配置加载失败' });
     }
   });
 

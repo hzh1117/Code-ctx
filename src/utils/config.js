@@ -40,16 +40,12 @@ function loadConfigWithVM(configPath) {
     const module = { exports: {} };
     const sandbox = {
       module,
-      exports: module.exports,
-      require,
-      process,
-      __dirname: path.dirname(configPath),
-      __filename: configPath
+      exports: module.exports
     };
     vm.runInNewContext(code, sandbox, { filename: configPath });
     return module.exports;
   } catch (err) {
-    throw new Error(`配置文件解析失败 (${configPath}): ${err.message}`);
+    throw new Error(`配置文件解析失败`);
   }
 }
 

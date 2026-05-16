@@ -1,23 +1,23 @@
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { STATE_FILES } = require('./constants');
 
-function hasGitRepo(rootDir) {
-  try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd: rootDir, stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
+function runGit(args, cwd) {
+  const result = spawnSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf8' });
+  if (result.error || result.status !== 0) {
+    return null;
   }
+  return result.stdout.trim();
+}
+
+function hasGitRepo(rootDir) {
+  const output = runGit(['rev-parse', '--is-inside-work-tree'], rootDir);
+  return output !== null;
 }
 
 function getCurrentCommitHash(rootDir) {
-  try {
-    return execSync('git rev-parse HEAD', { cwd: rootDir, stdio: 'pipe' }).toString().trim();
-  } catch {
-    return null;
-  }
+  return runGit(['rev-parse', 'HEAD'], rootDir);
 }
 
 function isValidCommitHash(hash) {
@@ -26,42 +26,24 @@ function isValidCommitHash(hash) {
 
 function getChangedFilesSince(rootDir, sinceCommit) {
   if (!isValidCommitHash(sinceCommit)) return null;
-  try {
-    const output = execSync(`git diff --name-only ${sinceCommit}..HEAD`, {
-      cwd: rootDir,
-      stdio: 'pipe'
-    }).toString().trim();
-    if (!output) return [];
-    return output.split('\n').filter(Boolean);
-  } catch {
-    return null;
-  }
+  const output = runGit(['diff', '--name-only', `${sinceCommit}..HEAD`], rootDir);
+  if (output === null) return null;
+  if (!output) return [];
+  return output.split('\n').filter(Boolean);
 }
 
 function getChangedFilesWorkingTree(rootDir) {
-  try {
-    const output = execSync('git diff --name-only HEAD', {
-      cwd: rootDir,
-      stdio: 'pipe'
-    }).toString().trim();
-    if (!output) return [];
-    return output.split('\n').filter(Boolean);
-  } catch {
-    return null;
-  }
+  const output = runGit(['diff', '--name-only', 'HEAD'], rootDir);
+  if (output === null) return null;
+  if (!output) return [];
+  return output.split('\n').filter(Boolean);
 }
 
 function getUntrackedFiles(rootDir) {
-  try {
-    const output = execSync('git ls-files --others --exclude-standard', {
-      cwd: rootDir,
-      stdio: 'pipe'
-    }).toString().trim();
-    if (!output) return [];
-    return output.split('\n').filter(Boolean);
-  } catch {
-    return [];
-  }
+  const output = runGit(['ls-files', '--others', '--exclude-standard'], rootDir);
+  if (output === null) return [];
+  if (!output) return [];
+  return output.split('\n').filter(Boolean);
 }
 
 function getLastScanCommit(rootDir) {

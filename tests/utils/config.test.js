@@ -1,4 +1,4 @@
-const { loadEnvConfig, getAIConfig, saveAIConfig } = require('../../src/utils/config');
+const { loadEnvConfig, getAIConfig, saveAIConfig, loadConfigWithVM, loadProjectConfig } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
@@ -133,5 +133,51 @@ describe('config', () => {
     expect(saved.openai.model).toBe('deepseek-chat');
     expect(saved.anthropic.baseUrl).toBe('https://proxy.example.com/anthropic');
     expect(saved.anthropic.model).toBe('claude-opus-4-6');
+  });
+
+  test('loadConfigWithVM: normal module.exports config loads correctly', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { projectName: 'test', ai: { protocol: 'openai' } };`);
+    const config = loadConfigWithVM(configPath);
+    expect(config.projectName).toBe('test');
+    expect(config.ai.protocol).toBe('openai');
+  });
+
+  test('loadConfigWithVM: exports.xxx pattern loads correctly', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `exports.projectName = 'test'; exports.ai = { protocol: 'openai' };`);
+    const config = loadConfigWithVM(configPath);
+    expect(config.projectName).toBe('test');
+    expect(config.ai.protocol).toBe('openai');
+  });
+
+  test('loadConfigWithVM: malicious config cannot require child_process', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `const cp = require('child_process'); module.exports = { cmd: cp.execSync('whoami').toString() };`);
+    expect(() => loadConfigWithVM(configPath)).toThrow();
+  });
+
+  test('loadConfigWithVM: malicious config cannot access process', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { env: process.env };`);
+    expect(() => loadConfigWithVM(configPath)).toThrow();
+  });
+
+  test('loadConfigWithVM: syntax error returns safe error message', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { broken`);
+    expect(() => loadConfigWithVM(configPath)).toThrow('配置文件解析失败');
+  });
+
+  test('loadProjectConfig: returns empty object when config file does not exist', () => {
+    const config = loadProjectConfig(testDir);
+    expect(config).toEqual({});
+  });
+
+  test('loadProjectConfig: loads valid config file', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { projectName: 'my-app' };`);
+    const config = loadProjectConfig(testDir);
+    expect(config.projectName).toBe('my-app');
   });
 });

@@ -2,6 +2,11 @@ const { updateCommand, executeUpdates, applySectionUpdates } = require('../../sr
 // Mock at file level — safe because updateCommand tests use dryRun (skips AI) or only check prompt structure
 jest.mock('../../src/ai/client', () => ({ generateWithAI: jest.fn() }));
 const { generateWithAI } = require('../../src/ai/client');
+// Force hash mode for deterministic updateCommand tests (avoids git repo dependency)
+jest.mock('../../src/utils/git-utils', () => {
+  const actual = jest.requireActual('../../src/utils/git-utils');
+  return { ...actual, hasGitRepo: () => false };
+});
 const fs = require('fs');
 const path = require('path');
 
@@ -44,13 +49,8 @@ describe('updateCommand', () => {
     }));
     
     const result = await updateCommand(testDir, { dryRun: true });
-    // In git mode, may detect changes from parent repo; in hash mode, should be 0
-    if (result.detectionMethod === 'hash') {
-      expect(result.changedFiles.length).toBe(0);
-    } else {
-      // Git mode may detect changes from parent repo
-      expect(result.changedFiles).toBeDefined();
-    }
+    expect(result.detectionMethod).toBe('hash');
+    expect(result.changedFiles.length).toBe(0);
   });
 
   test('should update scan state when not dryRun', async () => {
@@ -74,12 +74,8 @@ describe('updateCommand', () => {
 
   test('should handle missing src directory', async () => {
     const result = await updateCommand(testDir, { dryRun: true });
-    // In git mode, may detect changes from parent repo; in hash mode, should be empty
-    if (result.detectionMethod === 'hash') {
-      expect(result.changedFiles).toEqual([]);
-    } else {
-      expect(result.changedFiles).toBeDefined();
-    }
+    expect(result.detectionMethod).toBe('hash');
+    expect(result.changedFiles).toEqual([]);
   });
 
   test('should generate incremental prompt for changed files', async () => {

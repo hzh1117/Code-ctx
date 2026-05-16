@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "test": "jest",
+    "coverage": "jest --coverage --runInBand",
     "lint": "eslint src/",
     "check": "npm test -- --runInBand && npm run build:web",
     "build:web": "cd web && npm run build",
@@ -68,5 +69,13 @@
   "devDependencies": {
     "eslint": "^8.0.0",
     "jest": "^29.0.0"
+  },
+  "jest": {
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/web/dist/",
+      "/tests/fixtures/",
+      "/tests/helpers/"
+    ]
   }
 }

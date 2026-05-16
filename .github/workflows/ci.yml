@@ -38,5 +38,8 @@ jobs:
       - name: Run tests
         run: npm test -- --runInBand
 
+      - name: Run coverage
+        run: npm run coverage
+
       - name: Build dashboard
         run: npm run build:web

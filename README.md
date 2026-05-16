@@ -228,6 +228,7 @@ codecontext/
 
 ```bash
 npm test -- --runInBand
+npm run coverage
 npm run build:web
 npm run check
 node bin/cli.js help

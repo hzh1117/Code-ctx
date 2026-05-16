@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { extractSection, replaceSection, listSections } = require('../core/section');
-const { readFileUTF8 } = require('../utils/file-reader');
+const { readFileUTF8, isWithinDir } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
 const { STATE_FILES } = require('../utils/constants');
 const { generateWithAI } = require('../ai/client');
@@ -107,6 +107,13 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
 
   for (const [docName, updates] of Object.entries(updatesByDoc)) {
     const docPath = path.join(aiDocsDir, docName);
+    if (!isWithinDir(docPath, aiDocsDir)) {
+      for (const u of updates) {
+        results.push({ docName, sectionName: u.sectionName, status: 'skipped', reason: '非法文档路径' });
+        skipped++;
+      }
+      continue;
+    }
     if (!fs.existsSync(docPath)) {
       for (const u of updates) {
         results.push({ docName, sectionName: u.sectionName, status: 'skipped', reason: '文件不存在' });

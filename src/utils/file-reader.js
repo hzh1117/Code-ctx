@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const chardet = require('chardet');
 const iconv = require('iconv-lite');
 
@@ -40,4 +41,14 @@ function hasReplacementChars(str) {
   return str.includes('\uFFFD');
 }
 
-module.exports = { readFileUTF8 };
+/**
+ * Check that a file path resolves within an allowed directory.
+ * Prevents path traversal via ../ or absolute paths.
+ */
+function isWithinDir(filePath, allowedDir) {
+  const resolved = path.resolve(filePath);
+  const resolvedDir = path.resolve(allowedDir);
+  return resolved === resolvedDir || resolved.startsWith(resolvedDir + path.sep);
+}
+
+module.exports = { readFileUTF8, isWithinDir };

@@ -222,6 +222,50 @@ describe('generateWithAI', () => {
     })).resolves.toBeUndefined();
   });
 
+  test('should not leak full response content in debug output', async () => {
+    const originalEnv = process.env.AI_DEBUG_RESPONSE;
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      process.env.AI_DEBUG_RESPONSE = 'true';
+      jest.resetModules();
+      const { generateWithAI: freshGenerate } = require('../../src/ai/client');
+
+      const secretContent = 'SECRET_RESPONSE_CONTENT_SHOULD_NOT_APPEAR';
+      const server = http.createServer((req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          choices: [{ message: { content: secretContent } }],
+          usage: { total_tokens: 42 }
+        }));
+      });
+      await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+      try {
+        const { port } = server.address();
+        await freshGenerate('test', {
+          apiKey: 'sk-secret-key-should-not-appear',
+          protocol: 'openai',
+          baseUrl: `http://127.0.0.1:${port}/v1`,
+          model: 'test-model',
+          maxTokens: 10,
+          allowLocalBaseUrl: true,
+          allowInsecureBaseUrl: true
+        });
+
+        const allOutput = consoleSpy.mock.calls.map(args => args.join(' ')).join('\n');
+        expect(allOutput).not.toContain(secretContent);
+        expect(allOutput).not.toContain('sk-secret-key-should-not-appear');
+        expect(allOutput).toContain('AI-RESPONSE');
+      } finally {
+        await new Promise(resolve => server.close(resolve));
+      }
+    } finally {
+      process.env.AI_DEBUG_RESPONSE = originalEnv;
+      consoleSpy.mockRestore();
+      jest.resetModules();
+    }
+  });
+
   test('should normalize Anthropic system messages into top-level system field', () => {
     const result = normalizeAnthropicMessages([
       { role: 'system', content: 'Use concise Chinese.' },

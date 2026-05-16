@@ -4,6 +4,7 @@ const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
 const { filterSensitive } = require('../../utils/sensitive-filter');
 const { getScenarios, clearCache } = require('../../template/engine');
+const { isWithinDir } = require('../../utils/file-reader');
 const { buildContext, useCommand } = require('../../commands/use');
 const { listSections } = require('../../core/section');
 const { updateCommand } = require('../../commands/update');
@@ -131,9 +132,10 @@ module.exports = function(rootDir) {
           // 检查对应的子项目目录是否有更新的文件
           const alias = doc.name.replace('.md', '');
           const project = projectsArray.find(p => p.alias === alias);
-          if (project) {
+          // Skip stale check when project.path is missing — cannot determine project directory
+          if (project && project.path) {
             const projectDir = path.resolve(rootDir, project.path);
-            if (fs.existsSync(projectDir)) {
+            if (isWithinDir(projectDir, rootDir) && fs.existsSync(projectDir)) {
               const latestMtime = getLatestMtime(projectDir);
               if (latestMtime > docMtime) {
                 doc.stale = true;

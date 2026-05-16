@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
+const { isWithinDir } = require('../../utils/file-reader');
 
 module.exports = function(rootDir) {
   const router = express.Router();
@@ -28,6 +29,8 @@ module.exports = function(rootDir) {
 function normalizeProject(proj, alias, aiDocsDir, initState) {
   const projectAlias = proj.alias || alias;
   const status = initState.projects?.[projectAlias]?.status;
+  const docPath = path.join(aiDocsDir, `${projectAlias}.md`);
+  const docFile = isWithinDir(docPath, aiDocsDir) && fs.existsSync(docPath);
   return {
     alias: projectAlias,
     name: proj.name || proj.label || projectAlias,
@@ -35,7 +38,7 @@ function normalizeProject(proj, alias, aiDocsDir, initState) {
     type: proj.type || 'unknown',
     label: proj.label || proj.name || projectAlias,
     initialized: ['done', 'completed'].includes(status),
-    docFile: fs.existsSync(path.join(aiDocsDir, `${projectAlias}.md`))
+    docFile
   };
 }
 

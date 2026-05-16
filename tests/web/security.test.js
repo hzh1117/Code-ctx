@@ -274,3 +274,55 @@ describe('Security: path traversal on docs', () => {
     expect(res.body.name).toBe('test-doc.md');
   });
 });
+
+describe('Security: save-key validation', () => {
+  afterEach(() => {
+    const envPath = path.join(testDir, '.env');
+    if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
+    const bakPath = envPath + '.bak';
+    if (fs.existsSync(bakPath)) fs.unlinkSync(bakPath);
+  });
+
+  test('rejects API key longer than 512 characters', async () => {
+    const longKey = 'sk-' + 'a'.repeat(513);
+    const res = await requestJson('POST', '/api/ai/save-key', { apiKey: longKey });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test('rejects API key containing newline', async () => {
+    const res = await requestJson('POST', '/api/ai/save-key', { apiKey: 'sk-valid\ninjected' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test('rejects API key containing carriage return', async () => {
+    const res = await requestJson('POST', '/api/ai/save-key', { apiKey: 'sk-valid\rinjected' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+  });
+
+  test('rejects empty API key', async () => {
+    const res = await requestJson('POST', '/api/ai/save-key', { apiKey: '' });
+    expect(res.status).toBe(400);
+  });
+
+  test('accepts valid API key', async () => {
+    const res = await requestJson('POST', '/api/ai/save-key', { apiKey: 'sk-test-valid-key-1234' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('Security: update API options', () => {
+  test('only uses dryRun from request body, ignores unknown options', async () => {
+    const res = await requestJson('POST', '/api/update', {
+      dryRun: true,
+      maliciousOption: 'should-be-ignored',
+      force: true,
+      outputDir: '/tmp/evil'
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});

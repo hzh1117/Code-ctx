@@ -1,4 +1,9 @@
-const { updateCommand } = require('../../src/commands/update');
+const { updateCommand, executeUpdates, applySectionUpdates } = require('../../src/commands/update');
+
+jest.mock('../../src/ai/client', () => ({
+  generateWithAI: jest.fn()
+}));
+const { generateWithAI } = require('../../src/ai/client');
 const fs = require('fs');
 const path = require('path');
 
@@ -96,5 +101,171 @@ describe('updateCommand', () => {
     expect(Array.isArray(result.changedFiles)).toBe(true);
 
     fs.rmSync(testDir, { recursive: true, force: true });
+  });
+});
+
+describe('applySectionUpdates', () => {
+  const testDir = path.join(__dirname, '../fixtures/apply-section-test');
+
+  beforeEach(() => {
+    fs.mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('replaces single section', () => {
+    const docPath = path.join(testDir, 'doc.md');
+    fs.writeFileSync(docPath, [
+      '# Title',
+      '<!-- section:overview -->',
+      '旧概述',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+
+    applySectionUpdates(docPath, [
+      { sectionName: 'overview', newContent: '新概述' }
+    ]);
+
+    const result = fs.readFileSync(docPath, 'utf8');
+    expect(result).toContain('新概述');
+    expect(result).not.toContain('旧概述');
+    expect(result).toContain('<!-- section:overview -->');
+  });
+
+  test('replaces multiple sections in same file', () => {
+    const docPath = path.join(testDir, 'doc.md');
+    fs.writeFileSync(docPath, [
+      '<!-- section:a -->',
+      '旧A',
+      '<!-- /section:a -->',
+      '<!-- section:b -->',
+      '旧B',
+      '<!-- /section:b -->'
+    ].join('\n'));
+
+    applySectionUpdates(docPath, [
+      { sectionName: 'a', newContent: '新A' },
+      { sectionName: 'b', newContent: '新B' }
+    ]);
+
+    const result = fs.readFileSync(docPath, 'utf8');
+    expect(result).toContain('新A');
+    expect(result).toContain('新B');
+  });
+
+  test('preserves content outside updated sections', () => {
+    const docPath = path.join(testDir, 'doc.md');
+    fs.writeFileSync(docPath, [
+      '# 标题',
+      '<!-- section:s -->',
+      '旧',
+      '<!-- /section:s -->',
+      '尾部'
+    ].join('\n'));
+
+    applySectionUpdates(docPath, [
+      { sectionName: 's', newContent: '新' }
+    ]);
+
+    const result = fs.readFileSync(docPath, 'utf8');
+    expect(result).toContain('# 标题');
+    expect(result).toContain('尾部');
+  });
+});
+
+describe('executeUpdates', () => {
+  const testDir = path.join(__dirname, '../fixtures/execute-updates-test');
+
+  beforeEach(() => {
+    fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
+    generateWithAI.mockReset();
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('succeeds and writes back updated sections', async () => {
+    const docPath = path.join(testDir, 'ai-docs', 'web.md');
+    fs.writeFileSync(docPath, [
+      '# Web',
+      '<!-- section:overview -->',
+      '旧概述',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+
+    generateWithAI.mockResolvedValue('新概述内容');
+
+    const result = await executeUpdates(testDir, [
+      { docName: 'web.md', sectionName: 'overview', prompt: 'update overview' }
+    ], {});
+
+    expect(result.success).toBe(1);
+    expect(result.failed).toBe(0);
+    const content = fs.readFileSync(docPath, 'utf8');
+    expect(content).toContain('新概述内容');
+  });
+
+  test('partial failure does not corrupt successful sections', async () => {
+    const docPath = path.join(testDir, 'ai-docs', 'web.md');
+    fs.writeFileSync(docPath, [
+      '<!-- section:a -->',
+      '旧A',
+      '<!-- /section:a -->',
+      '<!-- section:b -->',
+      '旧B',
+      '<!-- /section:b -->'
+    ].join('\n'));
+
+    generateWithAI
+      .mockResolvedValueOnce('新A')
+      .mockRejectedValueOnce(new Error('AI failed'));
+
+    const result = await executeUpdates(testDir, [
+      { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
+      { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
+    ], {});
+
+    expect(result.success).toBe(1);
+    expect(result.failed).toBe(1);
+    const content = fs.readFileSync(docPath, 'utf8');
+    expect(content).toContain('新A');
+  });
+
+  test('skips non-existent doc', async () => {
+    const result = await executeUpdates(testDir, [
+      { docName: 'missing.md', sectionName: 's', prompt: 'update' }
+    ], {});
+
+    expect(result.skipped).toBe(1);
+    expect(result.success).toBe(0);
+  });
+
+  test('skips path traversal docName', async () => {
+    fs.writeFileSync(path.join(testDir, 'outside.md'), 'outside');
+    const result = await executeUpdates(testDir, [
+      { docName: '../outside.md', sectionName: 's', prompt: 'update' }
+    ], {});
+
+    expect(result.skipped).toBe(1);
+    expect(result.results[0].reason).toContain('非法');
+  });
+
+  test('creates backup before modifying', async () => {
+    const docPath = path.join(testDir, 'ai-docs', 'web.md');
+    const original = '# Web\n<!-- section:s -->\n旧\n<!-- /section:s -->';
+    fs.writeFileSync(docPath, original);
+
+    generateWithAI.mockResolvedValue('新');
+
+    await executeUpdates(testDir, [
+      { docName: 'web.md', sectionName: 's', prompt: 'update' }
+    ], {});
+
+    const backupPath = docPath + '.bak';
+    expect(fs.existsSync(backupPath)).toBe(true);
+    expect(fs.readFileSync(backupPath, 'utf8')).toBe(original);
   });
 });

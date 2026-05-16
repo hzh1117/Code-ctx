@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 jest.mock('child_process', () => ({
   spawnSync: jest.fn()
@@ -11,7 +12,8 @@ const {
   getChangedFilesSince,
   getChangedFilesWorkingTree,
   getUntrackedFiles,
-  isValidCommitHash
+  isValidCommitHash,
+  getLastScanCommit
 } = require('../../src/utils/git-utils');
 
 describe('git-utils', () => {
@@ -154,6 +156,47 @@ describe('git-utils', () => {
     test('returns empty array when no untracked files', () => {
       spawnSync.mockReturnValue({ stdout: '', status: 0, error: null });
       expect(getUntrackedFiles(testDir)).toEqual([]);
+    });
+  });
+
+  describe('getLastScanCommit', () => {
+    const scanDir = path.join(__dirname, '../fixtures/git-scan-test');
+
+    beforeEach(() => {
+      fs.mkdirSync(path.join(scanDir, 'ai-docs'), { recursive: true });
+    });
+
+    afterEach(() => {
+      fs.rmSync(scanDir, { recursive: true, force: true });
+    });
+
+    test('returns lastCommitHash from .last-scan.json', () => {
+      const hash = 'abc1234567890abcdef1234567890abcdef123456';
+      fs.writeFileSync(
+        path.join(scanDir, 'ai-docs', '.last-scan.json'),
+        JSON.stringify({ lastCommitHash: hash, timestamp: '2026-01-01' })
+      );
+      expect(getLastScanCommit(scanDir)).toBe(hash);
+    });
+
+    test('returns null when .last-scan.json does not exist', () => {
+      expect(getLastScanCommit(scanDir)).toBeNull();
+    });
+
+    test('returns null when .last-scan.json has no lastCommitHash', () => {
+      fs.writeFileSync(
+        path.join(scanDir, 'ai-docs', '.last-scan.json'),
+        JSON.stringify({ timestamp: '2026-01-01' })
+      );
+      expect(getLastScanCommit(scanDir)).toBeNull();
+    });
+
+    test('returns null when .last-scan.json is invalid JSON', () => {
+      fs.writeFileSync(
+        path.join(scanDir, 'ai-docs', '.last-scan.json'),
+        'not valid json{{{'
+      );
+      expect(getLastScanCommit(scanDir)).toBeNull();
     });
   });
 });

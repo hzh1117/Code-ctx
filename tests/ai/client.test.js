@@ -320,3 +320,130 @@ describe('generateWithAI', () => {
     }
   });
 });
+
+describe('AI retry mechanism', () => {
+  const baseOpts = {
+    apiKey: 'key',
+    protocol: 'openai',
+    model: 'test-model',
+    maxTokens: 10,
+    timeout: 5000,
+    allowLocalBaseUrl: true,
+    allowInsecureBaseUrl: true
+  };
+
+  test('retries on 429 and succeeds', async () => {
+    let count = 0;
+    const server = http.createServer((req, res) => {
+      count++;
+      res.setHeader('Content-Type', 'application/json');
+      if (count === 1) {
+        res.writeHead(429, { 'Retry-After': '1' });
+        res.end(JSON.stringify({ error: { message: 'rate limited' } }));
+      } else {
+        res.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }));
+      }
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      const result = await generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` });
+      expect(result).toBe('ok');
+      expect(count).toBe(2);
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }, 15000);
+
+  test('retries on 500 and succeeds', async () => {
+    let count = 0;
+    const server = http.createServer((req, res) => {
+      count++;
+      res.setHeader('Content-Type', 'application/json');
+      if (count === 1) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: { message: 'server error' } }));
+      } else {
+        res.end(JSON.stringify({ choices: [{ message: { content: 'recovered' } }] }));
+      }
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      const result = await generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` });
+      expect(result).toBe('recovered');
+      expect(count).toBe(2);
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }, 15000);
+
+  test('fails after max retries on persistent 500', async () => {
+    let count = 0;
+    const server = http.createServer((req, res) => {
+      count++;
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: { message: 'persistent error' } }));
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` }))
+        .rejects.toThrow('500');
+      // 1 initial + 3 retries = 4
+      expect(count).toBe(4);
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }, 30000);
+
+  test('uses Retry-After header for delay', async () => {
+    let count = 0;
+    const server = http.createServer((req, res) => {
+      count++;
+      res.setHeader('Content-Type', 'application/json');
+      if (count === 1) {
+        res.writeHead(429, { 'Retry-After': '1' });
+        res.end(JSON.stringify({ error: { message: 'rate limited' } }));
+      } else {
+        res.end(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }));
+      }
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      const start = Date.now();
+      const result = await generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` });
+      const elapsed = Date.now() - start;
+      expect(result).toBe('ok');
+      expect(count).toBe(2);
+      // Retry-After: 1 = 1000ms delay
+      expect(elapsed).toBeGreaterThanOrEqual(900);
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }, 15000);
+
+  test('error message does not leak full API response body', async () => {
+    const server = http.createServer((req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(400);
+      res.end(JSON.stringify({
+        error: {
+          message: 'Invalid request',
+          type: 'invalid_request_error',
+          internal_secret: 'should-not-leak'
+        }
+      }));
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    try {
+      const { port } = server.address();
+      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` }))
+        .rejects.toThrow(/400.*Invalid request/);
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  });
+});

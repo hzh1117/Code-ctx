@@ -128,6 +128,75 @@ describe('generateWithAI', () => {
     expect(() => validateBaseUrl('https://169.254.169.254/latest')).toThrow(/localhost|内网|metadata/);
   });
 
+  test('should reject 0.0.0.0', () => {
+    expect(() => validateBaseUrl('https://0.0.0.0/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject IPv6 loopback ::1', () => {
+    expect(() => validateBaseUrl('https://[::1]/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject 172.16-31.x private range', () => {
+    expect(() => validateBaseUrl('https://172.16.0.1/v1')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://172.31.255.255/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject 192.168.x private range', () => {
+    expect(() => validateBaseUrl('https://192.168.1.1/v1')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://192.168.0.100/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject case variations of localhost', () => {
+    expect(() => validateBaseUrl('https://LOCALHOST/v1')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://LocalHost/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject .localhost suffix', () => {
+    expect(() => validateBaseUrl('https://foo.localhost/v1')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should reject metadata hosts', () => {
+    expect(() => validateBaseUrl('https://metadata.google.internal/latest')).toThrow(/localhost|内网|metadata/);
+    expect(() => validateBaseUrl('https://metadata/latest')).toThrow(/localhost|内网|metadata/);
+  });
+
+  test('should handle trailing slashes correctly', () => {
+    const url = validateBaseUrl('https://api.openai.com/v1///');
+    expect(url.pathname).toBe('/v1');
+  });
+
+  test('should reject non-http/https protocols', () => {
+    expect(() => validateBaseUrl('ftp://example.com')).toThrow(/仅支持/);
+    expect(() => validateBaseUrl('file:///etc/passwd')).toThrow(/仅支持/);
+  });
+
+  test('should reject empty or invalid baseUrl', () => {
+    expect(() => validateBaseUrl('')).toThrow(/不能为空/);
+    expect(() => validateBaseUrl(null)).toThrow(/不能为空/);
+    expect(() => validateBaseUrl('not-a-url')).toThrow(/有效 URL/);
+  });
+
+  test('should allow normal HTTPS provider addresses', () => {
+    expect(() => validateBaseUrl('https://api.openai.com/v1')).not.toThrow();
+    expect(() => validateBaseUrl('https://api.anthropic.com')).not.toThrow();
+    expect(() => validateBaseUrl('https://api.deepseek.com')).not.toThrow();
+    expect(() => validateBaseUrl('https://api.moonshot.cn/v1')).not.toThrow();
+  });
+
+  test('should reject DNS resolution failure', async () => {
+    const url = validateBaseUrl('https://nonexistent.example.com/v1');
+    await expect(validateResolvedBaseUrl(url, {
+      dnsLookup: async () => { throw new Error('ENOTFOUND'); }
+    })).rejects.toThrow(/DNS 解析失败/);
+  });
+
+  test('should reject DNS resolving to IPv6 loopback', async () => {
+    const url = validateBaseUrl('https://ai-proxy.example.com/v1');
+    await expect(validateResolvedBaseUrl(url, {
+      dnsLookup: async () => [{ address: '::1', family: 6 }]
+    })).rejects.toThrow(/DNS|localhost|内网|metadata/);
+  });
+
   test('should allow explicit local insecure URLs for tests and local debugging', () => {
     const url = validateBaseUrl('http://127.0.0.1:3000/v1/', {
       allowLocalBaseUrl: true,

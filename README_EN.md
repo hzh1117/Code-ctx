@@ -15,7 +15,7 @@ English | [中文](README.md)
 
 ---
 
-> **Project status: active development.** The core CLI and local Dashboard are usable, but the audit reports under `docs/` still identify P0 security items and test gaps. Resolve those items before public deployment, team rollout, or commercial-license evaluation.
+> **Project status: active development.** The core CLI and local Dashboard are usable, but security, test coverage, and release engineering still need work before public deployment, team rollout, or commercial-license evaluation.
 
 > **License notice:** This project is source-available for non-commercial use only. Commercial use, SaaS hosting, paid integration, paid support, and redistribution as part of a commercial product are prohibited. See [LICENSE](LICENSE).
 
@@ -26,6 +26,8 @@ English | [中文](README.md)
 Code-ctx is a CLI tool for AI-assisted development. It scans a project, generates reusable context documentation under `ai-docs/`, and assembles task-specific prompts for Claude, ChatGPT, Cursor, Claude Code, Open Code, and similar AI coding tools.
 
 The problem is simple: every new AI session often starts with repeated explanations of project structure, tech stack, module responsibilities, API contracts, and business context. Code-ctx turns that repeated explanation into updateable, reusable context.
+
+Code-ctx is not an AI IDE. It does not provide code completion, editor-native inline generation, or a general agent workspace. Its boundary is generating, maintaining, and reusing AI-readable codebase context for whichever AI tool you choose.
 
 ## Core Features
 
@@ -207,28 +209,20 @@ codecontext/
 ├── web/                  # Vue 3 Dashboard frontend
 ├── templates/            # prompt templates and scenarios
 ├── tests/                # Jest tests
-└── docs/                 # analysis reports, repair plans, AI instructions
 ```
 
-## Documentation and Roadmap
-
-The repository includes detailed analysis documents. The published package includes these two actionable entry points:
-
-- [AI Implementation Instructions](docs/AI分阶段实施指令-ai-implementation-instructions.md)
-- [Project Improvement Roadmap](docs/项目完善路线图-project-improvement-roadmap.md)
-- [AI Execution Playbook](docs/AI后续执行提示词手册-ai-execution-playbook.md)
-
-Full audit reports such as `docs/安全审计报告-security-audit-report.md`, `docs/问题跟踪清单-issue-tracker.md`, and `docs/改进修复计划-repair-plan.md` are maintained inside the repository when present. Use the current repository files as the source of truth.
+## Roadmap
 
 Recommended order:
 
-1. Run `P00` from the [AI Execution Playbook](docs/AI后续执行提示词手册-ai-execution-playbook.md) to confirm the current baseline.
-2. Run `P01-P06` for pre-publication security hardening.
-3. Run `P07-P11` for tests and coverage output.
-4. Run `P12-P15` for AI generation, update, status, and frontend performance.
-5. Run `P16-P20` for architecture cleanup and hard-coded behavior removal.
-6. Run `P21-P24` for release engineering.
-7. Run `P25-P31` as needed for JSON config, plugins, documentation quality, Dashboard improvements, and E2E.
+1. Complete pre-publication security hardening for config loading, command execution, path access, and Web API error handling.
+2. Add core tests and coverage output for config, Git, section updates, Web APIs, and the AI client.
+3. Improve AI context-generation performance for `init`, `update --apply`, status pages, and frontend build experience.
+4. Clean up architecture by splitting large functions, removing hard-coded behavior, and unifying shared utilities.
+5. Complete release engineering: CI, release checklist, npm pack verification, and default model/config review.
+6. Add product capabilities as needed: JSON config, plugin system, document quality scoring, Dashboard improvements, and E2E smoke tests.
+
+Maintainers may keep `docs/` locally for planning and audit material, but `docs/` is ignored by Git by default and is not included in the npm package.
 
 ## Development
 
@@ -250,7 +244,7 @@ For security, path, config, or Web API changes, add matching tests.
 
 ## Known Risks
 
-The current audit reports under `docs/` call out these priority risks:
+Current priority risks:
 
 - `loadConfigWithVM()` config execution safety.
 - Command construction in dashboard dev mode and Git utilities.

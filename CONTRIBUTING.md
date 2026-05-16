@@ -6,13 +6,7 @@
 
 ### 当前优先级
 
-在完整维护仓库中，请优先阅读 `docs/` 下的分析报告，尤其是：
-
-- `docs/综合分析报告-comprehensive-analysis-report.md`
-- `docs/问题跟踪清单-issue-tracker.md`
-- `docs/改进修复计划-repair-plan.md`
-- `docs/安全审计报告-security-audit-report.md`
-- `docs/测试质量报告-test-quality-report.md`
+维护者本地可能保留 `docs/` 规划和审计资料，但该目录默认不上传 Git。公开贡献请以 README、SECURITY、CHANGELOG 和当前代码为准。
 
 当前最需要的贡献方向：
 
@@ -50,7 +44,6 @@ node bin/cli.js dashboard
 ### PR 检查清单
 
 - 说明问题、影响范围、解决方案和验证结果。
-- 涉及 `docs/问题跟踪清单-issue-tracker.md` 的问题时，标明问题 ID，例如 `SEC-001`、`TEST-003`。
 - 行为变更需要新增或更新测试。
 - 修改 CLI、Dashboard、配置、环境变量或用户流程时，同步更新 README 或相关文档。
 - 修改安全逻辑时，附上负向用例或手动验证命令。
@@ -89,13 +82,7 @@ Thanks for helping improve Code-ctx. The project is source-available for non-com
 
 ### Current Priorities
 
-In the full maintenance repository, read the reports under `docs/` first, especially:
-
-- `docs/综合分析报告-comprehensive-analysis-report.md`
-- `docs/问题跟踪清单-issue-tracker.md`
-- `docs/改进修复计划-repair-plan.md`
-- `docs/安全审计报告-security-audit-report.md`
-- `docs/测试质量报告-test-quality-report.md`
+Maintainers may keep local planning and audit material under `docs/`, but that directory is ignored by Git by default. Public contributions should use README, SECURITY, CHANGELOG, and the current code as the source of truth.
 
 The highest-value contribution areas are:
 
@@ -133,7 +120,6 @@ node bin/cli.js dashboard
 ### Pull Request Checklist
 
 - Explain the problem, impact, solution, and verification.
-- If the work maps to `docs/问题跟踪清单-issue-tracker.md`, include the issue ID such as `SEC-001` or `TEST-003`.
 - Add or update tests for behavior changes.
 - Update README or related docs when changing CLI commands, Dashboard behavior, config, environment variables, or workflows.
 - For security changes, include negative tests or manual verification commands.

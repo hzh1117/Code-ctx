@@ -8,7 +8,7 @@ Code-ctx 正在积极开发中。安全修复会应用到 `master` 分支的最�
 
 ### 当前安全状态
 
-完整维护仓库中的 `docs/安全审计报告-security-audit-report.md` 和 `docs/问题跟踪清单-issue-tracker.md` 已记录当前审计结论。公开部署或商业授权评估前，请优先处理 P0/P1 安全项。
+公开部署或商业授权评估前，请优先处理当前 P0/P1 安全项。维护者本地可保留 `docs/` 审计资料，但该目录默认不上传 Git。
 
 当前重点风险包括：
 
@@ -71,7 +71,7 @@ Code-ctx is in active development. Security fixes are applied to the latest vers
 
 ### Current Security Status
 
-In the full maintenance repository, `docs/安全审计报告-security-audit-report.md` and `docs/问题跟踪清单-issue-tracker.md` record the current audit findings. Resolve P0/P1 security items before public deployment or commercial license evaluation.
+Resolve current P0/P1 security items before public deployment or commercial license evaluation. Maintainers may keep local audit material under `docs/`, but that directory is ignored by Git by default.
 
 Current high-risk areas include:
 

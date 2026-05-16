@@ -15,7 +15,7 @@
 
 ---
 
-> **项目状态：积极开发中。** 核心 CLI 和本地 Dashboard 已可用，但 `docs/` 审计报告显示仍有 P0 安全项和测试缺口。公开部署、团队推广或商业授权评估前，请先处理安全修复。
+> **项目状态：积极开发中。** 核心 CLI 和本地 Dashboard 已可用，但公开部署、团队推广或商业授权评估前，仍需要继续补齐安全、测试和发布工程。
 
 > **许可说明：** 本项目源码公开，但仅允许非商业使用。禁止商业使用、SaaS 托管、付费集成、付费支持或作为商业产品的一部分再分发。详见 [LICENSE](LICENSE)。
 
@@ -26,6 +26,8 @@
 Code-ctx 是一个面向 AI 编程协作的 CLI 工具。它扫描项目结构，生成 `ai-docs/` 上下文文档，并根据开发任务自动组装适合 Claude、ChatGPT、Cursor、Claude Code、Open Code 等 AI 工具使用的 prompt。
 
 它要解决的问题很直接：每次开启新 AI 对话前，开发者都要重复解释项目结构、技术栈、模块职责、接口约定和业务背景。Code-ctx 把这些信息沉淀成可更新、可复用的上下文。
+
+Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 Agent 工作台。它的边界是生成、维护和复用 AI 可读的代码库上下文，并把这些上下文交给你选择的 AI 工具。
 
 ## 核心能力
 
@@ -207,28 +209,20 @@ codecontext/
 ├── web/                  # Vue 3 Dashboard 前端
 ├── templates/            # Prompt 模板和场景定义
 ├── tests/                # Jest 测试
-└── docs/                 # 项目分析、修复计划、AI 实施指令
 ```
 
-## 文档和路线图
-
-当前仓库已包含完整分析资料。公开发布包默认包含两份可执行入口文档：
-
-- [AI 分阶段实施指令](docs/AI分阶段实施指令-ai-implementation-instructions.md)
-- [项目完善路线图](docs/项目完善路线图-project-improvement-roadmap.md)
-- [后续 AI 执行提示词手册](docs/AI后续执行提示词手册-ai-execution-playbook.md)
-
-完整审计报告如 `docs/安全审计报告-security-audit-report.md`、`docs/问题跟踪清单-issue-tracker.md`、`docs/改进修复计划-repair-plan.md` 等用于仓库内维护，请以当前仓库实际文件为准。
+## 路线图
 
 建议执行顺序：
 
-1. 先按 [后续 AI 执行提示词手册](docs/AI后续执行提示词手册-ai-execution-playbook.md) 执行 `P00` 做基线复核。
-2. 执行 `P01-P06` 完成公开前安全加固。
-3. 执行 `P07-P11` 补齐测试和覆盖率输出。
-4. 执行 `P12-P15` 优化 AI 生成、update、status 和前端性能。
-5. 执行 `P16-P20` 做架构整理和硬编码清理。
-6. 执行 `P21-P24` 补齐发布工程。
-7. 执行 `P25-P31` 按需建设 JSON 配置、插件系统、文档质量、Dashboard 和 E2E。
+1. 完成配置加载、命令执行、路径访问、Web API 错误处理等公开前安全加固。
+2. 补齐核心测试和覆盖率输出，重点覆盖配置、Git、section 更新、Web API 和 AI 客户端。
+3. 优化 AI 上下文生成性能，包括 `init`、`update --apply`、状态页和前端构建体验。
+4. 做架构整理，拆分大函数、清理硬编码、统一公共能力。
+5. 补齐发布工程，包括 CI、release checklist、npm pack 校验和默认模型配置复核。
+6. 按需建设产品能力：JSON 配置、插件系统、文档质量评分、Dashboard 体验和 E2E smoke。
+
+维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包。
 
 ## 开发
 
@@ -250,7 +244,7 @@ npm run build:web
 
 ## 已知风险
 
-根据 `docs/` 审计报告，当前版本仍需重点处理：
+当前版本仍需重点处理：
 
 - `loadConfigWithVM()` 配置执行安全。
 - dashboard dev 命令和 Git 工具的命令构造。

@@ -1,38 +1,8 @@
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
 const { createServer } = require('../../src/web/server');
 const { clearCache } = require('../../src/template/engine');
-
-function requestJson(server, pathname, options = {}) {
-  const { port } = server.address();
-  const body = options.body ? JSON.stringify(options.body) : null;
-  return new Promise((resolve, reject) => {
-    const req = http.request({
-      hostname: '127.0.0.1',
-      port,
-      path: pathname,
-      method: options.method || 'GET',
-      headers: body ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } : {}
-    }, (res) => {
-      let data = '';
-      res.setEncoding('utf8');
-      res.on('data', chunk => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, body: JSON.parse(data) });
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
-  });
-}
+const { requestJson } = require('../helpers/http');
 
 describe('web scenarios edit api', () => {
   const scenariosPath = path.join(__dirname, '../../templates/scenarios.json');

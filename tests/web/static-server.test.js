@@ -1,28 +1,7 @@
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
 const { createServer } = require('../../src/web/server');
-
-function requestText(server, pathname) {
-  const { port } = server.address();
-  return new Promise((resolve, reject) => {
-    const req = http.get({
-      hostname: '127.0.0.1',
-      port,
-      path: pathname
-    }, (res) => {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', chunk => {
-        body += chunk;
-      });
-      res.on('end', () => {
-        resolve({ status: res.statusCode, contentType: res.headers['content-type'], body });
-      });
-    });
-    req.on('error', reject);
-  });
-}
+const { requestText } = require('../helpers/http');
 
 describe('web static server', () => {
   const distDir = path.join(__dirname, '../../web/dist');

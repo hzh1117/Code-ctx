@@ -1,32 +1,7 @@
 const fs = require('fs');
-const http = require('http');
 const path = require('path');
 const { createServer } = require('../../src/web/server');
-
-function requestJson(server, pathname) {
-  const { port } = server.address();
-  return new Promise((resolve, reject) => {
-    const req = http.get({
-      hostname: '127.0.0.1',
-      port,
-      path: pathname
-    }, (res) => {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', chunk => {
-        body += chunk;
-      });
-      res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, body: JSON.parse(body) });
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
-    req.on('error', reject);
-  });
-}
+const { requestJson } = require('../helpers/http');
 
 describe('web project/status api', () => {
   const testDir = path.join(__dirname, '../fixtures/web-api-project-status');

@@ -1,11 +1,12 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { localhostOnly, tokenAuth } = require('./middleware/security');
+const { securityHeaders, localhostOnly, tokenAuth } = require('./middleware/security');
 
 function createServer(rootDir) {
   const app = express();
 
+  app.use(securityHeaders);
   app.use(express.json({ limit: '1mb' }));
 
   // Security middleware

@@ -187,7 +187,12 @@ module.exports = function(rootDir) {
         return res.status(400).json({ error: '只支持 Markdown 文档' });
       }
 
-      const docPath = path.join(rootDir, 'ai-docs', fileName);
+      const allowedDir = path.resolve(rootDir, 'ai-docs');
+      const docPath = path.resolve(allowedDir, fileName);
+      if (!docPath.startsWith(allowedDir + path.sep) && docPath !== allowedDir) {
+        return res.status(403).json({ error: '禁止访问该路径' });
+      }
+
       if (!fs.existsSync(docPath)) {
         return res.status(404).json({ error: '文档不存在' });
       }

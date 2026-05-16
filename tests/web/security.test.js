@@ -193,3 +193,84 @@ describe('Security: error responses', () => {
     }
   });
 });
+
+describe('Security: response headers', () => {
+  test('includes X-Content-Type-Options header', async () => {
+    const res = await new Promise((resolve, reject) => {
+      const url = new URL('/api/config', baseUrl);
+      const req = http.request({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'GET'
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(res));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  test('includes X-Frame-Options header', async () => {
+    const res = await new Promise((resolve, reject) => {
+      const url = new URL('/api/config', baseUrl);
+      const req = http.request({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'GET'
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(res));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    expect(res.headers['x-frame-options']).toBe('DENY');
+  });
+
+  test('includes Referrer-Policy header', async () => {
+    const res = await new Promise((resolve, reject) => {
+      const url = new URL('/api/config', baseUrl);
+      const req = http.request({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'GET'
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(res));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+    expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+  });
+});
+
+describe('Security: path traversal on docs', () => {
+  test('rejects path traversal with ../', async () => {
+    const res = await requestJson('GET', '/api/docs/..%2F..%2Fpackage.json', null);
+    expect([400, 403, 404]).toContain(res.status);
+  });
+
+  test('rejects absolute path attempt', async () => {
+    const res = await requestJson('GET', '/api/docs/C%3A%5CWindows%5Csystem.ini', null);
+    expect([400, 403, 404]).toContain(res.status);
+  });
+
+  test('allows valid doc name', async () => {
+    fs.writeFileSync(path.join(testDir, 'ai-docs', 'test-doc.md'), '# Test');
+    const res = await requestJson('GET', '/api/docs/test-doc.md', null);
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe('test-doc.md');
+  });
+});

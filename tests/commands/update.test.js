@@ -1,8 +1,6 @@
 const { updateCommand, executeUpdates, applySectionUpdates } = require('../../src/commands/update');
-
-jest.mock('../../src/ai/client', () => ({
-  generateWithAI: jest.fn()
-}));
+// Mock at file level — safe because updateCommand tests use dryRun (skips AI) or only check prompt structure
+jest.mock('../../src/ai/client', () => ({ generateWithAI: jest.fn() }));
 const { generateWithAI } = require('../../src/ai/client');
 const fs = require('fs');
 const path = require('path');

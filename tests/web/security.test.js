@@ -249,26 +249,8 @@ describe('Security: token authentication', () => {
 
   test('allows requests with correct token', async () => {
     process.env.DASHBOARD_TOKEN = 'secret-token';
-    const http = require('http');
-    const { port } = server.address();
-    const res = await new Promise((resolve, reject) => {
-      const req = http.request({
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/config',
-        method: 'GET',
-        headers: { Authorization: 'Bearer secret-token' }
-      }, (res) => {
-        let data = '';
-        res.setEncoding('utf8');
-        res.on('data', chunk => { data += chunk; });
-        res.on('end', () => {
-          try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-          catch { resolve({ status: res.statusCode, body: data }); }
-        });
-      });
-      req.on('error', reject);
-      req.end();
+    const res = await requestJson(server, '/api/config', {
+      headers: { Authorization: 'Bearer secret-token' }
     });
     expect(res.status).toBe(200);
   });

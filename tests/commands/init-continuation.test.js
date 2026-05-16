@@ -30,6 +30,81 @@ describe('initCommand AI continuation', () => {
     }
   });
 
+  test('concurrency does not exceed 2 for BATCH_MINIMAL', async () => {
+    // Create 3 sub-projects with large files in src/ to trigger BATCH_MINIMAL (>60000 tokens)
+    const largeContent = 'x'.repeat(200000);
+    for (const name of ['app-a', 'app-b', 'app-c']) {
+      const dir = path.join(testDir, name);
+      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      }));
+      fs.writeFileSync(path.join(dir, 'src', 'App.jsx'), `// ${name}\n${largeContent}`);
+    }
+
+    let maxConcurrent = 0;
+    let currentConcurrent = 0;
+    const allSections = [
+      '<!-- section:overview -->', '概述', '<!-- /section:overview -->',
+      '<!-- section:structure -->', '结构', '<!-- /section:structure -->',
+      '<!-- section:modules -->', '模块', '<!-- /section:modules -->',
+      '<!-- section:api -->', 'API', '<!-- /section:api -->',
+      '<!-- section:data -->', '数据', '<!-- /section:data -->',
+      '<!-- section:dependencies -->', '依赖', '<!-- /section:dependencies -->',
+      '<!-- section:notes -->', '备注', '<!-- /section:notes -->'
+    ].join('\n');
+
+    generateWithContinuation.mockImplementation(async () => {
+      currentConcurrent++;
+      maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+      await new Promise(r => setTimeout(r, 50));
+      currentConcurrent--;
+      return allSections;
+    });
+
+    await initCommand(testDir, { skipPrompt: true, force: true });
+
+    expect(maxConcurrent).toBeLessThanOrEqual(2);
+    expect(maxConcurrent).toBeGreaterThan(0);
+  });
+
+  test('one project failure does not stop others', async () => {
+    const largeContent = 'x'.repeat(200000);
+    for (const name of ['app-a', 'app-b']) {
+      const dir = path.join(testDir, name);
+      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      }));
+      fs.writeFileSync(path.join(dir, 'src', 'App.jsx'), `// ${name}\n${largeContent}`);
+    }
+
+    const allSections = [
+      '<!-- section:overview -->', '概述', '<!-- /section:overview -->',
+      '<!-- section:structure -->', '结构', '<!-- /section:structure -->',
+      '<!-- section:modules -->', '模块', '<!-- /section:modules -->',
+      '<!-- section:api -->', 'API', '<!-- /section:api -->',
+      '<!-- section:data -->', '数据', '<!-- /section:data -->',
+      '<!-- section:dependencies -->', '依赖', '<!-- /section:dependencies -->',
+      '<!-- section:notes -->', '备注', '<!-- /section:notes -->'
+    ].join('\n');
+
+    generateWithContinuation.mockImplementation(async (prompt) => {
+      // Fail for app-a, succeed for app-b and OVERVIEW
+      if (prompt.includes('app-a')) throw new Error('AI service unavailable');
+      return allSections;
+    });
+
+    await initCommand(testDir, { skipPrompt: true, force: true });
+
+    const state = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs', '.init-state.json'), 'utf8'));
+    // app-a should have failed, app-b should be completed
+    expect(state.projects['app-a']?.status).toBe('failed');
+    expect(state.projects['app-b']?.status).toBe('completed');
+    // Both docs should still be attempted (failure doesn't crash the process)
+    expect(fs.existsSync(path.join(testDir, 'ai-docs', 'app-b.md'))).toBe(true);
+  });
+
   test('uses continuation generation and appends missing template sections', async () => {
     generateWithContinuation
       .mockResolvedValueOnce([

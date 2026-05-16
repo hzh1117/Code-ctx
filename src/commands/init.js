@@ -10,6 +10,25 @@ const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
 const { listSections } = require('../core/section');
 
+const CONCURRENCY = 2;
+
+async function asyncPool(poolSize, items, fn) {
+  const results = [];
+  const executing = new Set();
+  for (const item of items) {
+    const p = fn(item).then(result => {
+      executing.delete(p);
+      return result;
+    });
+    executing.add(p);
+    results.push(p);
+    if (executing.size >= poolSize) {
+      await Promise.race(executing);
+    }
+  }
+  return Promise.allSettled(results);
+}
+
 let verboseMode = false;
 
 function log(...args) {
@@ -356,40 +375,39 @@ async function initCommand(rootDir, options = {}) {
                 !(state.projects[p.alias]?.status === 'completed' && !options.force)
               );
 
-              log(`\n串行生成 ${pendingProjects.length} 个子项目文档...`);
-              for (const project of pendingProjects) {
-                try {
-                  logVerbose(`\n生成 ${project.alias}.md...`);
-                  const projectPrompt = buildInitPrompt({
-                    project,
-                    scanResult: scanResults[project.alias]
-                  });
-                  logVerbose('Prompt 长度:', projectPrompt.length, '字符');
-                  logVerbose('开始调用 AI...');
-                  const aiStartTime = Date.now();
-                  const doc = await generateDocument(projectPrompt, aiConfig, project.alias);
-                  const aiTime = Date.now() - aiStartTime;
-                  logVerbose('AI 调用完成 (耗时', aiTime, 'ms)');
-                  const safeDoc = await completeMissingSections(
-                    filterSensitive(doc).content,
-                    projectExpectedSections,
-                    aiConfig,
-                    project.alias
-                  );
-                  fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
-                  generatedDocs[project.alias] = safeDoc;
-                  state.projects[project.alias] = { status: 'completed' };
-                  log(`  ${project.alias}.md 生成完成`);
-                  saveInitState(outputDir, state);
-                } catch (err) {
-                  console.error(`  ${project.alias}.md 生成失败:`, err.message);
-                  if (verboseMode) {
-                    console.error('  错误详情:', err.stack);
-                  }
-                  failedDocs.push({ alias: project.alias, error: err.message });
-                  state.projects[project.alias] = { status: 'failed', error: err.message };
-                  saveInitState(outputDir, state);
+              log(`\n并发生成 ${pendingProjects.length} 个子项目文档 (并发度 ${CONCURRENCY})...`);
+              const aliasByPromise = new Map();
+              const settled = await asyncPool(CONCURRENCY, pendingProjects, async (project) => {
+                const alias = project.alias;
+                logVerbose(`\n生成 ${alias}.md...`);
+                const projectPrompt = buildInitPrompt({
+                  project,
+                  scanResult: scanResults[alias]
+                });
+                logVerbose('Prompt 长度:', projectPrompt.length, '字符');
+                const aiStartTime = Date.now();
+                const doc = await generateDocument(projectPrompt, aiConfig, alias);
+                const aiTime = Date.now() - aiStartTime;
+                logVerbose(`${alias} AI 调用完成 (耗时 ${aiTime}ms)`);
+                const safeDoc = await completeMissingSections(
+                  filterSensitive(doc).content,
+                  projectExpectedSections,
+                  aiConfig,
+                  alias
+                );
+                fs.writeFileSync(path.join(outputDir, `${alias}.md`), safeDoc);
+                return { alias, doc: safeDoc };
+              });
+              for (const result of settled) {
+                if (result.status === 'fulfilled') {
+                  generatedDocs[result.value.alias] = result.value.doc;
+                  state.projects[result.value.alias] = { status: 'completed' };
+                  log(`  ${result.value.alias}.md 生成完成`);
+                } else {
+                  console.error(`  生成失败:`, result.reason?.message);
+                  failedDocs.push({ error: result.reason?.message });
                 }
+                saveInitState(outputDir, state);
               }
             } else {
               // BATCH_WITH_CONTEXT: 串行生成（需要其他子项目文档作为上下文）

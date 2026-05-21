@@ -15,6 +15,21 @@ function getFileHash(filePath) {
   return crypto.createHash('md5').update(content).digest('hex');
 }
 
+// Backward-compatible: old .last-scan stored value as raw hash string;
+// new format stores { mtimeMs, hash } so we can skip hash recomputation when mtime unchanged.
+function normalizeFileEntry(entry) {
+  if (typeof entry === 'string') {
+    return { mtimeMs: null, hash: entry };
+  }
+  if (entry && typeof entry === 'object') {
+    return {
+      mtimeMs: typeof entry.mtimeMs === 'number' ? entry.mtimeMs : null,
+      hash: typeof entry.hash === 'string' ? entry.hash : null
+    };
+  }
+  return { mtimeMs: null, hash: null };
+}
+
 function getAllFiles(dir, ignoreDirs = ['node_modules', '.git', 'dist', 'ai-docs']) {
   const files = [];
   if (!fs.existsSync(dir)) return files;
@@ -86,6 +101,10 @@ function applySectionUpdates(docPath, updates) {
 
 /**
  * Execute section-level updates by calling AI and writing back.
+ * Sections within the same doc are requested in parallel; results are
+ * applied in a single atomic write per doc. A .bak backup is taken
+ * before writing so the original can be restored on write failure.
+ *
  * @param {string} rootDir
  * @param {Array<{docName: string, sectionName: string, prompt: string}>} sectionUpdates
  * @param {object} aiConfig - AI config from getAIConfig
@@ -122,7 +141,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
       continue;
     }
 
-    // Backup before modifying
+    // Backup before modifying so we can restore on write failure
     const backupPath = docPath + '.bak';
     try {
       fs.copyFileSync(docPath, backupPath);
@@ -130,23 +149,33 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
       console.warn(`  ⚠ 备份 ${docName} 失败: ${err.message}`);
     }
 
-    const sectionResults = [];
-    for (const update of updates) {
+    // Concurrent AI calls within this doc — each section catches its own error
+    // so Promise.all never rejects and partial failures don't abort the others.
+    const sectionOutcomes = await Promise.all(updates.map(async (update) => {
+      console.log(`  调用 AI 更新 ${docName} > ${update.sectionName}...`);
       try {
-        console.log(`  调用 AI 更新 ${docName} > ${update.sectionName}...`);
         const newContent = await generateWithAI(update.prompt, aiConfig);
         const safeContent = filterSensitive(newContent).content;
-        sectionResults.push({ sectionName: update.sectionName, newContent: safeContent });
-        results.push({ docName, sectionName: update.sectionName, status: 'success' });
-        success++;
+        return { sectionName: update.sectionName, status: 'success', newContent: safeContent };
       } catch (err) {
         console.error(`  ✗ ${docName} > ${update.sectionName} 更新失败: ${err.message}`);
-        results.push({ docName, sectionName: update.sectionName, status: 'failed', reason: err.message });
+        return { sectionName: update.sectionName, status: 'failed', reason: err.message };
+      }
+    }));
+
+    const sectionResults = [];
+    for (const outcome of sectionOutcomes) {
+      if (outcome.status === 'success') {
+        sectionResults.push({ sectionName: outcome.sectionName, newContent: outcome.newContent });
+        results.push({ docName, sectionName: outcome.sectionName, status: 'success' });
+        success++;
+      } else {
+        results.push({ docName, sectionName: outcome.sectionName, status: 'failed', reason: outcome.reason });
         failed++;
       }
     }
 
-    // Apply all successful section updates to the doc
+    // Apply all successful section updates to the doc in one write
     if (sectionResults.length > 0) {
       try {
         applySectionUpdates(docPath, sectionResults);
@@ -176,6 +205,8 @@ async function updateCommand(rootDir, options = {}) {
   let detectionMethod = 'hash';
 
   let gitFailed = false;
+  // Populated only in hash mode; used to write back full state without re-stat.
+  let hashScanState = null;
 
   if (useGit) {
     // Git mode: use git diff
@@ -223,15 +254,31 @@ async function updateCommand(rootDir, options = {}) {
     const files = getAllFiles(rootDir);
     for (const file of files) {
       const relativePath = path.relative(rootDir, file);
-      currentFiles[relativePath] = getFileHash(file);
+      const prev = normalizeFileEntry(lastScan.files && lastScan.files[relativePath]);
+      let stat;
+      try {
+        stat = fs.statSync(file);
+      } catch {
+        continue;
+      }
+      // Skip hash computation when mtime matches and we have a cached hash.
+      // Tradeoff: a content change that preserves mtime (rare in practice)
+      // would be missed; the speedup on unchanged trees is worth it.
+      if (prev.mtimeMs !== null && prev.hash && stat.mtimeMs === prev.mtimeMs) {
+        currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: prev.hash };
+      } else {
+        currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: getFileHash(file) };
+      }
     }
 
-    for (const [file, hash] of Object.entries(currentFiles)) {
-      if (lastScan.files[file] !== hash) {
+    for (const [file, entry] of Object.entries(currentFiles)) {
+      const prev = normalizeFileEntry(lastScan.files && lastScan.files[file]);
+      if (prev.hash !== entry.hash) {
         changedFiles.push(file);
       }
     }
     detectionMethod = 'hash';
+    hashScanState = currentFiles;
   }
 
   // Build section-aware update prompts
@@ -262,28 +309,47 @@ async function updateCommand(rootDir, options = {}) {
   }
 
   if (!options.dryRun) {
-    const newScan = {
-      timestamp: new Date().toISOString(),
-      lastCommitHash: useGit ? getCurrentCommitHash(rootDir) : null,
-      files: changedFiles.reduce((acc, f) => {
-        const absPath = path.join(rootDir, f);
-        if (fs.existsSync(absPath)) {
-          acc[f] = getFileHash(absPath);
-        }
-        return acc;
-      }, {})
-    };
-    // Preserve existing file hashes for unchanged files
+    // Start from previously-stored entries (normalized to new format) so
+    // unchanged files keep their metadata; then layer in fresh entries.
+    const finalFiles = {};
     if (fs.existsSync(lastScanPath)) {
       try {
         const oldScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
-        newScan.files = { ...oldScan.files, ...newScan.files };
+        if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
+          for (const [file, entry] of Object.entries(oldScan.files)) {
+            finalFiles[file] = normalizeFileEntry(entry);
+          }
+        }
       } catch {}
     }
+
+    if (hashScanState) {
+      // Hash mode already walked every file — use it as the authoritative state.
+      for (const [file, entry] of Object.entries(hashScanState)) {
+        finalFiles[file] = entry;
+      }
+    } else {
+      // Git mode: only refresh entries for files git reported as changed.
+      for (const f of changedFiles) {
+        const absPath = path.join(rootDir, f);
+        if (fs.existsSync(absPath)) {
+          try {
+            const stat = fs.statSync(absPath);
+            finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
+          } catch {}
+        }
+      }
+    }
+
+    const newScan = {
+      timestamp: new Date().toISOString(),
+      lastCommitHash: useGit ? getCurrentCommitHash(rootDir) : null,
+      files: finalFiles
+    };
     fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
   }
 
   return { changedFiles, prompt, sectionUpdates, detectionMethod };
 }
 
-module.exports = { updateCommand, applySectionUpdates, executeUpdates };
+module.exports = { updateCommand, applySectionUpdates, executeUpdates, getFileHash, normalizeFileEntry };

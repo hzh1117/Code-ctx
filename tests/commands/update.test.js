@@ -96,6 +96,63 @@ describe('updateCommand', () => {
 
     fs.rmSync(testDir, { recursive: true, force: true });
   });
+
+  test('hash mode accepts legacy string-hash last-scan format', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    const filePath = path.join(testDir, 'src/index.js');
+    fs.writeFileSync(filePath, 'content');
+    const hash = require('crypto').createHash('md5').update('content').digest('hex');
+    const relativePath = path.relative(testDir, filePath);
+
+    // Legacy format: value is the raw hash string, not { mtimeMs, hash }
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      files: { [relativePath]: hash }
+    }));
+
+    const result = await updateCommand(testDir, { dryRun: true });
+    expect(result.changedFiles.length).toBe(0);
+  });
+
+  test('hash mode persists new {mtimeMs, hash} format on write', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+
+    await updateCommand(testDir, { dryRun: false });
+
+    const lastScan = JSON.parse(
+      fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8')
+    );
+    const entries = Object.values(lastScan.files);
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      expect(typeof entry).toBe('object');
+      expect(typeof entry.hash).toBe('string');
+      expect(typeof entry.mtimeMs).toBe('number');
+    }
+  });
+
+  test('hash mode skips hash recomputation when mtime unchanged', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    const filePath = path.join(testDir, 'src/index.js');
+    fs.writeFileSync(filePath, 'real-content');
+
+    // Plant a last-scan whose mtimeMs matches the file's current mtime
+    // but whose hash is deliberately stale. With mtime preselection
+    // active, the cached (stale) hash is reused, so the entry equals
+    // itself and no change is reported. Without the optimization, the
+    // real hash would be computed and differ → file reported as changed.
+    const stat = fs.statSync(filePath);
+    const rel = path.relative(testDir, filePath);
+    const staleHash = require('crypto').createHash('md5').update('different').digest('hex');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      files: { [rel]: { mtimeMs: stat.mtimeMs, hash: staleHash } }
+    }));
+
+    const result = await updateCommand(testDir, { dryRun: true });
+    expect(result.changedFiles.length).toBe(0);
+  });
 });
 
 describe('applySectionUpdates', () => {

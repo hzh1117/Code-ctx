@@ -15,6 +15,26 @@ const { STATE_FILES } = require('../../utils/constants');
 const MAX_TEMPLATE_LENGTH = 10000;
 const VALID_SCENARIO_ID_PATTERN = /^[A-H]$/;
 
+// Section list is the only piece of doc-content the /api/status endpoint
+// needs. Cache by (path, mtimeMs) so unchanged docs only cost a stat call
+// on subsequent status requests.
+const sectionsCache = new Map();
+
+function getCachedSections(filePath, mtimeMs) {
+  const cached = sectionsCache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.sections;
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  const sections = listSections(content);
+  sectionsCache.set(filePath, { mtimeMs, sections });
+  return sections;
+}
+
+function _clearSectionsCache() {
+  sectionsCache.clear();
+}
+
 module.exports = function(rootDir) {
   const router = express.Router();
 
@@ -109,17 +129,16 @@ module.exports = function(rootDir) {
         result.historyCount = history.length;
         result.recentHistory = history.slice().reverse().slice(0, 5);
 
-        // 已存在的文档
+        // 已存在的文档：只 stat，section 列表按 mtime 缓存避免重复读全文
         result.documents = mdFiles.map(file => {
           const filePath = path.join(aiDocsDir, file);
           const stats = fs.statSync(filePath);
-          const content = fs.readFileSync(filePath, 'utf8');
           return {
             name: file,
             size: stats.size,
             lastModified: stats.mtime.toISOString(),
             mtime: stats.mtime.toISOString(),
-            sections: listSections(content),
+            sections: getCachedSections(filePath, stats.mtimeMs),
             exists: true,
             stale: false
           };
@@ -257,6 +276,8 @@ module.exports = function(rootDir) {
 
   return router;
 };
+
+module.exports._clearSectionsCache = _clearSectionsCache;
 
 function getLatestMtime(dirPath) {
   let latest = 0;

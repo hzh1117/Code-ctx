@@ -1,4 +1,5 @@
-const { doctorCommand, doctorFix, runDoctor } = require('../../src/commands/doctor');
+const doctorModule = require('../../src/commands/doctor');
+const { doctorCommand, doctorFix, runDoctor, _clearDoctorCache } = doctorModule;
 const fs = require('fs');
 const path = require('path');
 
@@ -74,6 +75,35 @@ describe('doctorCommand', () => {
 
     const report = await runDoctor({ rootDir: testDir });
     expect(report.issues.some(i => i.message.includes('ai-docs'))).toBe(true);
+  });
+
+  test('runDoctor silent mode caches result within TTL', async () => {
+    _clearDoctorCache();
+    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact');
+
+    // Identity check: cache hit returns the stored object reference, while
+    // a fresh doctorCommand run would produce a new object each time.
+    const a = await runDoctor({ rootDir: testDir, silent: true });
+    const b = await runDoctor({ rootDir: testDir, silent: true });
+    expect(b).toBe(a);
+    _clearDoctorCache();
+  });
+
+  test('runDoctor silent cache invalidates when ai-docs mtime changes', async () => {
+    _clearDoctorCache();
+    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact');
+
+    const a = await runDoctor({ rootDir: testDir, silent: true });
+
+    // Bumping the ai-docs directory mtime should drop the cache entry.
+    const future = new Date(Date.now() + 5000);
+    fs.utimesSync(path.join(testDir, 'ai-docs'), future, future);
+
+    const b = await runDoctor({ rootDir: testDir, silent: true });
+    expect(b).not.toBe(a);
+    _clearDoctorCache();
   });
 
   test('should return info object with projects', async () => {

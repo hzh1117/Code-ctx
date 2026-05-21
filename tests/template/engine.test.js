@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { renderTemplate, getScenarios } = require('../../src/template/engine');
+const { renderTemplate, getScenarios, clearCache } = require('../../src/template/engine');
 
 describe('Template Engine', () => {
   describe('renderTemplate', () => {
@@ -85,6 +85,24 @@ describe('Template Engine', () => {
         expect(Array.isArray(s.relatedProjects)).toBe(true);
         expect(typeof s.template).toBe('string');
         expect(s.template.length).toBeGreaterThan(0);
+      }
+    });
+
+    test('invalidates cache when scenarios file mtime changes', () => {
+      const tmpFile = path.join(os.tmpdir(), `scenarios-${Date.now()}.json`);
+      fs.writeFileSync(tmpFile, JSON.stringify([{ id: 'X', name: 'one', template: 't' }]));
+      clearCache();
+
+      try {
+        expect(getScenarios(tmpFile)[0].name).toBe('one');
+
+        fs.writeFileSync(tmpFile, JSON.stringify([{ id: 'X', name: 'two', template: 't' }]));
+        const future = new Date(Date.now() + 5000);
+        fs.utimesSync(tmpFile, future, future);
+
+        expect(getScenarios(tmpFile)[0].name).toBe('two');
+      } finally {
+        fs.unlinkSync(tmpFile);
       }
     });
   });

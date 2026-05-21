@@ -4,6 +4,9 @@ const path = require('path');
 const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 const DEFAULT_SCENARIOS_PATH = path.join(TEMPLATES_DIR, 'scenarios.json');
 
+// Caches store { mtimeMs, value } per file path so an external edit
+// (e.g. saveAIConfig writes, dev-time template tweaks) invalidates the
+// cache on the next call without needing an explicit clearCache.
 const templateCache = new Map();
 const scenariosCache = new Map();
 
@@ -19,88 +22,83 @@ function renderTemplate(template, variables) {
   });
 }
 
+function statMtime(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function readCachedFile(cache, filePath) {
+  const mtimeMs = statMtime(filePath);
+  if (mtimeMs === null) return null;
+
+  const cached = cache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.value;
+  }
+
+  const content = fs.readFileSync(filePath, 'utf8');
+  cache.set(filePath, { mtimeMs, value: content });
+  return content;
+}
+
 function loadTemplate(name, language) {
-  // Try language-specific template first
   if (language && language !== 'zh') {
     const ext = path.extname(name);
     const base = name.slice(0, -ext.length);
-    const langName = `${base}.${language}${ext}`;
-    const cacheKey = langName;
-
-    if (templateCache.has(cacheKey)) {
-      return templateCache.get(cacheKey);
-    }
-
-    const langPath = path.join(TEMPLATES_DIR, langName);
-    if (fs.existsSync(langPath)) {
-      const content = fs.readFileSync(langPath, 'utf8');
-      templateCache.set(cacheKey, content);
-      return content;
-    }
-  }
-
-  // Fall back to default template
-  if (templateCache.has(name)) {
-    return templateCache.get(name);
+    const langPath = path.join(TEMPLATES_DIR, `${base}.${language}${ext}`);
+    const langContent = readCachedFile(templateCache, langPath);
+    if (langContent !== null) return langContent;
   }
 
   const filePath = path.join(TEMPLATES_DIR, name);
+  const content = readCachedFile(templateCache, filePath);
+  if (content === null) {
+    throw new Error(`Template not found: ${name}`);
+  }
+  return content;
+}
+
+function readCachedScenarios(filePath) {
+  const mtimeMs = statMtime(filePath);
+  if (mtimeMs === null) return null;
+
+  const cached = scenariosCache.get(filePath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.value;
+  }
+
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    templateCache.set(name, content);
-    return content;
+    const scenarios = JSON.parse(content);
+    scenariosCache.set(filePath, { mtimeMs, value: scenarios });
+    return scenarios;
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      throw new Error(`Template not found: ${name}`);
+    if (err instanceof SyntaxError) {
+      throw new Error(`Invalid JSON in scenarios file: ${filePath}`);
     }
     throw err;
   }
 }
 
 function getScenarios(customPath, language) {
-  // Try language-specific scenarios file
   if (language && language !== 'zh') {
     const basePath = customPath || DEFAULT_SCENARIOS_PATH;
     const ext = path.extname(basePath);
     const base = basePath.slice(0, -ext.length);
     const langPath = `${base}.${language}${ext}`;
-
-    if (scenariosCache.has(langPath)) {
-      return scenariosCache.get(langPath);
-    }
-
-    if (fs.existsSync(langPath)) {
-      try {
-        const content = fs.readFileSync(langPath, 'utf8');
-        const scenarios = JSON.parse(content);
-        scenariosCache.set(langPath, scenarios);
-        return scenarios;
-      } catch (err) {
-        // Fall through to default
-      }
-    }
+    const langScenarios = readCachedScenarios(langPath);
+    if (langScenarios !== null) return langScenarios;
   }
 
   const scenariosPath = customPath || DEFAULT_SCENARIOS_PATH;
-
-  if (scenariosCache.has(scenariosPath)) {
-    return scenariosCache.get(scenariosPath);
+  const scenarios = readCachedScenarios(scenariosPath);
+  if (scenarios === null) {
+    throw new Error(`Scenarios file not found: ${scenariosPath}`);
   }
-
-  try {
-    const content = fs.readFileSync(scenariosPath, 'utf8');
-    const scenarios = JSON.parse(content);
-    scenariosCache.set(scenariosPath, scenarios);
-    return scenarios;
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      throw new Error(`Scenarios file not found: ${scenariosPath}`);
-    }
-    if (err instanceof SyntaxError) {
-      throw new Error(`Invalid JSON in scenarios file: ${scenariosPath}`);
-    }
-    throw err;
-  }
+  return scenarios;
 }
 
 function clearCache() {

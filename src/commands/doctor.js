@@ -488,10 +488,43 @@ async function doctorFix(rootDir, options = {}) {
   console.log(`\n✅ 修复完成，共修复 ${fixedCount} 个文档`);
 }
 
+const DOCTOR_CACHE_TTL_MS = 30 * 1000;
+// Only the silent variant is cached — interactive doctor calls always
+// re-run because the user expects current state on each invocation.
+const doctorSilentCache = new Map();
+
+function _statMtime(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function _clearDoctorCache() {
+  doctorSilentCache.clear();
+}
+
 async function runDoctor(options = {}) {
   const { rootDir = process.cwd(), silent = false, ...doctorOptions } = options;
   if (!silent) {
     return doctorCommand(rootDir, doctorOptions);
+  }
+
+  // Cache by rootDir; invalidate on (a) 30s TTL elapsed OR
+  // (b) ai-docs/ or code-ctx.config.js mtime changed.
+  const aiDocsMtime = _statMtime(path.join(rootDir, 'ai-docs'));
+  const configMtime = _statMtime(path.join(rootDir, 'code-ctx.config.js'));
+  const now = Date.now();
+  const cached = doctorSilentCache.get(rootDir);
+  if (
+    cached &&
+    now - cached.fetchedAt < DOCTOR_CACHE_TTL_MS &&
+    cached.aiDocsMtime === aiDocsMtime &&
+    cached.configMtime === configMtime &&
+    JSON.stringify(cached.options || {}) === JSON.stringify(doctorOptions)
+  ) {
+    return cached.result;
   }
 
   const originalLog = console.log;
@@ -500,13 +533,23 @@ async function runDoctor(options = {}) {
   console.log = () => {};
   console.warn = () => {};
   console.error = () => {};
+  let result;
   try {
-    return await doctorCommand(rootDir, doctorOptions);
+    result = await doctorCommand(rootDir, doctorOptions);
   } finally {
     console.log = originalLog;
     console.warn = originalWarn;
     console.error = originalError;
   }
+
+  doctorSilentCache.set(rootDir, {
+    result,
+    fetchedAt: now,
+    aiDocsMtime,
+    configMtime,
+    options: doctorOptions
+  });
+  return result;
 }
 
-module.exports = { doctorCommand, doctorFix, runDoctor };
+module.exports = { doctorCommand, doctorFix, runDoctor, _clearDoctorCache };

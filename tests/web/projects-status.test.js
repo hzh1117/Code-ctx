@@ -123,4 +123,26 @@ describe('web project/status api', () => {
     }));
     expect(res.body.doctor.issueCount).toBeGreaterThan(0);
   });
+
+  test('GET /api/status refreshes sections after a doc mtime change', async () => {
+    // First call populates the sections cache for web.md.
+    const first = await requestJson(server, '/api/status');
+    expect(first.body.documents.find(d => d.name === 'web.md').sections)
+      .toEqual(['overview', 'modules']);
+
+    // Replace web.md with a single-section doc and bump mtime so the
+    // cache entry is invalidated on the next request.
+    const webPath = path.join(testDir, 'ai-docs/web.md');
+    fs.writeFileSync(webPath, [
+      '<!-- section:overview -->',
+      'just overview',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+    const future = new Date(Date.now() + 5000);
+    fs.utimesSync(webPath, future, future);
+
+    const second = await requestJson(server, '/api/status');
+    expect(second.body.documents.find(d => d.name === 'web.md').sections)
+      .toEqual(['overview']);
+  });
 });

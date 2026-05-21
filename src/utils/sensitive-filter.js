@@ -30,14 +30,29 @@ const DETECTION_PATTERNS = [
   { regex: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/i, name: 'ssh_private_key' }
 ];
 
+// Pre-compile the global-flag variant of each default pattern once so
+// every filterSensitive call reuses the same RegExp instance instead of
+// constructing a new one per pattern per call.
+const DEFAULT_PATTERNS_PRECOMPILED = DEFAULT_PATTERNS.map(({ pattern, replacement }) => {
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const globalRegex = flags === pattern.flags ? pattern : new RegExp(pattern.source, flags);
+  return { pattern, replacement, globalRegex };
+});
+
+function precompileCustom(pattern, replacement) {
+  const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+  const globalRegex = flags === pattern.flags ? pattern : new RegExp(pattern.source, flags);
+  return { pattern, replacement, globalRegex };
+}
+
 function filterSensitive(content, customPatterns = []) {
   let result = content;
   let count = 0;
-  const patterns = [...DEFAULT_PATTERNS, ...customPatterns];
+  const compiled = customPatterns.length === 0
+    ? DEFAULT_PATTERNS_PRECOMPILED
+    : [...DEFAULT_PATTERNS_PRECOMPILED, ...customPatterns.map(p => precompileCustom(p.pattern, p.replacement))];
 
-  for (const { pattern, replacement } of patterns) {
-    const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
-    const globalRegex = new RegExp(pattern.source, flags);
+  for (const { pattern, replacement, globalRegex } of compiled) {
     for (const _ of content.matchAll(globalRegex)) {
       count++;
     }

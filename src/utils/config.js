@@ -3,16 +3,41 @@ const path = require('path');
 const vm = require('vm');
 const { AI_CLIENT, PROJECT_LIMITS } = require('./constants');
 
+// In-memory caches keyed by absolute file path. Each entry stores the
+// file mtimeMs at load time so subsequent calls can skip re-parsing
+// when the file hasn't been touched. Tests can clear via _clearCache.
+const envConfigCache = new Map();
+const projectConfigCache = new Map();
+
+function statMtime(filePath) {
+  try {
+    return fs.statSync(filePath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function _clearCache() {
+  envConfigCache.clear();
+  projectConfigCache.clear();
+}
+
 function loadEnvConfig(rootDir) {
   const envPath = path.join(rootDir, '.env');
-  
-  if (!fs.existsSync(envPath)) {
+
+  const mtimeMs = statMtime(envPath);
+  if (mtimeMs === null) {
     return {};
   }
-  
+
+  const cached = envConfigCache.get(envPath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.value;
+  }
+
   const envContent = fs.readFileSync(envPath, 'utf8');
   const config = {};
-  
+
   envContent.split('\n').forEach(line => {
     const [key, ...valueParts] = line.split('=');
     if (key && !key.startsWith('#')) {
@@ -20,18 +45,27 @@ function loadEnvConfig(rootDir) {
       config[key.trim()] = rawValue.replace(/^["']|["']$/g, '');
     }
   });
-  
+
+  envConfigCache.set(envPath, { mtimeMs, value: config });
   return config;
 }
 
 function loadProjectConfig(rootDir) {
   const configPath = path.join(rootDir, 'code-ctx.config.js');
 
-  if (!fs.existsSync(configPath)) {
+  const mtimeMs = statMtime(configPath);
+  if (mtimeMs === null) {
     return {};
   }
 
-  return loadConfigWithVM(configPath);
+  const cached = projectConfigCache.get(configPath);
+  if (cached && cached.mtimeMs === mtimeMs) {
+    return cached.value;
+  }
+
+  const value = loadConfigWithVM(configPath);
+  projectConfigCache.set(configPath, { mtimeMs, value });
+  return value;
 }
 
 function loadConfigWithVM(configPath) {
@@ -275,4 +309,4 @@ function saveAIConfig(rootDir, aiConfig) {
   return nextConfig.ai;
 }
 
-module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, loadConfigWithVM, saveAIConfig, getAIProviders, getProjectLimits };
+module.exports = { loadEnvConfig, getAIConfig, loadProjectConfig, loadConfigWithVM, saveAIConfig, getAIProviders, getProjectLimits, _clearCache };

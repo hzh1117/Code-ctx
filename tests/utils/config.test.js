@@ -1,16 +1,18 @@
-const { loadEnvConfig, getAIConfig, saveAIConfig, loadConfigWithVM, loadProjectConfig } = require('../../src/utils/config');
+const { loadEnvConfig, getAIConfig, saveAIConfig, loadConfigWithVM, loadProjectConfig, _clearCache } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
 describe('config', () => {
   const testDir = path.join(__dirname, '../fixtures/config-test');
-  
+
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });
+    _clearCache();
   });
-  
+
   afterEach(() => {
     fs.rmSync(testDir, { recursive: true, force: true });
+    _clearCache();
   });
   
   test('should load env config', () => {
@@ -179,5 +181,39 @@ describe('config', () => {
     fs.writeFileSync(configPath, `module.exports = { projectName: 'my-app' };`);
     const config = loadProjectConfig(testDir);
     expect(config.projectName).toBe('my-app');
+  });
+
+  test('loadProjectConfig: reuses cached result when file mtime unchanged', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { projectName: 'cached' };`);
+    const first = loadProjectConfig(testDir);
+    // Returning the same object reference proves the cache hit path is used.
+    const second = loadProjectConfig(testDir);
+    expect(second).toBe(first);
+  });
+
+  test('loadProjectConfig: invalidates cache when file mtime changes', () => {
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    fs.writeFileSync(configPath, `module.exports = { projectName: 'a' };`);
+    expect(loadProjectConfig(testDir).projectName).toBe('a');
+
+    // Bump mtime explicitly so the change is visible regardless of FS resolution.
+    fs.writeFileSync(configPath, `module.exports = { projectName: 'b' };`);
+    const future = new Date(Date.now() + 5000);
+    fs.utimesSync(configPath, future, future);
+
+    expect(loadProjectConfig(testDir).projectName).toBe('b');
+  });
+
+  test('loadEnvConfig: invalidates cache when .env mtime changes', () => {
+    const envPath = path.join(testDir, '.env');
+    fs.writeFileSync(envPath, 'OPENAI_API_KEY=first');
+    expect(loadEnvConfig(testDir).OPENAI_API_KEY).toBe('first');
+
+    fs.writeFileSync(envPath, 'OPENAI_API_KEY=second');
+    const future = new Date(Date.now() + 5000);
+    fs.utimesSync(envPath, future, future);
+
+    expect(loadEnvConfig(testDir).OPENAI_API_KEY).toBe('second');
   });
 });

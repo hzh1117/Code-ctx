@@ -62,7 +62,8 @@ export default {
 </script>
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
+/* Fonts are preconnected and loaded via <link> in index.html so the
+   stylesheet downloads in parallel with the JS bundle. */
 
 :root {
   --bg-base: #0c0c0e;
@@ -126,7 +127,6 @@ export default {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease;
 }
 
 html, body {

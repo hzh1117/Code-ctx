@@ -243,7 +243,16 @@ async function initCommand(rootDir, options = {}) {
   const generatedDocs = {};
 
   // 生成文档（除非跳过 AI）
-  if (options.generateDocs !== false && !options.skipAi) {
+  const hasPendingProjects = projects.some(p =>
+    !(state.projects[p.alias]?.status === 'completed' && !options.force)
+  );
+
+  if (options.generateDocs !== false && !options.skipAi && !hasPendingProjects) {
+    logStep('6/7', '生成项目文档');
+    log('所有子项目都已生成过文档（记录在 ai-docs/.init-state.json）');
+    log('如需重新生成，请使用：code-ctx init --force');
+    log('或删除 ai-docs/.init-state.json 后重新运行');
+  } else if (options.generateDocs !== false && !options.skipAi) {
     logStep('6/7', '生成项目文档');
 
     // 使用扫描结果中的 token 估算

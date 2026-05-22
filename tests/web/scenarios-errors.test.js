@@ -63,7 +63,10 @@ describe('web/api/scenarios — error & boundary paths', () => {
   let testDir;
   let server;
   const scenariosPath = path.join(__dirname, '../../templates/scenarios.json');
-  let originalScenariosContent;
+  // 读一次即可用于 spy 内部生成 stripped 列表，无需对磁盘文件做备份/还原；
+  // 之前的 backup-and-restore 模式会与并行运行的 scenarios-edit.test.js
+  // 在共享 scenarios.json 上互相覆盖，导致非确定性失败。
+  const originalScenariosContent = require('fs').readFileSync(scenariosPath, 'utf8');
 
   beforeEach((done) => {
     delete process.env.DASHBOARD_TOKEN;
@@ -71,7 +74,6 @@ describe('web/api/scenarios — error & boundary paths', () => {
     _resetPluginState();
     clearCache();
     if (scenariosApi._clearSectionsCache) scenariosApi._clearSectionsCache();
-    originalScenariosContent = fs.readFileSync(scenariosPath, 'utf8');
     jest.clearAllMocks();
 
     // mockImplementation 默认指向真实实现，单测里按需 override
@@ -91,7 +93,6 @@ describe('web/api/scenarios — error & boundary paths', () => {
 
   afterEach((done) => {
     server.close(() => {
-      fs.writeFileSync(scenariosPath, originalScenariosContent);
       clearCache();
       _clearCache();
       _resetPluginState();

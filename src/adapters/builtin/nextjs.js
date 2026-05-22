@@ -17,6 +17,18 @@ class NextjsAdapter extends BaseAdapter {
     ];
   }
 
+  get priorityKeywords() {
+    return {
+      'next.config': 1,
+      'middleware': 2,
+      'app/api': 3,
+      'pages/api': 4,
+      'lib': 5,
+      'app/': 6,
+      'pages/': 7
+    };
+  }
+
   getPromptHints() {
     return 'Next.js 项目，注意区分 App Router (app/) 和 Pages Router (pages/)，' +
       'Server Components 与 Client Components 的区别，' +

@@ -18,6 +18,25 @@ class JavaBackendAdapter extends BaseAdapter {
     ];
   }
 
+  get priorityKeywords() {
+    return {
+      'application.yml': 1,
+      'application.properties': 1,
+      'pom.xml': 2,
+      'build.gradle': 2,
+      'controller': 3,
+      'service': 4,
+      'entity': 5,
+      'model': 5,
+      'dto': 6,
+      'vo': 6,
+      'repository': 7,
+      'mapper': 7,
+      'config': 8,
+      'util': 9
+    };
+  }
+
   getPromptHints() {
     return 'Java 后端项目，注意 Controller-Service-Repository 分层，DTO 与 Entity 区分，关注 application.yml 配置';
   }

@@ -19,6 +19,19 @@ class PythonBackendAdapter extends BaseAdapter {
     ];
   }
 
+  get priorityKeywords() {
+    return {
+      'manage.py': 1,
+      'app.py': 2,
+      'urls.py': 3,
+      'views.py': 4,
+      'models.py': 5,
+      'serializers.py': 6,
+      'requirements.txt': 7,
+      'pyproject.toml': 7
+    };
+  }
+
   getPromptHints() {
     return 'Python 后端项目，注意 View-Model-Serializer 分层，关注路由 URL 配置和中间件设置';
   }

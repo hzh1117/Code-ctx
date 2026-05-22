@@ -207,3 +207,56 @@ describe('scanProject', () => {
     }
   });
 });
+
+describe('adapter priorityKeywords', () => {
+  const { defaultRegistry } = require('../../src/adapters');
+
+  test('Java adapter prioritizes controller > service > entity', () => {
+    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/controller/UserController.java'))
+      .toBeLessThan(defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java'));
+    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java'))
+      .toBeLessThan(defaultRegistry.getFilePriority('java-backend', '/proj/src/entity/User.java'));
+  });
+
+  test('Java adapter prioritizes application.yml above everything else', () => {
+    const yml = defaultRegistry.getFilePriority('java-backend', '/proj/src/main/resources/application.yml');
+    const ctrl = defaultRegistry.getFilePriority('java-backend', '/proj/src/controller/Foo.java');
+    expect(yml).toBeLessThan(ctrl);
+  });
+
+  test('Java priority keywords do not bleed into Go projects', () => {
+    // Path contains "controller" but project is Go — Java's "controller" rank
+    // (priority 3) must not apply. Go has no "controller" keyword, so this
+    // file ranks at the default 100.
+    expect(defaultRegistry.getFilePriority('go-backend', '/proj/controller/foo.go')).toBe(100);
+  });
+
+  test('Go adapter prioritizes handler over service', () => {
+    expect(defaultRegistry.getFilePriority('go-backend', '/proj/handler/user.go'))
+      .toBeLessThan(defaultRegistry.getFilePriority('go-backend', '/proj/service/user.go'));
+  });
+
+  test('Python adapter prioritizes urls.py over views.py', () => {
+    expect(defaultRegistry.getFilePriority('python-backend', '/proj/app/urls.py'))
+      .toBeLessThan(defaultRegistry.getFilePriority('python-backend', '/proj/app/views.py'));
+  });
+
+  test('Node backend adapter prioritizes app.js over routes', () => {
+    expect(defaultRegistry.getFilePriority('node-backend', '/proj/app.js'))
+      .toBeLessThan(defaultRegistry.getFilePriority('node-backend', '/proj/routes/index.js'));
+  });
+
+  test('React adapter prioritizes App.jsx over components', () => {
+    expect(defaultRegistry.getFilePriority('react', '/proj/src/app.jsx'))
+      .toBeLessThan(defaultRegistry.getFilePriority('react', '/proj/src/components/Button.jsx'));
+  });
+
+  test('Vue3 admin adapter prioritizes main.js over api', () => {
+    expect(defaultRegistry.getFilePriority('vue3-admin', '/proj/src/main.js'))
+      .toBeLessThan(defaultRegistry.getFilePriority('vue3-admin', '/proj/src/api/user.js'));
+  });
+
+  test('Unknown project type returns default priority 100', () => {
+    expect(defaultRegistry.getFilePriority('unknown-type', '/any/file/path.js')).toBe(100);
+  });
+});

@@ -18,6 +18,19 @@ class ReactAdapter extends BaseAdapter {
     ];
   }
 
+  get priorityKeywords() {
+    return {
+      '/app.': 1,
+      '/index.': 2,
+      'pages': 3,
+      'components': 4,
+      'hooks': 5,
+      'store': 6,
+      'config': 7,
+      'util': 8
+    };
+  }
+
   getPromptHints() {
     return 'React 前端项目，注意组件 props 类型定义，关注自定义 Hooks 复用逻辑，状态管理方案（Redux/Zustand/Context）';
   }

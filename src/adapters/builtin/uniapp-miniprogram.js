@@ -12,6 +12,20 @@ class UniappMiniprogramAdapter extends BaseAdapter {
     return ['api/*.js', 'pages.json', 'config/app.js', 'utils/request.js'];
   }
 
+  get priorityKeywords() {
+    return {
+      'pages.json': 1,
+      'manifest.json': 2,
+      'app.vue': 3,
+      'main.js': 4,
+      '/api/': 5,
+      'pages/': 6,
+      'components': 7,
+      'utils': 8,
+      'config': 9
+    };
+  }
+
   getPromptHints() {
     return 'UniApp 跨端项目，注意 pages.json 路由配置，条件编译 #ifdef 区分平台差异';
   }

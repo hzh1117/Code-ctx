@@ -28,6 +28,13 @@ class AdapterRegistry {
     return adapter ? adapter.scanPatterns : [];
   }
 
+  getFilePriority(type, filePath) {
+    const adapter = this.adapters.get(type);
+    if (!adapter || typeof adapter.getFilePriority !== 'function') return 100;
+    const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase();
+    return adapter.getFilePriority(normalizedPath);
+  }
+
   get types() {
     return [...this.adapters.keys()];
   }

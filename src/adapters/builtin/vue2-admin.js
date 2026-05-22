@@ -12,6 +12,19 @@ class Vue2AdminAdapter extends BaseAdapter {
     return ['src/api/*.js', 'src/router/modules/*.js', 'src/store/modules/*.js', '.env.*'];
   }
 
+  get priorityKeywords() {
+    return {
+      'main.js': 1,
+      'router/index': 2,
+      '/api/': 3,
+      'views': 4,
+      'components': 5,
+      'store': 6,
+      'vue.config': 7,
+      '.env': 8
+    };
+  }
+
   getPromptHints() {
     return '注意区分 views/ 和 components/，api/ 文件命名对应后端 Controller 名称';
   }

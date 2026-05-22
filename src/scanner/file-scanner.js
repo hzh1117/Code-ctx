@@ -26,18 +26,18 @@ function scanProject(projectDir, projectType, options = {}) {
   }
 
   const uniqueFiles = [...new Set(keyFiles)];
-  
+
   // 限制文件数量
   let limitedFiles = uniqueFiles;
   if (uniqueFiles.length > maxFiles) {
-    limitedFiles = prioritizeFiles(uniqueFiles).slice(0, maxFiles);
+    limitedFiles = prioritizeFiles(uniqueFiles, projectType).slice(0, maxFiles);
   }
-  
+
   // 限制 token 数量
   const result = limitByTokens(limitedFiles, maxTokens);
-  
-  return { 
-    tree, 
+
+  return {
+    tree,
     keyFiles: result.files,
     totalFiles: uniqueFiles.length,
     limitedTo: result.files.length,
@@ -45,42 +45,14 @@ function scanProject(projectDir, projectType, options = {}) {
   };
 }
 
-function prioritizeFiles(files) {
-  // 按文件类型优先级排序
-  const priorityOrder = {
-    'application.yml': 1,
-    'application.properties': 1,
-    'pom.xml': 2,
-    'build.gradle': 2,
-    'controller': 3,
-    'service': 4,
-    'entity': 5,
-    'model': 5,
-    'dto': 6,
-    'vo': 6,
-    'repository': 7,
-    'mapper': 7,
-    'config': 8,
-    'util': 9
-  };
-  
-  return files.sort((a, b) => {
-    const aScore = getFilePriority(a, priorityOrder);
-    const bScore = getFilePriority(b, priorityOrder);
+function prioritizeFiles(files, projectType) {
+  // Adapter-driven: each project type contributes its own priorityKeywords map.
+  // Unknown / unranked files get priority 100 and sort to the end.
+  return files.slice().sort((a, b) => {
+    const aScore = defaultRegistry.getFilePriority(projectType, a);
+    const bScore = defaultRegistry.getFilePriority(projectType, b);
     return aScore - bScore;
   });
-}
-
-function getFilePriority(filePath, priorityOrder) {
-  const normalizedPath = filePath.replace(/\\/g, '/').toLowerCase();
-  
-  for (const [keyword, priority] of Object.entries(priorityOrder)) {
-    if (normalizedPath.includes(keyword.toLowerCase())) {
-      return priority;
-    }
-  }
-  
-  return 100; // 默认低优先级
 }
 
 function limitByTokens(files, maxTokens) {

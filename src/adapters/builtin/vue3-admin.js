@@ -12,6 +12,19 @@ class Vue3AdminAdapter extends BaseAdapter {
     return ['src/api/*.js', 'src/router/*.js', 'src/stores/*.js', '.env.*'];
   }
 
+  get priorityKeywords() {
+    return {
+      'main.js': 1,
+      'router/index': 2,
+      '/api/': 3,
+      'views': 4,
+      'components': 5,
+      'stores': 6,
+      'vite.config': 7,
+      '.env': 8
+    };
+  }
+
   getPromptHints() {
     return 'Vue3 组合式 API 项目，使用 Pinia 状态管理，注意 setup 语法糖和 defineProps/defineEmits';
   }

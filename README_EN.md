@@ -136,36 +136,42 @@ Never commit `.env`. If a secret appears in logs, screenshots, issues, or pull r
 
 AI `baseUrl` values accept public HTTPS endpoints by default and reject localhost, private-network, link-local, and metadata addresses. If local model gateways are needed, add an explicit local-development option with tests instead of loosening Dashboard validation.
 
-### `code-ctx.config.js`
+### `code-ctx.config.json`
 
-`init` generates project config automatically. You can also edit it manually:
+`init` writes `code-ctx.config.json` by default (recommended). JSON cannot execute arbitrary code and is validated by a built-in lightweight schema:
 
-```javascript
-module.exports = {
-  projectName: 'my-app',
-  outputDir: './ai-docs',
-  aiMode: 'clipboard',
-  projects: [
-    { alias: 'web', path: './web', type: 'vue3-admin', label: 'Frontend' },
-    { alias: 'api', path: './api', type: 'java-backend', label: 'Backend' }
+```json
+{
+  "projectName": "my-app",
+  "outputDir": "./ai-docs",
+  "aiMode": "clipboard",
+  "projects": [
+    { "alias": "web", "path": "./web", "type": "vue3-admin", "label": "Frontend" },
+    { "alias": "api", "path": "./api", "type": "java-backend", "label": "Backend" }
   ],
-  excludeDirs: ['node_modules', '.git', 'dist'],
-  gitTrack: true,
-  ai: {
-    protocol: 'openai',
-    openai: {
-      baseUrl: 'https://api.deepseek.com',
-      model: 'deepseek-chat',
-      maxTokens: 4096
+  "excludeDirs": ["node_modules", ".git", "dist"],
+  "gitTrack": true,
+  "ai": {
+    "protocol": "openai",
+    "openai": {
+      "baseUrl": "https://api.deepseek.com",
+      "model": "deepseek-chat",
+      "maxTokens": 4096
     },
-    anthropic: {
-      baseUrl: 'https://api.anthropic.com',
-      model: 'claude-sonnet-4-6',
-      maxTokens: 4096
+    "anthropic": {
+      "baseUrl": "https://api.anthropic.com",
+      "model": "claude-sonnet-4-6",
+      "maxTokens": 4096
     }
   }
-};
+}
 ```
+
+Config-loading priority: `code-ctx.config.json` > `code-ctx.config.js`. When both exist the JSON file wins and the JS file is ignored (with a one-shot warning).
+
+> **Migrating from JS to JSON**: copy the object literal from `module.exports = {...}` into a new `code-ctx.config.json`, quote keys properly, and remove the `.js` file. Dashboard writes and `saveAIConfig` follow the currently active format (JSON preferred).
+
+The legacy `code-ctx.config.js` continues to load read-only. Use `code-ctx init --config-format=js` if you specifically want the legacy JS format for a new project. JS configs are evaluated inside a VM sandbox and cannot `require()` or touch `process`.
 
 ## Web Dashboard
 

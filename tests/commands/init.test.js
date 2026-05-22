@@ -1,5 +1,5 @@
 const { initCommand } = require('../../src/commands/init');
-const { loadConfigWithVM } = require('../../src/utils/config');
+const { loadProjectConfig, _clearCache } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,30 +19,55 @@ describe('initCommand', () => {
     }
   });
 
-  test('should create ai-docs directory', async () => {
+  test('should create ai-docs directory and JSON config by default', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
+    _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
-    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(false);
   });
 
   test('should generate valid config file', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
+    _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
-    const configPath = path.join(testDir, 'code-ctx.config.js');
+    const configPath = path.join(testDir, 'code-ctx.config.json');
     expect(fs.existsSync(configPath)).toBe(true);
 
-    const config = require(configPath);
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     expect(config.projectName).toBeDefined();
     expect(config.outputDir).toBe('./ai-docs');
     expect(config.aiMode).toBe('clipboard');
     expect(Array.isArray(config.projects)).toBe(true);
     expect(Array.isArray(config.excludeDirs)).toBe(true);
     expect(config.gitTrack).toBe(true);
+  });
+
+  test('should generate JS config when --config-format=js', async () => {
+    fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
+    _clearCache();
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true, configFormat: 'js' });
+
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(false);
+  });
+
+  test('should keep existing JS config and not create JSON', async () => {
+    fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = { projectName: 'legacy', projects: [] };\n`);
+    _clearCache();
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
   });
 
   test('should detect sub-projects', async () => {
@@ -64,11 +89,11 @@ describe('initCommand', () => {
     fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
       dependencies: { react: '^18.0.0' }
     }));
+    _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
-    const configPath = path.join(testDir, 'code-ctx.config.js');
-    const config = loadConfigWithVM(configPath);
+    const config = loadProjectConfig(testDir);
     expect(config.projects[0].path).toBe(subDir);
   });
 

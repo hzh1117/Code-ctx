@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject, estimateTokens } = require('../scanner/file-scanner');
-const { getAIConfig, getProjectLimits } = require('../utils/config');
+const { getAIConfig, getProjectLimits, getConfigFile, saveProjectConfig } = require('../utils/config');
 const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
@@ -223,13 +223,25 @@ function generateProjectConfig(rootDir, projects, options) {
     gitTrack: true
   };
 
-  const configPath = path.join(rootDir, 'code-ctx.config.js');
-  if (!fs.existsSync(configPath) || options.force) {
-    fs.writeFileSync(configPath, `module.exports = ${JSON.stringify(config, null, 2)};\n`);
-    logVerbose('配置文件已写入:', configPath);
-  } else {
+  const info = getConfigFile(rootDir);
+  if (info.exists && !options.force) {
     logVerbose('配置文件已存在，跳过');
+    if (info.format === 'js') {
+      log('提示：检测到 code-ctx.config.js（旧格式）。新格式 code-ctx.config.json 更安全，可手动迁移：');
+      log('  cp code-ctx.config.js code-ctx.config.json # 然后改为纯 JSON');
+    }
+    return config;
   }
+
+  // Force or fresh init: respect explicit --config-format, else keep existing
+  // format on --force, else default to JSON.
+  const desiredFormat = options.configFormat === 'js' ? 'js'
+    : options.configFormat === 'json' ? 'json'
+    : info.exists ? info.format
+    : 'json';
+
+  const written = saveProjectConfig(rootDir, config, { format: desiredFormat });
+  logVerbose('配置文件已写入:', written.path);
   return config;
 }
 

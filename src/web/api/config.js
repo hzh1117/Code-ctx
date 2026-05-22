@@ -1,9 +1,7 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { loadProjectConfig } = require('../../utils/config');
+const { loadProjectConfig, saveProjectConfig, validateProjectConfig } = require('../../utils/config');
 
-const ALLOWED_KEYS = ['projectName', 'outputDir', 'aiMode', 'projects', 'excludeDirs', 'gitTrack', 'ai'];
+const ALLOWED_KEYS = ['projectName', 'outputDir', 'aiMode', 'projects', 'excludeDirs', 'gitTrack', 'ai', 'plugins'];
 const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
 
 function sanitizeConfig(input) {
@@ -39,20 +37,15 @@ module.exports = function(rootDir) {
 
   router.put('/', (req, res) => {
     try {
-      const configPath = path.join(rootDir, 'code-ctx.config.js');
       const sanitized = sanitizeConfig(req.body);
 
-      // Backup before writing
-      if (fs.existsSync(configPath)) {
-        try {
-          fs.copyFileSync(configPath, configPath + '.bak');
-        } catch (backupErr) {
-          console.warn('配置备份失败:', backupErr.message);
-        }
+      const errors = validateProjectConfig(sanitized);
+      if (errors.length > 0) {
+        return res.status(400).json({ error: `配置 schema 校验失败: ${errors.join('; ')}` });
       }
 
-      fs.writeFileSync(configPath, `module.exports = ${JSON.stringify(sanitized, null, 2)};\n`);
-      res.json({ success: true });
+      const written = saveProjectConfig(rootDir, sanitized);
+      res.json({ success: true, format: written.format });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

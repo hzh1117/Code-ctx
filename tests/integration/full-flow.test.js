@@ -22,7 +22,7 @@ describe('Full Flow Integration', () => {
     // 1. Init
     const initResult = await initCommand(testDir, { skipPrompt: true, skipAi: true });
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
-    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
     expect(initResult).toBeDefined();
     expect(initResult.projects).toBeDefined();
     

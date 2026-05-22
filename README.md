@@ -136,36 +136,42 @@ AI_TIMEOUT=180000
 
 AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网、link-local 和 metadata 地址。需要对接本机模型网关时，应新增显式本地开发开关并配套测试，不要直接放开 Dashboard 配置校验。
 
-### `code-ctx.config.js`
+### `code-ctx.config.json`
 
-`init` 会生成项目配置，也可以手动维护：
+`init` 默认生成 `code-ctx.config.json`（推荐）。JSON 配置不可执行任意代码，更安全，并由内置 schema 做轻量校验：
 
-```javascript
-module.exports = {
-  projectName: 'my-app',
-  outputDir: './ai-docs',
-  aiMode: 'clipboard',
-  projects: [
-    { alias: 'web', path: './web', type: 'vue3-admin', label: '前端' },
-    { alias: 'api', path: './api', type: 'java-backend', label: '后端' }
+```json
+{
+  "projectName": "my-app",
+  "outputDir": "./ai-docs",
+  "aiMode": "clipboard",
+  "projects": [
+    { "alias": "web", "path": "./web", "type": "vue3-admin", "label": "前端" },
+    { "alias": "api", "path": "./api", "type": "java-backend", "label": "后端" }
   ],
-  excludeDirs: ['node_modules', '.git', 'dist'],
-  gitTrack: true,
-  ai: {
-    protocol: 'openai',
-    openai: {
-      baseUrl: 'https://api.deepseek.com',
-      model: 'deepseek-chat',
-      maxTokens: 4096
+  "excludeDirs": ["node_modules", ".git", "dist"],
+  "gitTrack": true,
+  "ai": {
+    "protocol": "openai",
+    "openai": {
+      "baseUrl": "https://api.deepseek.com",
+      "model": "deepseek-chat",
+      "maxTokens": 4096
     },
-    anthropic: {
-      baseUrl: 'https://api.anthropic.com',
-      model: 'claude-sonnet-4-6',
-      maxTokens: 4096
+    "anthropic": {
+      "baseUrl": "https://api.anthropic.com",
+      "model": "claude-sonnet-4-6",
+      "maxTokens": 4096
     }
   }
-};
+}
 ```
+
+配置加载优先级：`code-ctx.config.json` > `code-ctx.config.js`。两者同时存在时，使用 JSON 并忽略 JS。
+
+> **从 JS 迁移到 JSON**：把原 `code-ctx.config.js` 中 `module.exports = {...}` 的对象直接复制为 `code-ctx.config.json` 的内容（注意 key 加双引号），然后删除 `.js` 文件即可。Dashboard 和 `saveAIConfig` 会写回到当前生效的格式（即 JSON 优先）。
+
+仍想使用 JS 配置时，`code-ctx.config.js` 完全保留可读兼容；新项目如需生成 JS 配置可使用 `code-ctx init --config-format=js`。注意：JS 配置在 VM 沙箱内加载，不允许 `require` 或访问 `process`。
 
 ## Web Dashboard
 

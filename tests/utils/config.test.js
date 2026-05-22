@@ -1,4 +1,15 @@
-const { loadEnvConfig, getAIConfig, saveAIConfig, loadConfigWithVM, loadProjectConfig, _clearCache } = require('../../src/utils/config');
+const {
+  loadEnvConfig,
+  getAIConfig,
+  saveAIConfig,
+  loadConfigWithVM,
+  loadProjectConfig,
+  loadJsonConfig,
+  getConfigFile,
+  validateProjectConfig,
+  saveProjectConfig,
+  _clearCache
+} = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
 
@@ -215,5 +226,133 @@ describe('config', () => {
     fs.utimesSync(envPath, future, future);
 
     expect(loadEnvConfig(testDir).OPENAI_API_KEY).toBe('second');
+  });
+
+  describe('JSON config (P25)', () => {
+    test('getConfigFile: returns json format when only JSON exists', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), '{"projectName":"json-only"}');
+      const info = getConfigFile(testDir);
+      expect(info.exists).toBe(true);
+      expect(info.format).toBe('json');
+      expect(info.hasOtherFormat).toBe(false);
+    });
+
+    test('getConfigFile: returns js format when only JS exists', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'js-only' };`);
+      const info = getConfigFile(testDir);
+      expect(info.exists).toBe(true);
+      expect(info.format).toBe('js');
+    });
+
+    test('getConfigFile: returns absent target when neither exists', () => {
+      const info = getConfigFile(testDir);
+      expect(info.exists).toBe(false);
+      expect(info.format).toBe('json');
+    });
+
+    test('loadProjectConfig: reads JSON when both formats exist (JSON wins)', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), '{"projectName":"from-json"}');
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'from-js' };`);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const config = loadProjectConfig(testDir);
+        expect(config.projectName).toBe('from-json');
+        // Warns once on the dual-format situation.
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('同时检测到'));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test('loadProjectConfig: throws on malformed JSON', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), '{ "broken": ');
+      expect(() => loadProjectConfig(testDir)).toThrow(/JSON/);
+    });
+
+    test('loadJsonConfig: rejects non-object root', () => {
+      const p = path.join(testDir, 'array.json');
+      fs.writeFileSync(p, '[1,2,3]');
+      expect(() => loadJsonConfig(p)).toThrow(/对象/);
+    });
+
+    test('validateProjectConfig: accepts a minimal valid config', () => {
+      const errors = validateProjectConfig({ projectName: 'x', outputDir: './ai-docs' });
+      expect(errors).toEqual([]);
+    });
+
+    test('validateProjectConfig: rejects unknown top-level keys', () => {
+      const errors = validateProjectConfig({ projectName: 'x', evilKey: 1 });
+      expect(errors.some(e => e.includes('evilKey'))).toBe(true);
+    });
+
+    test('validateProjectConfig: rejects wrong types', () => {
+      const errors = validateProjectConfig({
+        projectName: 123,
+        outputDir: false,
+        aiMode: 'unknown',
+        gitTrack: 'yes',
+        excludeDirs: 'oops',
+        projects: 'oops'
+      });
+      // projectName, outputDir, aiMode, gitTrack, excludeDirs, projects
+      expect(errors.length).toBeGreaterThanOrEqual(6);
+    });
+
+    test('validateProjectConfig: validates project entries', () => {
+      const errors = validateProjectConfig({
+        projects: [{ /* missing alias */ }, { alias: 'ok' }, { alias: 'bad', path: 1 }]
+      });
+      expect(errors.some(e => e.includes('projects[0].alias'))).toBe(true);
+      expect(errors.some(e => e.includes('projects[2].path'))).toBe(true);
+    });
+
+    test('saveProjectConfig: defaults to JSON when nothing exists', () => {
+      saveProjectConfig(testDir, { projectName: 'fresh' });
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(false);
+    });
+
+    test('saveProjectConfig: preserves JS when JS already exists', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'old' };`);
+      saveProjectConfig(testDir, { projectName: 'updated' });
+      const content = fs.readFileSync(path.join(testDir, 'code-ctx.config.js'), 'utf8');
+      expect(content).toContain('module.exports');
+      expect(content).toContain('updated');
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(false);
+    });
+
+    test('saveProjectConfig: forced format overrides existing', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'old' };`);
+      const written = saveProjectConfig(testDir, { projectName: 'new' }, { format: 'json' });
+      expect(written.format).toBe('json');
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
+    });
+
+    test('saveProjectConfig: writes a .bak alongside existing file', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), '{"projectName":"original"}');
+      saveProjectConfig(testDir, { projectName: 'changed' });
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json.bak'))).toBe(true);
+    });
+
+    test('saveAIConfig: writes back to JSON when JSON is the active format', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+        projectName: 'json-app',
+        ai: { protocol: 'openai' }
+      }));
+      saveAIConfig(testDir, { protocol: 'anthropic' });
+      const parsed = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
+      expect(parsed.ai.protocol).toBe('anthropic');
+      expect(parsed.projectName).toBe('json-app');
+    });
+
+    test('getAIConfig: reads protocol from JSON config', () => {
+      fs.writeFileSync(path.join(testDir, '.env'), 'ANTHROPIC_API_KEY=k');
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+        ai: { protocol: 'anthropic' }
+      }));
+      const cfg = getAIConfig(testDir);
+      expect(cfg.protocol).toBe('anthropic');
+      expect(cfg.apiKey).toBe('k');
+    });
   });
 });

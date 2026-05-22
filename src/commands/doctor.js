@@ -3,7 +3,7 @@ const path = require('path');
 const { DETECTION_PATTERNS, scanDirectory } = require('../utils/sensitive-filter');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
-const { getAIConfig, loadConfigWithVM } = require('../utils/config');
+const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
@@ -11,12 +11,12 @@ const { buildInitPrompt } = require('../generator/prompt-builder');
 const { defaultRegistry } = require('../adapters');
 
 function loadDoctorConfig(rootDir) {
-  const configPath = path.join(rootDir, 'code-ctx.config.js');
-  if (!fs.existsSync(configPath)) {
+  const info = getConfigFile(rootDir);
+  if (!info.exists) {
     return { config: null, error: 'no-config' };
   }
   try {
-    return { config: loadConfigWithVM(configPath), error: null };
+    return { config: loadProjectConfig(rootDir), error: null };
   } catch {
     return { config: null, error: 'config-error' };
   }
@@ -367,18 +367,18 @@ async function doctorCommand(rootDir, options = {}) {
 
 async function doctorFix(rootDir, options = {}) {
   const aiDocsDir = path.join(rootDir, 'ai-docs');
-  const configPath = path.join(rootDir, 'code-ctx.config.js');
+  const info = getConfigFile(rootDir);
 
-  if (!fs.existsSync(configPath)) {
-    console.log('❌ code-ctx.config.js 不存在，请先运行 code-ctx init');
+  if (!info.exists) {
+    console.log('❌ 未找到 code-ctx.config.json 或 code-ctx.config.js，请先运行 code-ctx init');
     return;
   }
 
   let config;
   try {
-    config = loadConfigWithVM(configPath);
+    config = loadProjectConfig(rootDir);
   } catch {
-    console.log('❌ code-ctx.config.js 解析失败');
+    console.log(`❌ ${path.basename(info.path)} 解析失败`);
     return;
   }
 
@@ -507,14 +507,16 @@ async function runDoctor(options = {}) {
   }
 
   const aiDocsMtime = _statMtime(path.join(rootDir, 'ai-docs'));
-  const configMtime = _statMtime(path.join(rootDir, 'code-ctx.config.js'));
+  const configJsMtime = _statMtime(path.join(rootDir, 'code-ctx.config.js'));
+  const configJsonMtime = _statMtime(path.join(rootDir, 'code-ctx.config.json'));
   const now = Date.now();
   const cached = doctorSilentCache.get(rootDir);
   if (
     cached &&
     now - cached.fetchedAt < DOCTOR_CACHE_TTL_MS &&
     cached.aiDocsMtime === aiDocsMtime &&
-    cached.configMtime === configMtime &&
+    cached.configJsMtime === configJsMtime &&
+    cached.configJsonMtime === configJsonMtime &&
     JSON.stringify(cached.options || {}) === JSON.stringify(doctorOptions)
   ) {
     return cached.result;
@@ -539,7 +541,8 @@ async function runDoctor(options = {}) {
     result,
     fetchedAt: now,
     aiDocsMtime,
-    configMtime,
+    configJsMtime,
+    configJsonMtime,
     options: doctorOptions
   });
   return result;

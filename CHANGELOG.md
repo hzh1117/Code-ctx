@@ -25,6 +25,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - 安全策略补充当前审计发现的高风险区域，包括本地配置执行、Dashboard API、AI 凭据和生成文档泄漏风险。
 - SUPPORT 和 GitHub issue/PR 模板同步非商业使用、安全披露和提交检查提醒。
 - **默认 AI 模型按官方废弃文档校准**：OpenAI 默认从 `gpt-4` 改为 `gpt-5.5`（`gpt-4` 于 2026-10-23 退役）；Anthropic 默认从 `claude-3-5-sonnet-20241022` 改为 `claude-sonnet-4-6`（前者已于 2025-10-28 退役，调用会失败）。已显式覆盖 `OPENAI_MODEL` / `ANTHROPIC_MODEL` 或在 `code-ctx.config.js` 中指定 `model` 的用户不受影响；仍使用旧默认值的项目应检查 `code-ctx.config.js` 中的 `ai.openai.model` 和 `ai.anthropic.model`。
+- **P25 JSON 配置 MVP**：新增 `code-ctx.config.json` 支持，作为可校验、不可执行的配置文件（推荐格式）。加载优先级 `JSON > JS`，两者同时存在时使用 JSON 并 warning。`code-ctx init` 默认生成 JSON，可用 `--config-format=js` 显式选择 JS。`code-ctx.config.js` 保留只读兼容（仍在 VM 沙箱内加载）。Dashboard `PUT /api/config` 与 `saveAIConfig` 写回当前生效格式。新增 `validateProjectConfig` 内置轻量 schema 校验，覆盖顶层字段类型、`projects[]` 结构和 `aiMode` 枚举，不依赖 ajv。
 
 #### Known Issues
 

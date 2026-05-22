@@ -219,10 +219,11 @@ codecontext/
 2. 补齐核心测试和覆盖率输出，重点覆盖配置、Git、section 更新、Web API 和 AI 客户端。
 3. 优化 AI 上下文生成性能，包括 `init`、`update --apply`、状态页和前端构建体验。
 4. 做架构整理，拆分大函数、清理硬编码、统一公共能力。
-5. 补齐发布工程，包括 CI、release checklist、npm pack 校验和默认模型配置复核。
+5. 补齐发布工程，包括 CI、release checklist、npm pack 校验和默认模型配置复核。详见 [`docs/release-checklist.md`](docs/release-checklist.md)。
 6. 按需建设产品能力：JSON 配置、插件系统、文档质量评分、Dashboard 体验和 E2E smoke。
 
-维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包。
+维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包；
+`docs/release-checklist.md` 是显式例外，作为公开发布门槛说明。
 
 ## 开发
 

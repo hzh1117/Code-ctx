@@ -219,10 +219,11 @@ Recommended order:
 2. Add core tests and coverage output for config, Git, section updates, Web APIs, and the AI client.
 3. Improve AI context-generation performance for `init`, `update --apply`, status pages, and frontend build experience.
 4. Clean up architecture by splitting large functions, removing hard-coded behavior, and unifying shared utilities.
-5. Complete release engineering: CI, release checklist, npm pack verification, and default model/config review.
+5. Complete release engineering: CI, release checklist, npm pack verification, and default model/config review. See [`docs/release-checklist.md`](docs/release-checklist.md).
 6. Add product capabilities as needed: JSON config, plugin system, document quality scoring, Dashboard improvements, and E2E smoke tests.
 
-Maintainers may keep `docs/` locally for planning and audit material, but `docs/` is ignored by Git by default and is not included in the npm package.
+Maintainers may keep `docs/` locally for planning and audit material; `docs/` is ignored by Git by default and is not included in the npm package.
+`docs/release-checklist.md` is an explicit exception, published as the public release-gating reference.
 
 ## Development
 

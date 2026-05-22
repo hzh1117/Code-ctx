@@ -7,6 +7,7 @@ const { filterSensitive } = require('../utils/sensitive-filter');
 const { extractSection } = require('../core/section');
 const { PROMPT_MAX_CHARS } = require('../utils/constants');
 const { initPlugins } = require('../plugins/loader');
+const { addTask } = require('../utils/task-history');
 
 const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
 const LOW_CONFIDENCE_THRESHOLD = 50;
@@ -195,6 +196,24 @@ async function useCommand(options = {}) {
       originalLength: result.originalLength,
       compactLength: result.compactLength
     };
+  }
+
+  if (rootDir) {
+    try {
+      addTask(rootDir, {
+        source: 'use',
+        task: taskDescription,
+        scenario: matchedScenario,
+        scenarioName: selectedScenario.name,
+        relatedProjects: selectedScenario.relatedProjects || [],
+        matchMethod,
+        confidence,
+        prompt
+      });
+    } catch (err) {
+      // History writes are best-effort; never fail the user-facing prompt
+      // build because of a disk hiccup.
+    }
   }
 
   return {

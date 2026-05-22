@@ -10,6 +10,7 @@ const { filterSensitive } = require('../utils/sensitive-filter');
 const { hasGitRepo, getCurrentCommitHash, getChangedFilesSince, getChangedFilesWorkingTree, getUntrackedFiles, getLastScanCommit } = require('../utils/git-utils');
 const { findRelatedDoc, groupChangesByProject } = require('../core/doc-resolver');
 const { initPlugins } = require('../plugins/loader');
+const { addTask } = require('../utils/task-history');
 
 const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
 
@@ -365,6 +366,18 @@ async function updateCommand(rootDir, options = {}) {
 
   if (!options.dryRun) {
     saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState);
+  }
+
+  try {
+    addTask(rootDir, {
+      source: 'update',
+      task: options.dryRun ? 'update (dry-run)' : 'update',
+      changedFiles: changedFiles.length,
+      detectionMethod,
+      ...(prompt ? { prompt } : {})
+    });
+  } catch (err) {
+    // History writes are best-effort.
   }
 
   return { changedFiles, prompt, sectionUpdates, detectionMethod };

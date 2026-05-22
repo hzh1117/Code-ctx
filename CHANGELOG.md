@@ -29,6 +29,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - **P26 插件系统 MVP**：新增 `src/plugins/loader.js` 与 `src/plugins/state.js`。`code-ctx.config(.json|.js)` 可通过 `plugins: [...]` 挂载本地路径或 npm 包；每个插件可贡献 `adapters`（继承 `BaseAdapter`）、`scenarios`（按 `id` 覆盖内置）、`sensitivePatterns`、`sensitiveDetectionPatterns`。加载失败只 warn，内置能力不受影响。`filterSensitive`、`scanDirectory`、`getScenarios` 自动合并插件贡献。`init` / `use` / `update` / `doctor` / `fix` 与 web server 入口处都会调用 `initPlugins`，按 rootDir + 配置 mtime 幂等。新增最小示例 `examples/plugin-basic/`。
 - **P27 文档质量评分**：新增 `src/utils/doc-quality.js`，按完整度（核心 section 是否齐全）、新鲜度（与项目文件 mtime 比对）、风险（敏感信息、过短、缺失）三个维度评分，整体输出 `OK / WARN / HIGH_RISK` 与 0-100 综合分。`code-ctx doctor` CLI 末尾输出评分摘要并标注需要关注的文档；Dashboard `/api/status` 返回 `docQuality` 字段，Status 页顶部展示评分徽章和问题清单。评分纯规则，不依赖 AI。
 - **P28 Dashboard 安全状态页和 doctor 详情**：新增 `/api/doctor` 端点，复用 P14 的 doctor 缓存，返回 doctor issues/warnings、docQuality、敏感信息扫描、配置 schema 错误、已加载插件与加载错误。新增 Web 页面 `安全与健康`（路由 `/security`），可视化展示整体 OK/WARN/HIGH_RISK 徽章、各分类详情和文档质量明细表，仅显示敏感字段名与文件名不暴露原文；支持手动刷新。Sidebar 新增入口。
+- **P29 生成历史、prompt diff、任务历史轮转**：扩展 `src/utils/task-history.js`。每条记录加 `id` / `timestamp`，prompt 不落盘——只持久化 `promptHash` / `promptLength` 与经 `filterSensitive` 处理的 `promptPreview`；字段经白名单 sanitize，避免未知字段污染。新增 `MAX_ENTRIES=200` 与 `MAX_FILE_BYTES=256KB` 双轮转，写入后自动 trim 最早记录。`useCommand` 与 `updateCommand` 自动写入历史；Dashboard 时间轴展示场景与 preview。新增 API `GET /api/history` 与 `GET /api/history/diff`（按两个任务 ID 输出 scenario/hash/长度差异）。新增工具 `diffPrompts` 做简单文本 diff 摘要，不引入复杂依赖。
 
 #### Known Issues
 

@@ -89,11 +89,16 @@
           </div>
 
           <div v-if="recentHistory.length" class="timeline">
-            <div v-for="(item, index) in recentHistory" :key="index" class="timeline-item">
+            <div v-for="(item, index) in recentHistory" :key="item.id || index" class="timeline-item">
               <span class="timeline-dot"></span>
               <div class="timeline-body">
                 <strong>{{ item.task || item.action || item.command || '任务记录' }}</strong>
-                <span>{{ formatDate(item.timestamp) }}</span>
+                <span class="history-meta">
+                  <template v-if="item.scenario">场景 {{ item.scenario }} · </template>
+                  <template v-if="item.source">{{ item.source }} · </template>
+                  {{ formatDate(item.timestamp) }}
+                </span>
+                <span v-if="item.promptPreview" class="history-preview">{{ item.promptPreview }}</span>
               </div>
             </div>
           </div>
@@ -352,6 +357,14 @@ export default {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.timeline-body .history-preview {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  margin-top: 2px;
 }
 
 @media (max-width: 1100px) {

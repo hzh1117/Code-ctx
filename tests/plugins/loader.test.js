@@ -25,6 +25,7 @@ function writePlugin(dir, name, body) {
 describe('plugin loader', () => {
   let testDir;
   const originalAdapterTypes = new Set();
+  let originalAllowAll;
 
   beforeAll(() => {
     for (const t of defaultRegistry.types) originalAdapterTypes.add(t);
@@ -34,6 +35,11 @@ describe('plugin loader', () => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-plugin-'));
     _resetPluginState();
     _clearCache();
+    // Plugin tests load arbitrary throwaway files from temp dirs that are
+    // never going to be in any allowlist; bypass the trust gate for those.
+    // The dedicated allowlist tests below toggle this on a per-test basis.
+    originalAllowAll = process.env.CODE_CTX_PLUGINS_ALLOW_ALL;
+    process.env.CODE_CTX_PLUGINS_ALLOW_ALL = '1';
   });
 
   afterEach(() => {
@@ -44,6 +50,12 @@ describe('plugin loader', () => {
       if (!originalAdapterTypes.has(t)) defaultRegistry.adapters.delete(t);
     }
     fs.rmSync(testDir, { recursive: true, force: true });
+    if (originalAllowAll === undefined) {
+      delete process.env.CODE_CTX_PLUGINS_ALLOW_ALL;
+    } else {
+      process.env.CODE_CTX_PLUGINS_ALLOW_ALL = originalAllowAll;
+    }
+    delete process.env.CODE_CTX_PLUGINS_ALLOW;
   });
 
   test('no plugins configured → state stays empty', () => {
@@ -175,5 +187,82 @@ describe('plugin loader', () => {
     const second = getState();
     expect(second.plugins.length).toBe(first.plugins.length);
     expect(second.plugins[0].name).toBe('p');
+  });
+
+  describe('security gate', () => {
+    let warn;
+
+    beforeEach(() => {
+      // The dedicated security tests want to exercise the real gate, so
+      // turn the global bypass off and re-enable it after each test.
+      delete process.env.CODE_CTX_PLUGINS_ALLOW_ALL;
+      warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+      process.env.CODE_CTX_PLUGINS_ALLOW_ALL = '1';
+    });
+
+    test('non-TTY unknown plugin is rejected and recorded in state.errors', () => {
+      // jest runs without a TTY, so `process.stdin.isTTY` is undefined here.
+      const pluginPath = writePlugin(testDir, 'unknown.js', `
+        module.exports = { name: 'unknown', scenarios: [{ id: 'X', name: 'X' }] };
+      `);
+      writeConfig(testDir, [pluginPath]);
+      initPlugins(testDir);
+      const errors = getState().errors;
+      expect(errors.length).toBe(1);
+      expect(errors[0].error).toMatch(/不在信任列表/);
+      // No contributions were applied.
+      expect(getScenarios().find(s => s.id === 'X')).toBeUndefined();
+    });
+
+    test('CODE_CTX_PLUGINS_ALLOW=spec allows that spec', () => {
+      const pluginPath = writePlugin(testDir, 'envok.js', `
+        module.exports = { name: 'envok', scenarios: [{ id: 'E', name: 'Env' }] };
+      `);
+      writeConfig(testDir, [pluginPath]);
+      process.env.CODE_CTX_PLUGINS_ALLOW = pluginPath;
+      initPlugins(testDir);
+      expect(getState().errors).toEqual([]);
+      expect(getScenarios().find(s => s.id === 'E')).toMatchObject({ name: 'Env' });
+    });
+
+    test('persistent allowlist file admits the plugin', () => {
+      const pluginPath = writePlugin(testDir, 'persisted.js', `
+        module.exports = { name: 'persisted', scenarios: [{ id: 'P', name: 'Persist' }] };
+      `);
+      writeConfig(testDir, [pluginPath]);
+
+      // Point the user allowlist at a temp path so we don't touch the real
+      // ~/.code-ctx directory during tests.
+      const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-home-'));
+      const allowlistFile = path.join(fakeHome, '.code-ctx', 'allowed-plugins.json');
+      fs.mkdirSync(path.dirname(allowlistFile), { recursive: true });
+      fs.writeFileSync(allowlistFile, JSON.stringify([pluginPath]));
+
+      const origHome = os.homedir;
+      jest.spyOn(os, 'homedir').mockReturnValue(fakeHome);
+      try {
+        initPlugins(testDir);
+        expect(getState().errors).toEqual([]);
+        expect(getScenarios().find(s => s.id === 'P')).toMatchObject({ name: 'Persist' });
+      } finally {
+        os.homedir = origHome;
+        fs.rmSync(fakeHome, { recursive: true, force: true });
+      }
+    });
+
+    test('CODE_CTX_PLUGINS_ALLOW_ALL=1 bypasses the gate', () => {
+      const pluginPath = writePlugin(testDir, 'bypass.js', `
+        module.exports = { name: 'bypass', scenarios: [{ id: 'B', name: 'Bypass' }] };
+      `);
+      writeConfig(testDir, [pluginPath]);
+      process.env.CODE_CTX_PLUGINS_ALLOW_ALL = '1';
+      initPlugins(testDir);
+      expect(getState().errors).toEqual([]);
+      expect(getScenarios().find(s => s.id === 'B')).toMatchObject({ name: 'Bypass' });
+    });
   });
 });

@@ -1,9 +1,138 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { loadProjectConfig } = require('../utils/config');
 const { getState, setLoaded, addContributions, addError, _reset } = require('./state');
 const { BaseAdapter } = require('../adapters');
 const { defaultRegistry } = require('../adapters');
+
+// ─── Plugin security gate ───────────────────────────────────────────────
+// Plugins are arbitrary Node modules; require()-ing one executes its code.
+// Any actor who can write code-ctx.config.json's `plugins` field would
+// otherwise get RCE on the next CLI invocation. The loader therefore
+// requires explicit trust before loading any plugin spec.
+//
+// Trust sources, checked in order:
+//   1. Built-in allowlist (OFFICIAL_PLUGIN_ALLOWLIST) — populated as the
+//      project publishes first-party plugins.
+//   2. Env var bypass CODE_CTX_PLUGINS_ALLOW_ALL=1 — for tests / CI where
+//      the caller already vetted the config.
+//   3. Env var CODE_CTX_PLUGINS_ALLOW="spec1,spec2" — per-run trust list.
+//   4. Persistent user allowlist at ~/.code-ctx/allowed-plugins.json.
+//   5. Interactive TTY confirmation, which writes the spec into (4).
+//
+// Non-TTY environments without any of (1)–(4) refuse the plugin and
+// surface the error to the caller (caught by initPlugins and stored in
+// plugin state.errors so the rest of the run continues).
+
+const OFFICIAL_PLUGIN_ALLOWLIST = [
+  // Future first-party plugins go here, e.g. '@code-ctx/plugin-eslint'.
+];
+
+function getUserAllowlistPath() {
+  return path.join(os.homedir(), '.code-ctx', 'allowed-plugins.json');
+}
+
+function getUserAllowedPlugins() {
+  try {
+    const content = fs.readFileSync(getUserAllowlistPath(), 'utf8');
+    const arr = JSON.parse(content);
+    return Array.isArray(arr) ? arr.filter(s => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveUserAllowedPlugin(spec) {
+  const list = getUserAllowedPlugins();
+  if (list.includes(spec)) return;
+  list.push(spec);
+  const allowlistPath = getUserAllowlistPath();
+  try {
+    fs.mkdirSync(path.dirname(allowlistPath), { recursive: true });
+    fs.writeFileSync(allowlistPath, JSON.stringify(list, null, 2) + '\n', { mode: 0o600 });
+  } catch (err) {
+    console.warn(`[code-ctx] 无法保存插件信任列表: ${err.message}`);
+  }
+}
+
+function getEnvAllowedSpecs() {
+  const env = process.env.CODE_CTX_PLUGINS_ALLOW;
+  if (!env) return [];
+  return env.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function isPluginAllowed(spec) {
+  if (process.env.CODE_CTX_PLUGINS_ALLOW_ALL === '1') return true;
+  if (OFFICIAL_PLUGIN_ALLOWLIST.includes(spec)) return true;
+  if (getEnvAllowedSpecs().includes(spec)) return true;
+  if (getUserAllowedPlugins().includes(spec)) return true;
+  return false;
+}
+
+// Sync TTY read so the gate can keep initPlugins synchronous. Falls back
+// to null if stdin can't be read (piped input, no /dev/tty, etc.) and the
+// caller treats that as "refuse".
+function promptUserSync(question) {
+  if (!process.stdin.isTTY) return null;
+  try {
+    process.stdout.write(question);
+    const useDevTty = process.platform !== 'win32';
+    const fd = useDevTty ? fs.openSync('/dev/tty', 'rs') : 0;
+    const buf = Buffer.alloc(64);
+    let answer = '';
+    while (true) {
+      const n = fs.readSync(fd, buf, 0, buf.length);
+      if (n <= 0) break;
+      const chunk = buf.slice(0, n).toString('utf8');
+      const newlineIdx = chunk.indexOf('\n');
+      if (newlineIdx !== -1) {
+        answer += chunk.slice(0, newlineIdx);
+        break;
+      }
+      answer += chunk;
+      if (answer.length > 256) break;
+    }
+    if (useDevTty) {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
+    }
+    return answer.replace(/\r$/, '').trim();
+  } catch {
+    return null;
+  }
+}
+
+function ensurePluginTrusted(spec, resolved) {
+  if (isPluginAllowed(spec)) return;
+
+  const allowlistPath = getUserAllowlistPath();
+
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      `插件 "${spec}" 不在信任列表中（非交互式环境）。\n` +
+      `  - 设置环境变量 CODE_CTX_PLUGINS_ALLOW="${spec}" 临时放行\n` +
+      `  - 或将 spec 加入 ${allowlistPath}\n` +
+      `  - 测试环境可设 CODE_CTX_PLUGINS_ALLOW_ALL=1`
+    );
+  }
+
+  const answer = promptUserSync(
+    `\n⚠️  安全警告：插件 "${spec}" 不在信任列表中。\n` +
+    `   路径: ${resolved}\n` +
+    `   加载此插件将执行其代码。是否允许？ [y/N] `
+  );
+
+  if (answer === null) {
+    throw new Error(`无法读取用户确认，插件 "${spec}" 已拒绝加载`);
+  }
+  const normalized = answer.toLowerCase();
+  if (normalized !== 'y' && normalized !== 'yes') {
+    throw new Error(`用户拒绝了插件 "${spec}" 的加载`);
+  }
+
+  saveUserAllowedPlugin(spec);
+  console.log(`✓ 插件 "${spec}" 已添加到信任列表 (${allowlistPath})`);
+}
 
 // Resolve a plugin spec to an absolute module path. Relative paths are
 // resolved against rootDir; bare specifiers (npm names) go through
@@ -25,6 +154,7 @@ function resolvePluginPath(spec, rootDir) {
 
 function loadPluginModule(spec, rootDir) {
   const resolved = resolvePluginPath(spec, rootDir);
+  ensurePluginTrusted(spec, resolved);
   // Bust require cache so plugin edits are picked up on re-init (tests).
   delete require.cache[resolved];
   const mod = require(resolved);
@@ -153,4 +283,16 @@ function initPlugins(rootDir) {
   return getState();
 }
 
-module.exports = { initPlugins, _resetPluginState: _reset, BaseAdapter };
+module.exports = {
+  initPlugins,
+  _resetPluginState: _reset,
+  BaseAdapter,
+  // Exposed for tests; not part of the public API.
+  _internals: {
+    OFFICIAL_PLUGIN_ALLOWLIST,
+    getUserAllowlistPath,
+    getUserAllowedPlugins,
+    isPluginAllowed,
+    ensurePluginTrusted
+  }
+};

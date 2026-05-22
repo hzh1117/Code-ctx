@@ -83,15 +83,22 @@ function loadConfigWithVM(configPath) {
   }
 }
 
+// 默认模型依据官方废弃文档校准（2026-05 复核）：
+// - OpenAI gpt-4 系列将于 2026-10-23 退役，官方推荐替换为 gpt-5.5。
+//   参考 https://platform.openai.com/docs/deprecations
+// - Anthropic claude-3-5-sonnet-20241022 已于 2025-10-28 退役，调用会失败，
+//   官方推荐替换为 claude-sonnet-4-6。
+//   参考 https://platform.claude.com/docs/en/about-claude/model-deprecations
+// 用户可通过 .env (OPENAI_MODEL / ANTHROPIC_MODEL) 或 code-ctx.config.js 覆盖。
 const DEFAULT_PROVIDER_CONFIG = {
   openai: {
     baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4',
+    model: 'gpt-5.5',
     maxTokens: 4096
   },
   anthropic: {
     baseUrl: 'https://api.anthropic.com',
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-4-6',
     maxTokens: 4096
   }
 };

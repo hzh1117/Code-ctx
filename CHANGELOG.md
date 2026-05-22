@@ -24,6 +24,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - 项目许可从 MIT 调整为 Code-ctx Non-Commercial Source License，允许非商业使用、学习、修改和分发，禁止商业使用。
 - 安全策略补充当前审计发现的高风险区域，包括本地配置执行、Dashboard API、AI 凭据和生成文档泄漏风险。
 - SUPPORT 和 GitHub issue/PR 模板同步非商业使用、安全披露和提交检查提醒。
+- **默认 AI 模型按官方废弃文档校准**：OpenAI 默认从 `gpt-4` 改为 `gpt-5.5`（`gpt-4` 于 2026-10-23 退役）；Anthropic 默认从 `claude-3-5-sonnet-20241022` 改为 `claude-sonnet-4-6`（前者已于 2025-10-28 退役，调用会失败）。已显式覆盖 `OPENAI_MODEL` / `ANTHROPIC_MODEL` 或在 `code-ctx.config.js` 中指定 `model` 的用户不受影响；仍使用旧默认值的项目应检查 `code-ctx.config.js` 中的 `ai.openai.model` 和 `ai.anthropic.model`。
 
 #### Known Issues
 
@@ -50,6 +51,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - Changed the project license from MIT to the Code-ctx Non-Commercial Source License. Non-commercial use, study, modification, and distribution are allowed; commercial use is prohibited.
 - Expanded the security policy with current audit focus areas: local config execution, Dashboard APIs, AI credentials, and generated documentation leakage.
 - Synchronized SUPPORT and GitHub issue/PR templates with non-commercial-use, security-reporting, and submission-check guidance.
+- **Default AI models aligned with official deprecation docs.** OpenAI default changed from `gpt-4` to `gpt-5.5` (`gpt-4` retires on 2026-10-23). Anthropic default changed from `claude-3-5-sonnet-20241022` to `claude-sonnet-4-6` (the former was retired on 2025-10-28 and now fails). Users who explicitly set `OPENAI_MODEL` / `ANTHROPIC_MODEL` or specify `model` in `code-ctx.config.js` are unaffected; projects still relying on the old defaults should review `ai.openai.model` and `ai.anthropic.model` in `code-ctx.config.js`.
 
 #### Known Issues
 

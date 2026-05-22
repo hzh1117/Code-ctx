@@ -125,9 +125,9 @@ ANTHROPIC_API_KEY=
 
 # 可选
 OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4
+OPENAI_MODEL=gpt-5.5
 ANTHROPIC_BASE_URL=https://api.anthropic.com
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
+ANTHROPIC_MODEL=claude-sonnet-4-6
 DASHBOARD_TOKEN=
 AI_TIMEOUT=180000
 ```
@@ -160,7 +160,7 @@ module.exports = {
     },
     anthropic: {
       baseUrl: 'https://api.anthropic.com',
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-6',
       maxTokens: 4096
     }
   }

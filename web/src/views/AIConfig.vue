@@ -58,7 +58,7 @@
           </div>
           <div class="input-group">
             <label class="input-label">model</label>
-            <input v-model="config.providers.openai.model" class="input" placeholder="gpt-4o-mini" />
+            <input v-model="config.providers.openai.model" class="input" placeholder="gpt-5.5" />
           </div>
           <div class="input-group">
             <label class="input-label">max_tokens</label>
@@ -135,8 +135,8 @@ export default {
     return {
       config: {},
       defaultProviders: {
-        openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4', maxTokens: 4096 },
-        anthropic: { baseUrl: 'https://api.anthropic.com', model: 'claude-3-5-sonnet-20241022', maxTokens: 4096 }
+        openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.5', maxTokens: 4096 },
+        anthropic: { baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-6', maxTokens: 4096 }
       },
       loading: true,
       testing: false,

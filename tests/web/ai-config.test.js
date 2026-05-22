@@ -96,7 +96,7 @@ describe('web ai config api', () => {
         protocol: 'openai',
         openai: {
           baseUrl: 'https://api.openai.com/v1',
-          model: 'gpt-4',
+          model: 'gpt-5.5',
           maxTokens: -1
         }
       }

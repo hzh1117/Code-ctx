@@ -1,7 +1,7 @@
 const { Command } = require('commander');
 const { updateCommand, executeUpdates } = require('../../src/commands/update');
-const { writeToClipboard } = require('../../src/utils/clipboard');
 const { getAIConfig } = require('../../src/utils/config');
+const { outputPrompt } = require('../../src/utils/prompt-output');
 
 const update = new Command('update')
   .description('检测变化，更新相关文档')
@@ -49,16 +49,9 @@ const update = new Command('update')
           console.log('\n没有可更新的 section（文档可能缺少 section 标记）');
           if (result.prompt) {
             console.log('已生成全量更新 prompt，可手动粘贴给 AI：');
-            if (options.stdout) {
-              process.stdout.write(result.prompt);
-            } else {
-              const clipResult = await writeToClipboard(result.prompt);
-              if (clipResult.success) {
-                console.log('✓ prompt 已复制到剪贴板');
-              } else {
-                console.log(`⚠ 剪贴板写入失败，已降级输出到 ${clipResult.fallbackPath}`);
-              }
-            }
+            await outputPrompt(result.prompt, options, {
+              successMessage: '✓ prompt 已复制到剪贴板'
+            });
           }
           return;
         }
@@ -67,16 +60,9 @@ const update = new Command('update')
         if (!aiConfig.apiKey) {
           console.log('\n⚠ 未配置 API Key，请先在 .env 文件中配置');
           console.log('  已生成 prompt，可手动粘贴给 AI：');
-          if (options.stdout) {
-            process.stdout.write(result.prompt || '');
-          } else {
-            const clipResult = await writeToClipboard(result.prompt || '');
-            if (clipResult.success) {
-              console.log('✓ prompt 已复制到剪贴板');
-            } else {
-              console.log(`⚠ 剪贴板写入失败，已降级输出到 ${clipResult.fallbackPath}`);
-            }
-          }
+          await outputPrompt(result.prompt || '', options, {
+            successMessage: '✓ prompt 已复制到剪贴板'
+          });
           return;
         }
 
@@ -93,16 +79,10 @@ const update = new Command('update')
       } else {
         // Default: copy prompt to clipboard
         if (result.prompt) {
-          if (options.stdout) {
-            process.stdout.write(result.prompt);
-          } else {
-            const clipResult = await writeToClipboard(result.prompt);
-            if (clipResult.success) {
-              console.log('\n✓ 增量更新 prompt 已复制到剪贴板');
-            } else {
-              console.log(`\n⚠ 剪贴板写入失败，已降级输出到 ${clipResult.fallbackPath}`);
-            }
-          }
+          await outputPrompt(result.prompt, options, {
+            successMessage: '\n✓ 增量更新 prompt 已复制到剪贴板',
+            fallbackPrefix: '\n'
+          });
         }
       }
     } catch (err) {

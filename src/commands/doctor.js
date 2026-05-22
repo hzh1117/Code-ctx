@@ -10,30 +10,38 @@ const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { defaultRegistry } = require('../adapters');
 
+function loadDoctorConfig(rootDir) {
+  const configPath = path.join(rootDir, 'code-ctx.config.js');
+  if (!fs.existsSync(configPath)) {
+    return { config: null, error: 'no-config' };
+  }
+  try {
+    return { config: loadConfigWithVM(configPath), error: null };
+  } catch {
+    return { config: null, error: 'config-error' };
+  }
+}
+
 function checkSectionIntegrity(aiDocsDir) {
   const issues = [];
   const requiredDocs = ['OVERVIEW.md'];
 
-  // 检查必要文档是否存在
   for (const doc of requiredDocs) {
     if (!fs.existsSync(path.join(aiDocsDir, doc))) {
       issues.push({ type: 'missing', file: doc, message: `${doc} 不存在` });
     }
   }
 
-  // 检查已有文档的章节完整性
   const files = fs.readdirSync(aiDocsDir).filter(f => f.endsWith('.md'));
   for (const file of files) {
     const content = readFileUTF8(path.join(aiDocsDir, file));
     const lines = content.split('\n');
 
-    // 检查是否有实质内容（不只是标题）
     const contentLines = lines.filter(l => l.trim() && !l.startsWith('#'));
     if (contentLines.length < 5) {
       issues.push({ type: 'sparse', file, message: `${file} 内容过少（${contentLines.length} 行有效内容）` });
     }
 
-    // 检查 OVERVIEW 必要章节
     if (file === 'OVERVIEW.md') {
       const requiredSections = ['项目概述', '子项目', '技术栈'];
       for (const section of requiredSections) {
@@ -48,27 +56,19 @@ function checkSectionIntegrity(aiDocsDir) {
   return issues;
 }
 
-function checkDocsVsCode(rootDir) {
+function checkDocsVsCode(rootDir, configResult) {
   const issues = [];
-  const configPath = path.join(rootDir, 'code-ctx.config.js');
-  const aiDocsDir = path.join(rootDir, 'ai-docs');
-
-  if (!fs.existsSync(configPath)) {
+  if (configResult.error === 'no-config') {
     issues.push({ type: 'no-config', message: 'code-ctx.config.js 不存在，请先运行 code-ctx init' });
     return issues;
   }
-
-  let config;
-  try {
-    config = loadConfigWithVM(configPath);
-  } catch {
+  if (configResult.error === 'config-error') {
     issues.push({ type: 'config-error', message: 'code-ctx.config.js 解析失败' });
     return issues;
   }
 
-  const configProjects = config.projects || [];
+  const configProjects = configResult.config.projects || [];
 
-  // 检查配置中的子项目是否真的存在
   for (const project of configProjects) {
     const projectDir = path.join(rootDir, project.path);
     if (!fs.existsSync(projectDir)) {
@@ -76,7 +76,6 @@ function checkDocsVsCode(rootDir) {
     }
   }
 
-  // 检查实际目录是否都被配置覆盖
   try {
     const entries = fs.readdirSync(rootDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -91,7 +90,6 @@ function checkDocsVsCode(rootDir) {
         continue;
       }
 
-      // 检查是否有 package.json、pom.xml 等项目标识文件
       const hasProjectFile = files.some(f => ['package.json', 'pom.xml', 'build.gradle', 'go.mod', 'requirements.txt', 'pyproject.toml'].includes(f));
       if (!hasProjectFile) continue;
 
@@ -100,35 +98,22 @@ function checkDocsVsCode(rootDir) {
         issues.push({ type: 'unconfigured', directory: entry.name, message: `目录 ${entry.name} 看起来是子项目但未在配置中` });
       }
     }
-  } catch {
-    // 读取目录失败
-  }
+  } catch {}
 
   return issues;
 }
 
-function checkDocsVsActual(rootDir) {
+function checkDocsVsActual(rootDir, configResult, aiDocsDir) {
   const issues = [];
-  const configPath = path.join(rootDir, 'code-ctx.config.js');
-  const aiDocsDir = path.join(rootDir, 'ai-docs');
+  if (!configResult.config || !fs.existsSync(aiDocsDir)) return issues;
 
-  if (!fs.existsSync(configPath) || !fs.existsSync(aiDocsDir)) return issues;
-
-  let config;
-  try {
-    config = loadConfigWithVM(configPath);
-  } catch {
-    return issues;
-  }
-
-  for (const project of (config.projects || [])) {
+  for (const project of (configResult.config.projects || [])) {
     const docPath = path.join(aiDocsDir, `${project.alias}.md`);
     if (!fs.existsSync(docPath)) {
       issues.push({ type: 'doc-missing', alias: project.alias, message: `${project.alias}.md 不存在` });
       continue;
     }
 
-    // 扫描实际项目
     try {
       const projectDir = path.join(rootDir, project.path);
       if (!fs.existsSync(projectDir)) continue;
@@ -136,7 +121,6 @@ function checkDocsVsActual(rootDir) {
       const scanResult = scanProject(projectDir, project.type);
       const docContent = readFileUTF8(docPath);
 
-      // 检查关键文件是否在文档中被提及
       const keyFileNames = scanResult.keyFiles
         .map(f => path.basename(f))
         .filter(name => !['package.json', 'pom.xml', 'build.gradle'].includes(name));
@@ -153,7 +137,6 @@ function checkDocsVsActual(rootDir) {
         });
       }
 
-      // 检查目录结构是否与文档一致
       const treeLines = scanResult.tree.split('\n').filter(l => l.trim());
       const topDirs = treeLines
         .filter(l => l.includes('├──') && l.includes('/'))
@@ -183,7 +166,6 @@ function extractRoutesFromCode(projectDir, projectType) {
   const { globSync } = require('glob');
 
   try {
-    // Use adapter scanPatterns to find relevant files
     const patterns = defaultRegistry.getScanPatterns(projectType);
     if (patterns.length === 0) return routes;
 
@@ -198,7 +180,6 @@ function extractRoutesFromCode(projectDir, projectType) {
       const content = readFileUTF8(file);
       const basename = path.basename(file);
 
-      // Java: @RequestMapping, @GetMapping, etc.
       if (basename.endsWith('.java')) {
         const classMapping = content.match(/@RequestMapping\(["']([^"']+)["']\)/)?.[1] || '';
         const methodMappings = content.matchAll(/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*(?:\(\s*)?(?:["']([^"']+)["'])?/g);
@@ -210,7 +191,6 @@ function extractRoutesFromCode(projectDir, projectType) {
         }
       }
 
-      // Node.js: router.get/post etc.
       if (basename.endsWith('.js') || basename.endsWith('.ts')) {
         const matches = content.matchAll(/router\.(get|post|put|delete|patch)\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
@@ -218,7 +198,6 @@ function extractRoutesFromCode(projectDir, projectType) {
         }
       }
 
-      // Python: path() in urls.py
       if (basename === 'urls.py') {
         const matches = content.matchAll(/path\s*\(\s*["']([^"']+)["']/g);
         for (const match of matches) {
@@ -233,22 +212,7 @@ function extractRoutesFromCode(projectDir, projectType) {
   return routes;
 }
 
-async function doctorCommand(rootDir, options = {}) {
-  const aiDocsDir = path.join(rootDir, 'ai-docs');
-  const issues = [];
-  const warnings = [];
-  const info = { projects: [], routes: [] };
-
-  console.log('🔍 正在分析项目...\n');
-
-  // 1. 检查 ai-docs 目录
-  if (!fs.existsSync(aiDocsDir)) {
-    console.log('❌ ai-docs/ 目录不存在');
-    console.log('\n修复：运行 code-ctx init 初始化项目');
-    return { issues: [{ type: 'no-ai-docs', message: 'ai-docs/ 目录不存在' }], warnings, info };
-  }
-
-  // 2. 检测项目结构
+function checkProjectStructure(rootDir, info) {
   console.log('📁 检测项目结构...');
   const projects = detectProjects(rootDir);
   info.projects = projects.map(p => ({ alias: p.alias, type: p.type, name: p.name }));
@@ -258,10 +222,12 @@ async function doctorCommand(rootDir, options = {}) {
   } else {
     console.log(`  ✓ 检测到 ${projects.length} 个子项目: ${projects.map(p => p.alias).join(', ')}`);
   }
+  return projects;
+}
 
-  // 3. 检查配置与实际的一致性
+function checkConfigConsistency(rootDir, configResult, issues, warnings) {
   console.log('\n📋 检查配置一致性...');
-  const configIssues = checkDocsVsCode(rootDir);
+  const configIssues = checkDocsVsCode(rootDir, configResult);
   for (const issue of configIssues) {
     if (issue.type === 'unconfigured') {
       warnings.push({ type: issue.type, message: issue.message });
@@ -271,8 +237,9 @@ async function doctorCommand(rootDir, options = {}) {
       console.log(`  ❌ ${issue.message}`);
     }
   }
+}
 
-  // 4. 检查文档完整性
+function checkDocsCompleteness(aiDocsDir, issues, warnings) {
   console.log('\n📄 检查文档完整性...');
   const docIssues = checkSectionIntegrity(aiDocsDir);
   for (const issue of docIssues) {
@@ -284,10 +251,11 @@ async function doctorCommand(rootDir, options = {}) {
       console.log(`  ❌ ${issue.message}`);
     }
   }
+}
 
-  // 5. 检查文档与代码的一致性
+function checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings) {
   console.log('\n🔄 检查文档与代码一致性...');
-  const consistencyIssues = checkDocsVsActual(rootDir);
+  const consistencyIssues = checkDocsVsActual(rootDir, configResult, aiDocsDir);
   for (const issue of consistencyIssues) {
     if (issue.type === 'outdated' || issue.type === 'structure-mismatch') {
       warnings.push(issue);
@@ -297,43 +265,43 @@ async function doctorCommand(rootDir, options = {}) {
       console.log(`  ❌ ${issue.message}`);
     }
   }
+}
 
-  // 6. 严格模式：解析代码路由
-  if (options.strict) {
-    console.log('\n🔎 严格模式：解析代码路由...');
-    for (const project of projects) {
-      const routes = extractRoutesFromCode(project.path, project.type);
-      if (routes.length > 0) {
-        info.routes.push(...routes);
-        console.log(`  📊 ${project.alias}: 发现 ${routes.length} 个路由`);
+function checkStrictRoutes(projects, aiDocsDir, info, warnings) {
+  console.log('\n🔎 严格模式：解析代码路由...');
+  for (const project of projects) {
+    const routes = extractRoutesFromCode(project.path, project.type);
+    if (routes.length === 0) continue;
 
-        // 检查 api-contracts.md 是否记录了这些路由
-        const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
-        if (fs.existsSync(contractsPath)) {
-          const contractsContent = readFileUTF8(contractsPath);
-          const unrecorded = routes.filter(r => !contractsContent.includes(r.path));
-          if (unrecorded.length > 0) {
-            warnings.push({
-              type: 'unrecorded-routes',
-              message: `${project.alias} 有 ${unrecorded.length} 个路由未在 api-contracts.md 中记录`,
-              details: unrecorded.slice(0, 5).map(r => `${r.method} ${r.path}`)
-            });
-            console.log(`  ⚠️ ${unrecorded.length} 个路由未记录`);
-          }
-        }
-      }
+    info.routes.push(...routes);
+    console.log(`  📊 ${project.alias}: 发现 ${routes.length} 个路由`);
+
+    const contractsPath = path.join(aiDocsDir, 'api-contracts.md');
+    if (!fs.existsSync(contractsPath)) continue;
+
+    const contractsContent = readFileUTF8(contractsPath);
+    const unrecorded = routes.filter(r => !contractsContent.includes(r.path));
+    if (unrecorded.length > 0) {
+      warnings.push({
+        type: 'unrecorded-routes',
+        message: `${project.alias} 有 ${unrecorded.length} 个路由未在 api-contracts.md 中记录`,
+        details: unrecorded.slice(0, 5).map(r => `${r.method} ${r.path}`)
+      });
+      console.log(`  ⚠️ ${unrecorded.length} 个路由未记录`);
     }
   }
+}
 
-  // 7. 敏感信息检查
+function checkSensitiveInfo(aiDocsDir, warnings) {
   console.log('\n🔒 检查敏感信息...');
   const sensitiveWarnings = scanDirectory(aiDocsDir);
   for (const w of sensitiveWarnings) {
     warnings.push({ ...w, message: `${w.file} 可能包含敏感信息 (${w.field})` });
     console.log(`  ⚠️ ${w.file} 可能包含敏感信息 (${w.field})`);
   }
+}
 
-  // 8. 输出统计
+function printDoctorSummary(issues, warnings, info) {
   console.log('\n' + '─'.repeat(50));
   if (issues.length === 0 && warnings.length === 0) {
     console.log('✅ 文档健康检查通过');
@@ -347,7 +315,6 @@ async function doctorCommand(rootDir, options = {}) {
       warnings.forEach(w => console.log(`  - ${w.message}`));
     }
 
-    // 提供修复建议
     console.log('\n💡 修复建议：');
     const hasMissingDocs = issues.some(i => i.type === 'missing' || i.type === 'doc-missing');
     const hasOutdated = warnings.some(w => w.type === 'outdated' || w.type === 'structure-mismatch');
@@ -363,6 +330,37 @@ async function doctorCommand(rootDir, options = {}) {
   if (info.routes.length > 0) {
     console.log(`\n📊 共发现 ${info.routes.length} 个 API 路由`);
   }
+}
+
+async function doctorCommand(rootDir, options = {}) {
+  const aiDocsDir = path.join(rootDir, 'ai-docs');
+  const issues = [];
+  const warnings = [];
+  const info = { projects: [], routes: [] };
+
+  console.log('🔍 正在分析项目...\n');
+
+  if (!fs.existsSync(aiDocsDir)) {
+    console.log('❌ ai-docs/ 目录不存在');
+    console.log('\n修复：运行 code-ctx init 初始化项目');
+    return { issues: [{ type: 'no-ai-docs', message: 'ai-docs/ 目录不存在' }], warnings, info };
+  }
+
+  const projects = checkProjectStructure(rootDir, info);
+
+  // Load config once; shared by checkConfigConsistency and checkDocsCodeConsistency.
+  const configResult = loadDoctorConfig(rootDir);
+
+  checkConfigConsistency(rootDir, configResult, issues, warnings);
+  checkDocsCompleteness(aiDocsDir, issues, warnings);
+  checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings);
+
+  if (options.strict) {
+    checkStrictRoutes(projects, aiDocsDir, info, warnings);
+  }
+
+  checkSensitiveInfo(aiDocsDir, warnings);
+  printDoctorSummary(issues, warnings, info);
 
   return { issues, warnings, info };
 }
@@ -404,7 +402,6 @@ async function doctorFix(rootDir, options = {}) {
     const docPath = path.join(aiDocsDir, `${project.alias}.md`);
     const projectDir = path.join(rootDir, project.path);
 
-    // 检查是否需要修复
     let needFix = false;
     let reason = '';
 
@@ -415,7 +412,6 @@ async function doctorFix(rootDir, options = {}) {
       needFix = true;
       reason = '强制重新生成';
     } else {
-      // 检查文档是否过期
       try {
         if (fs.existsSync(projectDir)) {
           const scanResult = scanProject(projectDir, project.type);
@@ -462,7 +458,6 @@ async function doctorFix(rootDir, options = {}) {
     }
   }
 
-  // 检查并修复 OVERVIEW.md
   const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
   if (!fs.existsSync(overviewPath) || options.force) {
     console.log('\n  🔧 生成 OVERVIEW.md...');
@@ -511,8 +506,6 @@ async function runDoctor(options = {}) {
     return doctorCommand(rootDir, doctorOptions);
   }
 
-  // Cache by rootDir; invalidate on (a) 30s TTL elapsed OR
-  // (b) ai-docs/ or code-ctx.config.js mtime changed.
   const aiDocsMtime = _statMtime(path.join(rootDir, 'ai-docs'));
   const configMtime = _statMtime(path.join(rootDir, 'code-ctx.config.js'));
   const now = Date.now();

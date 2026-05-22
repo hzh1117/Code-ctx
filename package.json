@@ -53,18 +53,18 @@
     "url": "https://github.com/hzh1117/Code-ctx/issues"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.4.3",
     "chalk": "^4.1.0",
     "chardet": "^1.6.0",
     "clipboardy": "3.0.0",
-    "commander": "^11.0.0",
+    "commander": "^14.0.3",
     "concurrently": "^9.2.1",
     "express": "~5.2.1",
     "glob": "^10.5.0",
-    "iconv-lite": "^0.6.3"
+    "iconv-lite": "^0.7.2"
   },
   "devDependencies": {
     "eslint": "^8.0.0",

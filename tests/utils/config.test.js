@@ -55,6 +55,37 @@ describe('config', () => {
     expect(config.model).toBe('kimi-for-coding');
   });
 
+  test('显式设置 ANTHROPIC_MODEL 时不会被 preset 推断覆盖', () => {
+    fs.writeFileSync(
+      path.join(testDir, '.env'),
+      [
+        'ANTHROPIC_BASE_URL=https://api.kimi.com/coding/',
+        'ANTHROPIC_API_KEY=test-key',
+        'ANTHROPIC_MODEL=custom-model'
+      ].join('\n')
+    );
+
+    const config = getAIConfig(testDir);
+
+    expect(config.model).toBe('custom-model');
+  });
+
+  test('preset 推断同样适用 DeepSeek（openai 兼容）默认 model', () => {
+    fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=test-key');
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+      ai: {
+        protocol: 'openai',
+        openai: { baseUrl: 'https://api.deepseek.com' }
+      }
+    }));
+
+    const config = getAIConfig(testDir);
+
+    expect(config.protocol).toBe('openai');
+    expect(config.baseUrl).toBe('https://api.deepseek.com');
+    expect(config.model).toBe('deepseek-chat');
+  });
+
   test('should select OpenAI provider config and key from grouped config', () => {
     fs.writeFileSync(path.join(testDir, '.env'), [
       'OPENAI_API_KEY=openai-key',

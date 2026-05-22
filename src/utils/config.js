@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { AI_CLIENT, PROJECT_LIMITS } = require('./constants');
+const { listPresets } = require('../ai/presets');
 
 // In-memory caches keyed by absolute file path. Each entry stores the
 // file mtimeMs at load time so subsequent calls can skip re-parsing
@@ -265,6 +266,22 @@ function normalizeProtocol(protocol) {
   return protocol === 'anthropic' ? 'anthropic' : 'openai';
 }
 
+// 通过 baseUrl 反查 preset，让 preset 决定默认 model。
+// 用户未显式设置 model 时，若 baseUrl 命中 presets 中某条记录，
+// 就采用该 preset 的默认 model（如 kimi 的 kimi-for-coding）。
+function inferPresetFromBaseUrl(baseUrl, protocol) {
+  if (!baseUrl) return null;
+  const normalize = u => String(u).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const target = normalize(baseUrl);
+  if (!target) return null;
+  return listPresets().find(p => {
+    if (protocol && p.protocol !== protocol) return false;
+    const preset = normalize(p.baseUrl);
+    if (!preset) return false;
+    return target === preset || target.startsWith(preset + '/') || preset.startsWith(target + '/');
+  }) || null;
+}
+
 function providerFromLegacy(aiConfig, protocol) {
   if (!aiConfig || !aiConfig.baseUrl && !aiConfig.model && !aiConfig.maxTokens) {
     return {};
@@ -281,16 +298,17 @@ function normalizeProviderConfig(provider, protocol) {
   const defaults = DEFAULT_PROVIDER_CONFIG[protocol];
   const baseUrl = provider.baseUrl || defaults.baseUrl;
   let model = provider.model || defaults.model;
+  let maxTokens = provider.maxTokens || defaults.maxTokens;
 
-  if (!provider.model && protocol === 'anthropic' && baseUrl.includes('api.kimi.com/coding')) {
-    model = 'kimi-for-coding';
+  if (!provider.model) {
+    const preset = inferPresetFromBaseUrl(baseUrl, protocol);
+    if (preset) {
+      if (preset.model) model = preset.model;
+      if (!provider.maxTokens && preset.maxTokens) maxTokens = preset.maxTokens;
+    }
   }
 
-  return {
-    baseUrl,
-    model,
-    maxTokens: provider.maxTokens || defaults.maxTokens
-  };
+  return { baseUrl, model, maxTokens };
 }
 
 function getAIProviders(projectConfig = {}) {
@@ -343,8 +361,11 @@ function getAIConfig(rootDir) {
 
   if (envConfig.ANTHROPIC_MODEL) {
     providers.anthropic.model = envConfig.ANTHROPIC_MODEL;
-  } else if (providers.anthropic.baseUrl.includes('api.kimi.com/coding') && !aiConfig.anthropic?.model && !(protocol === 'anthropic' && aiConfig.model)) {
-    providers.anthropic.model = 'kimi-for-coding';
+  } else if (!aiConfig.anthropic?.model && !(protocol === 'anthropic' && aiConfig.model)) {
+    const preset = inferPresetFromBaseUrl(providers.anthropic.baseUrl, 'anthropic');
+    if (preset && preset.model) {
+      providers.anthropic.model = preset.model;
+    }
   }
 
   if (envConfig.OPENAI_MODEL) {

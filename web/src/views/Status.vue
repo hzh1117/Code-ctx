@@ -13,6 +13,24 @@
     </div>
 
     <div v-else>
+      <div v-if="docQuality" class="card quality-card">
+        <div class="quality-row">
+          <span :class="['quality-badge', qualityClass(docQuality.overall)]">
+            {{ qualityLabel(docQuality.overall) }}
+          </span>
+          <span class="quality-score">综合分 {{ docQuality.score }}</span>
+          <span class="quality-meta">完整度 {{ docQuality.summary?.completeness ?? 0 }} · 新鲜度 {{ docQuality.summary?.freshness ?? 0 }} · 风险 {{ docQuality.summary?.risk ?? 100 }}</span>
+        </div>
+        <ul v-if="docQualityIssues.length" class="quality-issue-list">
+          <li v-for="(d, idx) in docQualityIssues" :key="idx">
+            <strong>{{ d.name }}</strong>
+            <span :class="['quality-tag', qualityClass(d.level)]">{{ d.level }}</span>
+            <span v-if="d.completeness?.missing?.length" class="quality-detail">缺失：{{ d.completeness.missing.join(', ') }}</span>
+            <span v-for="r in d.risks || []" :key="r.type" class="quality-detail">{{ r.message }}</span>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="documents.length" class="card">
         <table class="status-table">
           <thead>
@@ -86,12 +104,19 @@ export default {
   data() {
     return {
       documents: [],
+      docQuality: null,
       loading: true,
       updating: false,
       updatingDoc: '',
       viewer: { show: false, name: '', content: '' },
       toast: { show: false, message: '', type: 'success' }
     };
+  },
+  computed: {
+    docQualityIssues() {
+      if (!this.docQuality) return [];
+      return (this.docQuality.perDoc || []).filter(d => d.level !== 'OK');
+    }
   },
   async mounted() {
     await this.loadStatus();
@@ -102,6 +127,7 @@ export default {
       try {
         const res = await axios.get('/api/status');
         this.documents = res.data.documents || [];
+        this.docQuality = res.data.docQuality || null;
       } catch (err) {
         this.showToast('加载失败: ' + err.message, 'error');
       } finally {
@@ -161,6 +187,16 @@ export default {
       if (!doc.exists) return '缺失';
       if (doc.stale) return '待更新';
       return '正常';
+    },
+    qualityClass(level) {
+      if (level === 'OK') return 'health-ok';
+      if (level === 'WARN') return 'health-stale';
+      return 'health-missing';
+    },
+    qualityLabel(level) {
+      if (level === 'OK') return '✅ OK';
+      if (level === 'WARN') return '⚠️ WARN';
+      return '❌ HIGH_RISK';
     }
   }
 };
@@ -288,6 +324,67 @@ export default {
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
+}
+
+.quality-card {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+}
+
+.quality-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quality-badge {
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.quality-score {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.quality-meta {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.quality-issue-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.quality-issue-list li {
+  padding: 6px 0;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quality-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+
+.quality-detail {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .doc-source {

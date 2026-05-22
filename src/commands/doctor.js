@@ -10,6 +10,7 @@ const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { defaultRegistry } = require('../adapters');
 const { initPlugins } = require('../plugins/loader');
+const { scoreDocs, formatLevelLabel } = require('../utils/doc-quality');
 
 function loadDoctorConfig(rootDir) {
   const info = getConfigFile(rootDir);
@@ -302,7 +303,25 @@ function checkSensitiveInfo(aiDocsDir, warnings) {
   }
 }
 
-function printDoctorSummary(issues, warnings, info) {
+function printDocQuality(quality) {
+  if (!quality) return;
+  console.log('\n📊 文档质量评分');
+  console.log(`  整体：${formatLevelLabel(quality.overall)}（综合分 ${quality.score}）`);
+  console.log(`  完整度 ${quality.summary.completeness} / 新鲜度 ${quality.summary.freshness} / 风险 ${quality.summary.risk}`);
+  const notOk = quality.perDoc.filter(d => d.level !== 'OK');
+  if (notOk.length > 0) {
+    console.log('  需关注的文档：');
+    for (const d of notOk) {
+      const missing = d.completeness && d.completeness.missing.length > 0
+        ? `，缺失 section：${d.completeness.missing.join(', ')}`
+        : '';
+      const risk = (d.risks || []).map(r => r.message).join('；');
+      console.log(`    - ${d.name} ${formatLevelLabel(d.level)}（${d.score}）${missing}${risk ? '；' + risk : ''}`);
+    }
+  }
+}
+
+function printDoctorSummary(issues, warnings, info, quality) {
   console.log('\n' + '─'.repeat(50));
   if (issues.length === 0 && warnings.length === 0) {
     console.log('✅ 文档健康检查通过');
@@ -331,6 +350,8 @@ function printDoctorSummary(issues, warnings, info) {
   if (info.routes.length > 0) {
     console.log(`\n📊 共发现 ${info.routes.length} 个 API 路由`);
   }
+
+  printDocQuality(quality);
 }
 
 async function doctorCommand(rootDir, options = {}) {
@@ -362,9 +383,11 @@ async function doctorCommand(rootDir, options = {}) {
   }
 
   checkSensitiveInfo(aiDocsDir, warnings);
-  printDoctorSummary(issues, warnings, info);
 
-  return { issues, warnings, info };
+  const quality = scoreDocs(rootDir);
+  printDoctorSummary(issues, warnings, info, quality);
+
+  return { issues, warnings, info, quality };
 }
 
 async function doctorFix(rootDir, options = {}) {

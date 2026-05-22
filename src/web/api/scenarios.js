@@ -11,6 +11,7 @@ const { updateCommand } = require('../../commands/update');
 const { runDoctor } = require('../../commands/doctor');
 const { getHistory } = require('../../utils/task-history');
 const { STATE_FILES } = require('../../utils/constants');
+const { scoreDocs } = require('../../utils/doc-quality');
 
 const MAX_TEMPLATE_LENGTH = 10000;
 const VALID_SCENARIO_ID_PATTERN = /^[A-H]$/;
@@ -186,9 +187,14 @@ module.exports = function(rootDir) {
         issueCount: doctorReport.issues.length,
         warningCount: doctorReport.warnings.length
       };
-      if (doctorReport.issues.length > 0) {
+
+      // Surface the quality score directly to Dashboard so the Status page
+      // can render the OK/WARN/HIGH_RISK badge without re-running doctor.
+      result.docQuality = doctorReport.quality || scoreDocs(rootDir);
+
+      if (doctorReport.issues.length > 0 || result.docQuality.overall === 'HIGH_RISK') {
         result.healthStatus = '异常';
-      } else if (doctorReport.warnings.length > 0 || result.documents.some(doc => doc.stale)) {
+      } else if (doctorReport.warnings.length > 0 || result.documents.some(doc => doc.stale) || result.docQuality.overall === 'WARN') {
         result.healthStatus = '警告';
       } else if (result.exists) {
         result.healthStatus = '正常';

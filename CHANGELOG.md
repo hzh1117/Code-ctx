@@ -27,6 +27,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - **默认 AI 模型按官方废弃文档校准**：OpenAI 默认从 `gpt-4` 改为 `gpt-5.5`（`gpt-4` 于 2026-10-23 退役）；Anthropic 默认从 `claude-3-5-sonnet-20241022` 改为 `claude-sonnet-4-6`（前者已于 2025-10-28 退役，调用会失败）。已显式覆盖 `OPENAI_MODEL` / `ANTHROPIC_MODEL` 或在 `code-ctx.config.js` 中指定 `model` 的用户不受影响；仍使用旧默认值的项目应检查 `code-ctx.config.js` 中的 `ai.openai.model` 和 `ai.anthropic.model`。
 - **P25 JSON 配置 MVP**：新增 `code-ctx.config.json` 支持，作为可校验、不可执行的配置文件（推荐格式）。加载优先级 `JSON > JS`，两者同时存在时使用 JSON 并 warning。`code-ctx init` 默认生成 JSON，可用 `--config-format=js` 显式选择 JS。`code-ctx.config.js` 保留只读兼容（仍在 VM 沙箱内加载）。Dashboard `PUT /api/config` 与 `saveAIConfig` 写回当前生效格式。新增 `validateProjectConfig` 内置轻量 schema 校验，覆盖顶层字段类型、`projects[]` 结构和 `aiMode` 枚举，不依赖 ajv。
 - **P26 插件系统 MVP**：新增 `src/plugins/loader.js` 与 `src/plugins/state.js`。`code-ctx.config(.json|.js)` 可通过 `plugins: [...]` 挂载本地路径或 npm 包；每个插件可贡献 `adapters`（继承 `BaseAdapter`）、`scenarios`（按 `id` 覆盖内置）、`sensitivePatterns`、`sensitiveDetectionPatterns`。加载失败只 warn，内置能力不受影响。`filterSensitive`、`scanDirectory`、`getScenarios` 自动合并插件贡献。`init` / `use` / `update` / `doctor` / `fix` 与 web server 入口处都会调用 `initPlugins`，按 rootDir + 配置 mtime 幂等。新增最小示例 `examples/plugin-basic/`。
+- **P27 文档质量评分**：新增 `src/utils/doc-quality.js`，按完整度（核心 section 是否齐全）、新鲜度（与项目文件 mtime 比对）、风险（敏感信息、过短、缺失）三个维度评分，整体输出 `OK / WARN / HIGH_RISK` 与 0-100 综合分。`code-ctx doctor` CLI 末尾输出评分摘要并标注需要关注的文档；Dashboard `/api/status` 返回 `docQuality` 字段，Status 页顶部展示评分徽章和问题清单。评分纯规则，不依赖 AI。
 
 #### Known Issues
 

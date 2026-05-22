@@ -4,6 +4,7 @@
     "name": "New Frontend Feature",
     "description": "Add new mini-program/H5/frontend pages and features",
     "relatedProjects": ["mp", "api"],
+    "keywords": ["miniapp", "mini-program", "uni-app", "frontend", "page", "h5", "client", "user-facing"],
     "template": "Task: Add [{{featureName}}] feature to {{projectName}}.\n\nRequirements:\n1. Page location: [To be filled]\n2. Feature description: [To be filled]\n3. API path: Follow {{apiPrefix}} convention\n\nFirst list the complete file change list, confirm then implement one by one."
   },
   {
@@ -11,6 +12,7 @@
     "name": "Merchant Admin Feature",
     "description": "Add merchant management admin features",
     "relatedProjects": ["mer", "api"],
+    "keywords": ["merchant", "admin", "management", "back office", "backoffice"],
     "template": "Task: Add [{{featureName}}] feature to merchant admin.\n\nRequirements:\n1. Menu location: [To be filled]\n2. Page functionality: [To be filled]\n3. Backend API: Follow {{apiPrefix}} convention\n\nFirst list the complete file change list, confirm then implement one by one."
   },
   {
@@ -18,6 +20,7 @@
     "name": "Platform Admin Feature",
     "description": "Add platform management admin features",
     "relatedProjects": ["plat", "api"],
+    "keywords": ["platform", "operations", "ops", "admin platform"],
     "template": "Task: Add [{{featureName}}] feature to platform admin.\n\nRequirements:\n1. Menu location: [To be filled]\n2. Page functionality: [To be filled]\n3. Backend API: Follow {{apiPrefix}} convention\n\nFirst list the complete file change list, confirm then implement one by one."
   },
   {
@@ -25,6 +28,7 @@
     "name": "Data Model Change",
     "description": "Modify database schema or data models",
     "relatedProjects": ["api"],
+    "keywords": ["database", "schema", "table", "migration", "data model"],
     "template": "Task: Modify data model [{{featureName}}].\n\nRequirements:\n1. Tables involved: [To be filled]\n2. Changes: [To be filled: add field/modify field/add table]\n3. Compatibility: [To be filled: data migration needed?]\n\nPlease list the impact scope (APIs, frontend pages) first, confirm then implement."
   },
   {
@@ -32,6 +36,7 @@
     "name": "Modify Existing Feature",
     "description": "Optimize, refactor, or adjust existing features",
     "relatedProjects": [],
+    "keywords": ["optimize", "refactor", "modify", "adjust", "improve"],
     "template": "Task: Modify existing feature [{{featureName}}].\n\nRequirements:\n1. Current behavior: [To be filled]\n2. Expected behavior: [To be filled]\n3. Modules involved: [To be filled]\n\nPlease analyze the impact scope, list files to change, confirm then implement one by one."
   },
   {
@@ -39,6 +44,7 @@
     "name": "Bug Fix",
     "description": "Locate and fix issues",
     "relatedProjects": [],
+    "keywords": ["bug", "error", "issue", "fix", "investigate", "exception"],
     "template": "Task: Investigate and fix the following issue.\n\nIssue description: [To be filled: describe the problem in detail]\nSteps to reproduce: [To be filled]\nExpected behavior: [To be filled]\n\nPlease analyze possible causes first, then provide a fix."
   },
   {
@@ -46,6 +52,7 @@
     "name": "Backend Only Change",
     "description": "Backend logic changes, no frontend involved",
     "relatedProjects": ["api"],
+    "keywords": ["backend", "api", "server-side", "endpoint"],
     "template": "Task: Backend adjustment [{{featureName}}].\n\nRequirements:\n1. Changes: [To be filled]\n2. APIs involved: [To be filled]\n3. Impact on existing callers: [To be filled]\n\nPlease list the files to change, confirm then implement."
   },
   {
@@ -53,6 +60,7 @@
     "name": "Cross-platform Feature",
     "description": "Multi-platform coordinated feature development",
     "relatedProjects": ["mp", "mer", "api"],
+    "keywords": ["cross-platform", "multi-platform", "full-stack", "integration"],
     "template": "Task: Add cross-platform feature [{{featureName}}].\n\nPlatforms involved: [To be filled: e.g., mini-program + merchant admin + backend]\n\nRequirements:\n1. User-facing behavior: [To be filled]\n2. Admin behavior: [To be filled]\n3. Backend API: [To be filled]\n\nPlease list the file changes for each platform first, confirm then implement one by one."
   }
 ]

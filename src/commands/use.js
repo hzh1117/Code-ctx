@@ -26,7 +26,7 @@ async function resolveScenario(taskDescription, scenario, aiConfig, noAiMatch, l
   let matchedKeyword = null;
 
   if (!matchedScenario && taskDescription) {
-    const match = await matchScenarioWithAI(taskDescription, aiConfig, { noAiMatch });
+    const match = await matchScenarioWithAI(taskDescription, aiConfig, { noAiMatch, language });
     matchedScenario = match.scenarioId;
     confidence = match.confidence;
     matchMethod = match.method;

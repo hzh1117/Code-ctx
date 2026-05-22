@@ -363,18 +363,23 @@ describe('web/api/scenarios — error & boundary paths', () => {
     });
 
     test('PUT /api/scenarios/:id — id 通过 A-H 校验但不存在 → 404', async () => {
-      // 临时把 A 从 scenarios.json 中移除，使其通过正则但 find 不到
-      const original = JSON.parse(originalScenariosContent);
-      const withoutA = original.filter(s => s.id !== 'A');
-      fs.writeFileSync(scenariosPath, JSON.stringify(withoutA, null, 2));
-      clearCache();
-
-      const res = await requestJson(server, '/api/scenarios/A', {
-        method: 'PUT',
-        body: { template: 'whatever' }
+      // 用 spyOn 临时把 scenarios.json 的读取返回值剥掉 A，避免并行写盘冲突
+      const realRead = jest.requireActual('fs').readFileSync;
+      const stripped = JSON.parse(originalScenariosContent).filter(s => s.id !== 'A');
+      const readSpy = jest.spyOn(fs, 'readFileSync').mockImplementation((p, enc) => {
+        if (p === scenariosPath) return JSON.stringify(stripped);
+        return realRead(p, enc);
       });
-      expect(res.status).toBe(404);
-      expect(res.body.error).toMatch(/未找到/);
+      try {
+        const res = await requestJson(server, '/api/scenarios/A', {
+          method: 'PUT',
+          body: { template: 'whatever' }
+        });
+        expect(res.status).toBe(404);
+        expect(res.body.error).toMatch(/未找到/);
+      } finally {
+        readSpy.mockRestore();
+      }
     });
 
     test('GET /api/doctor — sensitive 文件触发 HIGH_RISK', async () => {

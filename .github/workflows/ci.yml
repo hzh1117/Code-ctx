@@ -16,6 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Node 16 已 EOL（2023-09），不再纳入测试矩阵；package.json engines 仍声明 >=16，
+        # 仅作为安装兼容下限，未保证持续验证。
         node-version: [18.x, 20.x, 22.x]
 
     steps:
@@ -35,6 +37,9 @@ jobs:
         run: npm ci
         working-directory: web
 
+      - name: Lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test -- --runInBand
 
@@ -43,3 +48,25 @@ jobs:
 
       - name: Build dashboard
         run: npm run build:web
+
+  audit:
+    name: npm audit (high)
+    runs-on: ubuntu-latest
+    # 不阻塞主流程，仅作为可见性信号；真实漏洞由 Dependabot PR 跟进处理。
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Audit CLI dependencies
+        run: npm audit --audit-level=high
+
+      - name: Audit dashboard dependencies
+        run: npm audit --audit-level=high
+        working-directory: web

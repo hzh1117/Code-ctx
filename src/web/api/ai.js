@@ -4,6 +4,7 @@ const path = require('path');
 const { getAIConfig, saveAIConfig, loadEnvConfig } = require('../../utils/config');
 const { generateWithAI, validateBaseUrl } = require('../../ai/client');
 const { filterSensitive } = require('../../utils/sensitive-filter');
+const { listPresets } = require('../../ai/presets');
 
 const MAX_API_KEY_LENGTH = 512;
 const MAX_MODEL_LENGTH = 128;
@@ -110,6 +111,12 @@ function updateEnvValue(content, key, value) {
 module.exports = function(rootDir) {
   const router = express.Router();
   const sensitiveAiRateLimit = createRateLimiter();
+
+  router.get('/presets', (req, res) => {
+    // Presets are static metadata (baseUrl/model/maxTokens) — never API keys.
+    // Dashboard renders them as a one-click fill for the AI config form.
+    res.json({ presets: listPresets() });
+  });
 
   router.get('/config', (req, res) => {
     try {

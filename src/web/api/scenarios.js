@@ -10,6 +10,8 @@ const { listSections } = require('../../core/section');
 const { updateCommand } = require('../../commands/update');
 const { runDoctor } = require('../../commands/doctor');
 const { getHistory, getRecentHistory, findEntryById, summarizeEntryDiff } = require('../../utils/task-history');
+const { evaluatePromptBudget } = require('../../utils/token-estimator');
+const { getAIConfig } = require('../../utils/config');
 const { STATE_FILES } = require('../../utils/constants');
 const { scoreDocs } = require('../../utils/doc-quality');
 const { getState: getPluginState } = require('../../plugins/state');
@@ -349,11 +351,20 @@ module.exports = function(rootDir) {
         language: 'zh'
       });
 
+      let tokenBudget = null;
+      try {
+        const aiConfig = getAIConfig(rootDir);
+        tokenBudget = evaluatePromptBudget(prompt, aiConfig?.maxTokens);
+      } catch {
+        // tokenBudget is optional — never block the prompt response on it
+      }
+
       res.json({
         success: true,
         scenario: result.matchedScenario,
         scenarioName: result.scenarioName,
-        prompt
+        prompt,
+        tokenBudget
       });
     } catch (err) {
       console.error('Generate prompt error:', err.message);

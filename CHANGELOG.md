@@ -30,6 +30,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - **P27 文档质量评分**：新增 `src/utils/doc-quality.js`，按完整度（核心 section 是否齐全）、新鲜度（与项目文件 mtime 比对）、风险（敏感信息、过短、缺失）三个维度评分，整体输出 `OK / WARN / HIGH_RISK` 与 0-100 综合分。`code-ctx doctor` CLI 末尾输出评分摘要并标注需要关注的文档；Dashboard `/api/status` 返回 `docQuality` 字段，Status 页顶部展示评分徽章和问题清单。评分纯规则，不依赖 AI。
 - **P28 Dashboard 安全状态页和 doctor 详情**：新增 `/api/doctor` 端点，复用 P14 的 doctor 缓存，返回 doctor issues/warnings、docQuality、敏感信息扫描、配置 schema 错误、已加载插件与加载错误。新增 Web 页面 `安全与健康`（路由 `/security`），可视化展示整体 OK/WARN/HIGH_RISK 徽章、各分类详情和文档质量明细表，仅显示敏感字段名与文件名不暴露原文；支持手动刷新。Sidebar 新增入口。
 - **P29 生成历史、prompt diff、任务历史轮转**：扩展 `src/utils/task-history.js`。每条记录加 `id` / `timestamp`，prompt 不落盘——只持久化 `promptHash` / `promptLength` 与经 `filterSensitive` 处理的 `promptPreview`；字段经白名单 sanitize，避免未知字段污染。新增 `MAX_ENTRIES=200` 与 `MAX_FILE_BYTES=256KB` 双轮转，写入后自动 trim 最早记录。`useCommand` 与 `updateCommand` 自动写入历史；Dashboard 时间轴展示场景与 preview。新增 API `GET /api/history` 与 `GET /api/history/diff`（按两个任务 ID 输出 scenario/hash/长度差异）。新增工具 `diffPrompts` 做简单文本 diff 摘要，不引入复杂依赖。
+- **P30 AI 客户端增强 MVP（provider preset + token budget）**：新增 `src/ai/presets.js`（OpenAI/Anthropic/DeepSeek/Kimi/MiniMax 五个默认值），新增 `GET /api/ai/presets` 端点。Dashboard `AI 配置` 页加入「服务商模板」一键填充 baseUrl/model/maxTokens，不保存 Key。新增 `src/utils/token-estimator.js`，并迁移 file-scanner 内的旧实现复用同一函数。`useCommand` 返回 `tokenBudget`（estimate / maxTokens / status: ok|warn|over）；CLI `code-ctx use` 与 Dashboard `/generate-prompt` 输出 token 估算与超限警告。不引入流式与取消，留待后续 MVP。
 
 #### Known Issues
 

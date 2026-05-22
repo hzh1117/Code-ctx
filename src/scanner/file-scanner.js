@@ -3,6 +3,7 @@ const path = require('path');
 const { globSync } = require('glob');
 const { defaultRegistry } = require('../adapters');
 const { PROJECT_LIMITS } = require('../utils/constants');
+const { estimateTokensForContent } = require('../utils/token-estimator');
 
 function scanProject(projectDir, projectType, options = {}) {
   if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
@@ -80,27 +81,6 @@ function limitByTokens(files, maxTokens) {
   }
   
   return { files: resultFiles, tokens: totalTokens };
-}
-
-function estimateTokensForContent(content) {
-  let enCount = 0;
-  let cnCount = 0;
-  let codeCount = 0;
-
-  for (const char of content) {
-    const code = char.codePointAt(0);
-    if (code >= 0x4e00 && code <= 0x9fff) {
-      cnCount++;
-    } else if ((code >= 0x0020 && code <= 0x007e) || code === 0x000a || code === 0x000d) {
-      if (/[a-zA-Z0-9\s]/.test(char)) {
-        enCount++;
-      } else {
-        codeCount++;
-      }
-    }
-  }
-
-  return Math.round(enCount * 0.3 + cnCount * 0.6 + codeCount * 0.4);
 }
 
 function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {

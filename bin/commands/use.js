@@ -1,7 +1,6 @@
 const { Command } = require('commander');
 const { input, confirm, select } = require('@inquirer/prompts');
 const { useCommand } = require('../../src/commands/use');
-const { addTask } = require('../../src/utils/task-history');
 const { getAIConfig } = require('../../src/utils/config');
 const { outputPrompt } = require('../../src/utils/prompt-output');
 
@@ -92,6 +91,19 @@ const use = new Command('use')
         console.log(`✓ 已启用精简模式（原 ${originalLength} 字 → ${compactLength} 字）`);
       }
 
+      if (result.tokenBudget) {
+        const { estimate, maxTokens, status } = result.tokenBudget;
+        if (status === 'over') {
+          console.log(`⚠️ token 预算超限：估算 ~${estimate} > 配置 ${maxTokens}，可能被截断`);
+        } else if (status === 'warn') {
+          console.log(`⚠️ token 预算接近上限：估算 ~${estimate} / 配置 ${maxTokens}`);
+        } else if (maxTokens) {
+          console.log(`ℹ️ token 估算 ~${estimate} / 配置 ${maxTokens}`);
+        } else {
+          console.log(`ℹ️ token 估算 ~${estimate}`);
+        }
+      }
+
       const finalPrompt = options.nonInteractive
         ? result.prompt
         : await fillPlaceholders(result.prompt);
@@ -99,15 +111,7 @@ const use = new Command('use')
         successMessage: '✓ 已复制到剪贴板，去你的 AI 工具粘贴即可'
       });
 
-      try {
-        addTask(rootDir, {
-          task: task,
-          scenario: result.matchedScenario,
-          projects: result.relatedProjects || []
-        });
-      } catch (err) {
-        console.warn(`⚠ 记录任务历史失败: ${err.message}`);
-      }
+      // Task history is recorded inside useCommand (P29) — no duplicate write here.
 
       if (!options.nonInteractive) {
         console.log('\n提示：粘贴后记得补充具体需求细节');

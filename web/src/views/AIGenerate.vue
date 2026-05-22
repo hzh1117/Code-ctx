@@ -51,6 +51,12 @@
               复制
             </button>
           </div>
+          <div v-if="tokenBudget" class="token-budget" :class="tokenBudgetClass">
+            token 估算 ~{{ tokenBudget.estimate }}
+            <template v-if="tokenBudget.maxTokens"> / {{ tokenBudget.maxTokens }}</template>
+            <template v-if="tokenBudget.status === 'over'">（超出预算，可能被截断）</template>
+            <template v-else-if="tokenBudget.status === 'warn'">（接近上限）</template>
+          </div>
           <div class="code-block prompt-block">{{ generatedPrompt }}</div>
         </div>
       </div>
@@ -124,11 +130,20 @@ export default {
       selectedScenario: 'A',
       taskDescription: '',
       generatedPrompt: '',
+      tokenBudget: null,
       aiResponse: '',
       responseError: '',
       generating: false,
       toast: { show: false, message: '', type: 'success' }
     };
+  },
+  computed: {
+    tokenBudgetClass() {
+      const status = this.tokenBudget?.status;
+      if (status === 'over') return 'token-over';
+      if (status === 'warn') return 'token-warn';
+      return 'token-ok';
+    }
   },
   async mounted() {
     await this.loadScenarios();
@@ -156,6 +171,7 @@ export default {
       try {
         const promptRes = await axios.post('/api/generate-prompt', { scenario: this.selectedScenario, task: this.taskDescription });
         this.generatedPrompt = promptRes.data.prompt;
+        this.tokenBudget = promptRes.data.tokenBudget || null;
         const aiRes = await axios.post('/api/ai/generate', { prompt: this.generatedPrompt });
         if (aiRes.data.success) {
           this.aiResponse = aiRes.data.content;
@@ -234,6 +250,18 @@ export default {
   flex-direction: column;
   min-height: 500px;
 }
+
+.token-budget {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+.token-ok { color: var(--text-secondary); background: var(--bg-hover); border: 1px solid var(--border); }
+.token-warn { color: var(--warning); background: var(--warning-dim); border: 1px solid var(--warning-border); }
+.token-over { color: var(--danger); background: var(--danger-dim); border: 1px solid var(--danger-border); }
 
 .prompt-card {
   flex-shrink: 0;

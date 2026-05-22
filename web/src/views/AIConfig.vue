@@ -28,6 +28,22 @@
         </button>
       </div>
 
+      <div class="card preset-card" v-if="presets.length">
+        <div class="card-header">
+          <h2 class="card-title">服务商模板</h2>
+          <span class="mono-dim">一键填充 baseUrl / model / maxTokens</span>
+        </div>
+        <div class="preset-row">
+          <button
+            v-for="p in presets"
+            :key="p.id"
+            class="btn btn-secondary btn-sm preset-btn"
+            @click="applyPreset(p)"
+            :title="p.description"
+          >{{ p.name }}</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
@@ -146,11 +162,12 @@ export default {
       showOpenAIKey: false,
       showAnthropicKey: false,
       apiKeys: { openai: '', anthropic: '' },
+      presets: [],
       toast: { show: false, message: '', type: 'success' }
     };
   },
   async mounted() {
-    await this.loadConfig();
+    await Promise.all([this.loadConfig(), this.loadPresets()]);
     this.activeTab = this.config.protocol || 'openai';
   },
   computed: {
@@ -186,6 +203,28 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    async loadPresets() {
+      try {
+        const res = await axios.get('/api/ai/presets');
+        this.presets = res.data.presets || [];
+      } catch (err) {
+        // Presets are an enhancement — silently skip if unavailable.
+      }
+    },
+    applyPreset(p) {
+      // Only fill the matching protocol's fields so we never silently replace
+      // settings the user just typed for the other protocol.
+      if (!this.config.providers) this.config.providers = { ...this.defaultProviders };
+      if (p.protocol === 'openai') {
+        this.config.providers.openai = { baseUrl: p.baseUrl, model: p.model, maxTokens: p.maxTokens };
+        this.activeTab = 'openai';
+      } else if (p.protocol === 'anthropic') {
+        this.config.providers.anthropic = { baseUrl: p.baseUrl, model: p.model, maxTokens: p.maxTokens };
+        this.activeTab = 'anthropic';
+      }
+      this.config.protocol = p.protocol;
+      this.showToast(`已应用模板：${p.name}`, 'success');
     },
     setProtocol(p) {
       this.config.protocol = p;
@@ -245,6 +284,20 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.preset-card .preset-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.preset-btn {
+  font-family: var(--font-mono);
+}
+.mono-dim {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .status-bar {

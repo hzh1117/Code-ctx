@@ -80,32 +80,33 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
   return parts.join('\n');
 }
 
-function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs, language }) {
+function buildOverviewPrompt({ config, generatedDocs, language } = {}) {
+  const configObj = config || {};
+  const projects = configObj.projects || [];
+  const docs = generatedDocs || {};
+
+  const projectSummaries = projects.map(p => {
+    const doc = docs[p.alias] || '';
+    const summary = doc.split('\n').slice(0, 20).join('\n');
+    return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
+  }).join('\n');
+
+  const tpl = loadTemplate('scan-prompt-overview.md', language);
+  return renderTemplate(tpl, {
+    projectName: configObj.projectName || '',
+    projectList: projects.map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n'),
+    projectSummaries
+  });
+}
+
+function buildOneShotPrompt({ projects, scanResults, language } = {}) {
   const labels = getLabels(language);
+  const projectList = projects || [];
+  const results = scanResults || {};
 
-  if (type === 'overview') {
-    const configObj = config || {};
-    const projectSummaries = (configObj.projects || []).map(p => {
-      const doc = (generatedDocs || {})[p.alias] || '';
-      const lines = doc.split('\n');
-      const summary = lines.slice(0, 20).join('\n');
-      return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
-    }).join('\n');
-
-    const tpl = loadTemplate('scan-prompt-overview.md', language);
-    return renderTemplate(tpl, {
-      projectName: configObj.projectName || '',
-      projectList: (configObj.projects || []).map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n'),
-      projectSummaries
-    });
-  }
-
-  if (type === 'one-shot') {
-    const projectList = projects || [];
-    const results = scanResults || {};
-    const projectSections = projectList.map(p => {
-      const result = results[p.alias] || {};
-      return `## ${p.alias}
+  const projectSections = projectList.map(p => {
+    const result = results[p.alias] || {};
+    return `## ${p.alias}
 ${labels.projectName}：${p.name}
 ${labels.projectType}：${p.type}
 ${labels.projectPath}：${p.path}
@@ -115,12 +116,14 @@ ${result.tree || ''}
 
 ${labels.keyFiles}：
 ${(result.keyFiles || []).join('\n')}`;
-    }).join('\n\n---\n\n');
+  }).join('\n\n---\n\n');
 
-    const tpl = loadTemplate('scan-prompt-one-shot.md', language);
-    return renderTemplate(tpl, { projectSections });
-  }
+  const tpl = loadTemplate('scan-prompt-one-shot.md', language);
+  return renderTemplate(tpl, { projectSections });
+}
 
+function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}) {
+  const labels = getLabels(language);
   const projectObj = project || {};
   const scanObj = scanResult || {};
 
@@ -128,8 +131,7 @@ ${(result.keyFiles || []).join('\n')}`;
   if (otherDocs && Object.keys(otherDocs).length > 0) {
     otherDocsSection = labels.otherDocs;
     for (const [alias, doc] of Object.entries(otherDocs)) {
-      const lines = doc.split('\n');
-      const summary = lines.slice(0, 15).join('\n');
+      const summary = doc.split('\n').slice(0, 15).join('\n');
       otherDocsSection += `\n\n### ${alias}\n${summary}`;
     }
   }
@@ -143,6 +145,18 @@ ${(result.keyFiles || []).join('\n')}`;
     keyFiles: (scanObj.keyFiles || []).join('\n'),
     otherDocsSection
   });
+}
+
+// 兼容分发层：根据 type 派发到专用函数
+// 新代码请直接调用 buildOverviewPrompt / buildOneShotPrompt / buildSubprojectPrompt
+function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs, language } = {}) {
+  if (type === 'overview') {
+    return buildOverviewPrompt({ config, generatedDocs, language });
+  }
+  if (type === 'one-shot') {
+    return buildOneShotPrompt({ projects, scanResults, language });
+  }
+  return buildSubprojectPrompt({ project, scanResult, otherDocs, language });
 }
 
 function categorizeFiles(keyFiles) {
@@ -210,4 +224,13 @@ function buildDatabasePrompt({ project, scanResult, language }) {
   });
 }
 
-module.exports = { buildUsePrompt, buildInitPrompt, buildApiPrompt, buildDatabasePrompt, getLabels };
+module.exports = {
+  buildUsePrompt,
+  buildInitPrompt,
+  buildOverviewPrompt,
+  buildOneShotPrompt,
+  buildSubprojectPrompt,
+  buildApiPrompt,
+  buildDatabasePrompt,
+  getLabels
+};

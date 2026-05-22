@@ -1,4 +1,10 @@
-const { buildUsePrompt, buildInitPrompt } = require('../../src/generator/prompt-builder');
+const {
+  buildUsePrompt,
+  buildInitPrompt,
+  buildOverviewPrompt,
+  buildOneShotPrompt,
+  buildSubprojectPrompt
+} = require('../../src/generator/prompt-builder');
 
 describe('prompt-builder', () => {
   describe('buildUsePrompt', () => {
@@ -144,6 +150,101 @@ describe('prompt-builder', () => {
       });
 
       expect(result).toContain('OVERVIEW');
+    });
+  });
+
+  describe('buildOverviewPrompt', () => {
+    test('生成包含项目名和子项目摘要的概览', () => {
+      const result = buildOverviewPrompt({
+        config: { projectName: 'demo', projects: [{ alias: 'web', label: '前端', type: 'react' }] },
+        generatedDocs: { web: '# 前端\n第二行\n' }
+      });
+      expect(result).toContain('demo');
+      expect(result).toContain('web');
+      expect(result).toContain('前端');
+    });
+
+    test('无参数时返回模板默认值', () => {
+      expect(() => buildOverviewPrompt()).not.toThrow();
+      const result = buildOverviewPrompt();
+      expect(result).toContain('OVERVIEW');
+    });
+  });
+
+  describe('buildOneShotPrompt', () => {
+    test('合并多项目结构到单个 prompt', () => {
+      const result = buildOneShotPrompt({
+        projects: [
+          { alias: 'web', name: 'frontend', type: 'react', path: 'apps/web' },
+          { alias: 'api', name: 'backend', type: 'node', path: 'apps/api' }
+        ],
+        scanResults: {
+          web: { tree: 'web-tree', keyFiles: ['web/App.jsx'] },
+          api: { tree: 'api-tree', keyFiles: ['api/index.js'] }
+        }
+      });
+      expect(result).toContain('frontend');
+      expect(result).toContain('backend');
+      expect(result).toContain('web-tree');
+      expect(result).toContain('api/index.js');
+    });
+
+    test('无参数时也能稳定渲染', () => {
+      expect(() => buildOneShotPrompt()).not.toThrow();
+    });
+  });
+
+  describe('buildSubprojectPrompt', () => {
+    test('渲染单个子项目结构', () => {
+      const result = buildSubprojectPrompt({
+        project: { name: 'my-app', type: 'vue', path: 'apps/my' },
+        scanResult: { tree: 'src/\n  index.vue', keyFiles: ['src/index.vue'] }
+      });
+      expect(result).toContain('my-app');
+      expect(result).toContain('vue');
+      expect(result).toContain('src/index.vue');
+    });
+
+    test('otherDocs 非空时包含摘要', () => {
+      const result = buildSubprojectPrompt({
+        project: { name: 'app', type: 'react' },
+        scanResult: { tree: '', keyFiles: [] },
+        otherDocs: { sibling: '# 邻居项目\n说明\n' }
+      });
+      expect(result).toContain('sibling');
+      expect(result).toContain('邻居项目');
+    });
+
+    test('无参数时不抛错', () => {
+      expect(() => buildSubprojectPrompt()).not.toThrow();
+    });
+  });
+
+  describe('buildInitPrompt 兼容分发', () => {
+    test('type 为 overview 时与 buildOverviewPrompt 等价', () => {
+      const args = {
+        config: { projectName: 'eq', projects: [{ alias: 'a', label: 'A', type: 't' }] },
+        generatedDocs: { a: 'doc' }
+      };
+      expect(buildInitPrompt({ type: 'overview', ...args }))
+        .toBe(buildOverviewPrompt(args));
+    });
+
+    test('type 为 one-shot 时与 buildOneShotPrompt 等价', () => {
+      const args = {
+        projects: [{ alias: 'a', name: 'A', type: 't', path: '/a' }],
+        scanResults: { a: { tree: 'tree-a', keyFiles: ['f.js'] } }
+      };
+      expect(buildInitPrompt({ type: 'one-shot', ...args }))
+        .toBe(buildOneShotPrompt(args));
+    });
+
+    test('默认分支等价于 buildSubprojectPrompt', () => {
+      const args = {
+        project: { name: 'p', type: 't' },
+        scanResult: { tree: 'tree', keyFiles: ['f'] }
+      };
+      expect(buildInitPrompt(args)).toBe(buildSubprojectPrompt(args));
     });
   });
 });

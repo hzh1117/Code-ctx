@@ -28,6 +28,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - **P25 JSON 配置 MVP**：新增 `code-ctx.config.json` 支持，作为可校验、不可执行的配置文件（推荐格式）。加载优先级 `JSON > JS`，两者同时存在时使用 JSON 并 warning。`code-ctx init` 默认生成 JSON，可用 `--config-format=js` 显式选择 JS。`code-ctx.config.js` 保留只读兼容（仍在 VM 沙箱内加载）。Dashboard `PUT /api/config` 与 `saveAIConfig` 写回当前生效格式。新增 `validateProjectConfig` 内置轻量 schema 校验，覆盖顶层字段类型、`projects[]` 结构和 `aiMode` 枚举，不依赖 ajv。
 - **P26 插件系统 MVP**：新增 `src/plugins/loader.js` 与 `src/plugins/state.js`。`code-ctx.config(.json|.js)` 可通过 `plugins: [...]` 挂载本地路径或 npm 包；每个插件可贡献 `adapters`（继承 `BaseAdapter`）、`scenarios`（按 `id` 覆盖内置）、`sensitivePatterns`、`sensitiveDetectionPatterns`。加载失败只 warn，内置能力不受影响。`filterSensitive`、`scanDirectory`、`getScenarios` 自动合并插件贡献。`init` / `use` / `update` / `doctor` / `fix` 与 web server 入口处都会调用 `initPlugins`，按 rootDir + 配置 mtime 幂等。新增最小示例 `examples/plugin-basic/`。
 - **P27 文档质量评分**：新增 `src/utils/doc-quality.js`，按完整度（核心 section 是否齐全）、新鲜度（与项目文件 mtime 比对）、风险（敏感信息、过短、缺失）三个维度评分，整体输出 `OK / WARN / HIGH_RISK` 与 0-100 综合分。`code-ctx doctor` CLI 末尾输出评分摘要并标注需要关注的文档；Dashboard `/api/status` 返回 `docQuality` 字段，Status 页顶部展示评分徽章和问题清单。评分纯规则，不依赖 AI。
+- **P28 Dashboard 安全状态页和 doctor 详情**：新增 `/api/doctor` 端点，复用 P14 的 doctor 缓存，返回 doctor issues/warnings、docQuality、敏感信息扫描、配置 schema 错误、已加载插件与加载错误。新增 Web 页面 `安全与健康`（路由 `/security`），可视化展示整体 OK/WARN/HIGH_RISK 徽章、各分类详情和文档质量明细表，仅显示敏感字段名与文件名不暴露原文；支持手动刷新。Sidebar 新增入口。
 
 #### Known Issues
 

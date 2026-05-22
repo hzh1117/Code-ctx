@@ -11,7 +11,8 @@ const routes = [
   { path: '/ai-generate', component: () => import('./views/AIGenerate.vue') },
   { path: '/projects', component: () => import('./views/Projects.vue') },
   { path: '/scenarios', component: () => import('./views/Scenarios.vue') },
-  { path: '/status', component: () => import('./views/Status.vue') }
+  { path: '/status', component: () => import('./views/Status.vue') },
+  { path: '/security', component: () => import('./views/Security.vue') }
 ];
 
 const router = createRouter({

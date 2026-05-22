@@ -12,6 +12,9 @@ const { runDoctor } = require('../../commands/doctor');
 const { getHistory } = require('../../utils/task-history');
 const { STATE_FILES } = require('../../utils/constants');
 const { scoreDocs } = require('../../utils/doc-quality');
+const { getState: getPluginState } = require('../../plugins/state');
+const { scanDirectory: scanSensitive } = require('../../utils/sensitive-filter');
+const { validateProjectConfig } = require('../../utils/config');
 
 const MAX_TEMPLATE_LENGTH = 10000;
 const VALID_SCENARIO_ID_PATTERN = /^[A-H]$/;
@@ -34,6 +37,18 @@ function getCachedSections(filePath, mtimeMs) {
 
 function _clearSectionsCache() {
   sectionsCache.clear();
+}
+
+// Combine per-axis findings into a single severity label that mirrors
+// what the Dashboard Security page shows at the top.
+function deriveOverall(report, schemaErrors, sensitive) {
+  if ((report.issues || []).length > 0 || (sensitive || []).length > 0) {
+    return 'HIGH_RISK';
+  }
+  if ((report.warnings || []).length > 0 || (schemaErrors || []).length > 0 || (report.quality && report.quality.overall === 'WARN')) {
+    return 'WARN';
+  }
+  return 'OK';
 }
 
 module.exports = function(rootDir) {
@@ -204,6 +219,40 @@ module.exports = function(rootDir) {
     } catch (err) {
       console.error('Status error:', err.message);
       res.status(500).json({ error: '状态查询失败' });
+    }
+  });
+
+  router.get('/doctor', async (req, res) => {
+    try {
+      const report = await runDoctor({ rootDir, silent: true });
+      const aiDocsDir = path.join(rootDir, 'ai-docs');
+      const sensitive = fs.existsSync(aiDocsDir) ? scanSensitive(aiDocsDir) : [];
+
+      let config = {};
+      try {
+        config = loadProjectConfig(rootDir);
+      } catch (err) {
+        // surfaced as schema/config error below
+      }
+      const schemaErrors = validateProjectConfig(config);
+      const pluginState = getPluginState();
+
+      res.json({
+        overall: deriveOverall(report, schemaErrors, sensitive),
+        issues: report.issues || [],
+        warnings: report.warnings || [],
+        info: report.info || {},
+        docQuality: report.quality || scoreDocs(rootDir),
+        sensitive,
+        schemaErrors,
+        plugins: {
+          loaded: pluginState.plugins,
+          errors: pluginState.errors
+        }
+      });
+    } catch (err) {
+      console.error('Doctor API error:', err.message);
+      res.status(500).json({ error: 'doctor 接口失败' });
     }
   });
 

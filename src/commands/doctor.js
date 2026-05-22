@@ -9,6 +9,7 @@ const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { defaultRegistry } = require('../adapters');
+const { initPlugins } = require('../plugins/loader');
 
 function loadDoctorConfig(rootDir) {
   const info = getConfigFile(rootDir);
@@ -333,6 +334,7 @@ function printDoctorSummary(issues, warnings, info) {
 }
 
 async function doctorCommand(rootDir, options = {}) {
+  initPlugins(rootDir);
   const aiDocsDir = path.join(rootDir, 'ai-docs');
   const issues = [];
   const warnings = [];
@@ -366,6 +368,7 @@ async function doctorCommand(rootDir, options = {}) {
 }
 
 async function doctorFix(rootDir, options = {}) {
+  initPlugins(rootDir);
   const aiDocsDir = path.join(rootDir, 'ai-docs');
   const info = getConfigFile(rootDir);
 

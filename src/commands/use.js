@@ -6,6 +6,7 @@ const { buildUsePrompt } = require('../generator/prompt-builder');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { extractSection } = require('../core/section');
 const { PROMPT_MAX_CHARS } = require('../utils/constants');
+const { initPlugins } = require('../plugins/loader');
 
 const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
 const LOW_CONFIDENCE_THRESHOLD = 50;
@@ -123,6 +124,7 @@ function compactPrompt(prompt, taskDescription, template, overviewContent, relat
 
 async function buildContext(task, scenario, options = {}) {
   const { rootDir, aiConfig, noAiMatch, language } = options;
+  if (rootDir) initPlugins(rootDir);
   const resolved = await resolveScenario(task, scenario, aiConfig, noAiMatch, language);
   const { overviewContent, relatedDocs } = loadContextDocs(rootDir, resolved.selectedScenario);
 
@@ -146,6 +148,8 @@ async function buildContext(task, scenario, options = {}) {
 
 async function useCommand(options = {}) {
   const { taskDescription, scenario, rootDir, aiConfig, noAiMatch, language } = options;
+
+  if (rootDir) initPlugins(rootDir);
 
   // 1. 确定场景
   const resolved = await resolveScenario(taskDescription, scenario, aiConfig, noAiMatch, language);

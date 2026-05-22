@@ -9,6 +9,7 @@ const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { hasGitRepo, getCurrentCommitHash, getChangedFilesSince, getChangedFilesWorkingTree, getUntrackedFiles, getLastScanCommit } = require('../utils/git-utils');
 const { findRelatedDoc, groupChangesByProject } = require('../core/doc-resolver');
+const { initPlugins } = require('../plugins/loader');
 
 const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
 
@@ -350,6 +351,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
 }
 
 async function updateCommand(rootDir, options = {}) {
+  initPlugins(rootDir);
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 
   const { changedFiles, detectionMethod, useGit, hashScanState } =

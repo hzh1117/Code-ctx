@@ -3,6 +3,7 @@ const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject, estimateTokens } = require('../scanner/file-scanner');
 const { getAIConfig, getProjectLimits, getConfigFile, saveProjectConfig } = require('../utils/config');
+const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
@@ -576,6 +577,7 @@ async function initCommand(rootDir, options = {}) {
   verboseMode = options.verbose || false;
 
   validateRootDir(rootDir);
+  initPlugins(rootDir);
   const projects = detectSubProjects(rootDir, options);
   const outputDir = prepareOutputDir(rootDir);
 

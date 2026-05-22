@@ -2,8 +2,10 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { securityHeaders, localhostOnly, tokenAuth } = require('./middleware/security');
+const { initPlugins } = require('../plugins/loader');
 
 function createServer(rootDir) {
+  initPlugins(rootDir);
   const app = express();
 
   app.use(securityHeaders);

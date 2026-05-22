@@ -173,6 +173,27 @@ Config-loading priority: `code-ctx.config.json` > `code-ctx.config.js`. When bot
 
 The legacy `code-ctx.config.js` continues to load read-only. Use `code-ctx init --config-format=js` if you specifically want the legacy JS format for a new project. JS configs are evaluated inside a VM sandbox and cannot `require()` or touch `process`.
 
+### Plugin system (MVP)
+
+Mount user extensions by listing them in the config's `plugins` array:
+
+```json
+{
+  "plugins": [
+    "./my-plugin.js",
+    "code-ctx-plugin-foo"
+  ]
+}
+```
+
+A plugin can contribute:
+
+- `adapters`: custom project-type adapters (extending `BaseAdapter`)
+- `scenarios`: scenarios to add or override (override by matching `id`)
+- `sensitivePatterns` / `sensitiveDetectionPatterns`: organization-internal redaction and detection rules
+
+See [`examples/plugin-basic/`](examples/plugin-basic/) for a minimal example. Plugin loading failures only emit a warning and never break builtin functionality.
+
 ## Web Dashboard
 
 ```bash

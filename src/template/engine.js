@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const pluginState = require('../plugins/state');
 
 const TEMPLATES_DIR = path.join(__dirname, '../../templates');
 const DEFAULT_SCENARIOS_PATH = path.join(TEMPLATES_DIR, 'scenarios.json');
@@ -84,21 +85,38 @@ function readCachedScenarios(filePath) {
 }
 
 function getScenarios(customPath, language) {
+  let baseScenarios = null;
   if (language && language !== 'zh') {
     const basePath = customPath || DEFAULT_SCENARIOS_PATH;
     const ext = path.extname(basePath);
     const base = basePath.slice(0, -ext.length);
     const langPath = `${base}.${language}${ext}`;
-    const langScenarios = readCachedScenarios(langPath);
-    if (langScenarios !== null) return langScenarios;
+    baseScenarios = readCachedScenarios(langPath);
   }
 
-  const scenariosPath = customPath || DEFAULT_SCENARIOS_PATH;
-  const scenarios = readCachedScenarios(scenariosPath);
-  if (scenarios === null) {
-    throw new Error(`Scenarios file not found: ${scenariosPath}`);
+  if (baseScenarios === null) {
+    const scenariosPath = customPath || DEFAULT_SCENARIOS_PATH;
+    baseScenarios = readCachedScenarios(scenariosPath);
+    if (baseScenarios === null) {
+      throw new Error(`Scenarios file not found: ${scenariosPath}`);
+    }
   }
-  return scenarios;
+
+  // Plugin contributions augment the loaded list. Plugin scenarios whose id
+  // collides with a builtin id win (override semantics), since users expect
+  // a plugin to be able to retune a builtin scenario without forking.
+  const pluginScenarios = pluginState.getState().scenarios;
+  if (pluginScenarios.length === 0) {
+    return baseScenarios;
+  }
+
+  const overrides = new Map(pluginScenarios.map(s => [s.id, s]));
+  const merged = baseScenarios.map(s => overrides.get(s.id) || s);
+  const extraIds = new Set(merged.map(s => s.id));
+  for (const s of pluginScenarios) {
+    if (!extraIds.has(s.id)) merged.push(s);
+  }
+  return merged;
 }
 
 function clearCache() {

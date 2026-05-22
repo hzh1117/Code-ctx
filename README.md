@@ -173,6 +173,27 @@ AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网�
 
 仍想使用 JS 配置时，`code-ctx.config.js` 完全保留可读兼容；新项目如需生成 JS 配置可使用 `code-ctx init --config-format=js`。注意：JS 配置在 VM 沙箱内加载，不允许 `require` 或访问 `process`。
 
+### 插件系统（MVP）
+
+在配置中通过 `plugins` 数组挂载自定义扩展：
+
+```json
+{
+  "plugins": [
+    "./my-plugin.js",
+    "code-ctx-plugin-foo"
+  ]
+}
+```
+
+插件可以贡献：
+
+- `adapters`：自定义项目类型适配器（继承 `BaseAdapter`）
+- `scenarios`：追加或覆盖场景（按 `id` 覆盖内置）
+- `sensitivePatterns` / `sensitiveDetectionPatterns`：内部敏感数据脱敏与扫描
+
+最小示例见 [`examples/plugin-basic/`](examples/plugin-basic/)。插件加载失败只会输出 warning，不会破坏内置能力。
+
 ## Web Dashboard
 
 ```bash

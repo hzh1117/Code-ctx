@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { readFileUTF8 } = require('./file-reader');
+const pluginState = require('../plugins/state');
 
 const DEFAULT_PATTERNS = [
   { pattern: /(^|[^?&\w-])(password\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
@@ -48,11 +49,16 @@ function precompileCustom(pattern, replacement) {
 function filterSensitive(content, customPatterns = []) {
   let result = content;
   let count = 0;
-  const compiled = customPatterns.length === 0
+  const pluginPatterns = pluginState.getState().sensitivePatterns;
+  const merged = (customPatterns.length === 0 && pluginPatterns.length === 0)
     ? DEFAULT_PATTERNS_PRECOMPILED
-    : [...DEFAULT_PATTERNS_PRECOMPILED, ...customPatterns.map(p => precompileCustom(p.pattern, p.replacement))];
+    : [
+        ...DEFAULT_PATTERNS_PRECOMPILED,
+        ...customPatterns.map(p => precompileCustom(p.pattern, p.replacement)),
+        ...pluginPatterns.map(p => precompileCustom(p.pattern, p.replacement))
+      ];
 
-  for (const { pattern, replacement, globalRegex } of compiled) {
+  for (const { pattern, replacement, globalRegex } of merged) {
     for (const _ of content.matchAll(globalRegex)) {
       count++;
     }
@@ -67,11 +73,15 @@ function scanDirectory(dir) {
   if (!fs.existsSync(dir)) return warnings;
 
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
+  const pluginDetections = pluginState.getState().sensitiveDetectionPatterns;
+  const allDetections = pluginDetections.length === 0
+    ? DETECTION_PATTERNS
+    : [...DETECTION_PATTERNS, ...pluginDetections];
 
   for (const file of files) {
     try {
       const content = readFileUTF8(path.join(dir, file));
-      for (const { regex, name } of DETECTION_PATTERNS) {
+      for (const { regex, name } of allDetections) {
         if (regex.test(content)) {
           warnings.push({ file, field: name });
         }

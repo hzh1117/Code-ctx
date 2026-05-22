@@ -2,11 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
+const { initPlugins } = require('../plugins/loader');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
 async function fixCommand(rootDir, projectAlias, options = {}) {
+  initPlugins(rootDir);
   const info = getConfigFile(rootDir);
 
   if (!info.exists) {

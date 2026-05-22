@@ -218,97 +218,67 @@ function getRetryDelay(retries, res) {
   return BASE_RETRY_DELAY * Math.pow(2, retries) + Math.random() * 1000;
 }
 
-async function callOpenAIWithMessages(messages, options, retries = 0) {
-  const {
-    apiKey,
-    baseUrl,
-    model,
-    maxTokens,
-    timeout = DEFAULT_TIMEOUT,
-    allowLocalBaseUrl,
-    allowInsecureBaseUrl,
-    dnsLookup
-  } = options;
-
-  const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
-  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
-  const normalizedBaseUrl = parsedBaseUrl.toString();
-  const url = new URL(`${trimTrailingSlashes(normalizedBaseUrl)}/chat/completions`);
+// Shared HTTP transport for both providers. Resolves with the raw response
+// body + status code so each provider can apply its own JSON shape checks
+// (json.choices[0].message.content vs json.content[0].text). Handles:
+//   - retryable status codes (429/500-504) with exponential backoff /
+//     Retry-After header parsing
+//   - request timeout via socket destroy + retry
+//   - retryable connection errors (ETIMEDOUT / ECONNRESET / etc.)
+//   - debug logging of summary metadata (never response body or headers)
+//
+// SSRF validation MUST be performed by the caller before invoking this
+// helper (validateBaseUrl + validateResolvedBaseUrl), so a recursive retry
+// doesn't re-resolve DNS each pass.
+function postJsonWithRetry({ url, headers, body, timeout, debugLabel, retries = 0 }) {
   const protocol = url.protocol === 'https:' ? https : http;
-
-  const body = JSON.stringify({
-    model,
-    max_tokens: maxTokens,
-    messages
-  });
-
-  debugLog('OpenAI请求开始', {
-    url: url.toString(),
-    model,
-    maxTokens,
-    timeout,
-    messagesCount: messages.length,
-    retry: retries + 1
-  });
 
   return new Promise((resolve, reject) => {
     let retried = false;
+
+    const scheduleRetry = (reason, delay) => {
+      retried = true;
+      console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
+      setTimeout(
+        () => postJsonWithRetry({ url, headers, body, timeout, debugLabel, retries: retries + 1 })
+          .then(resolve)
+          .catch(reject),
+        delay
+      );
+    };
+
     const doRetry = (reason, res) => {
       if (retried) return;
-      retried = true;
       debugLog('准备重试', { reason, retry: retries + 1 });
       if (retries < MAX_RETRIES) {
         const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
-        console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-        setTimeout(() => callOpenAIWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
+        scheduleRetry(reason, delay);
       } else {
         reject(new Error(reason));
       }
     };
 
-    const req = protocol.request(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+    const req = protocol.request(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        timeout
       },
-      timeout
-    }, (res) => {
-      debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        debugResponse('OpenAI 响应', data);
-        if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
-          retried = true;
-          const delay = getRetryDelay(retries, res);
-          console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-          setTimeout(() => callOpenAIWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
-          return;
-        }
-        try {
-          const json = JSON.parse(data);
-          if (json.error) {
-            debugLog('API返回错误', json.error);
-            reject(createApiError(res.statusCode, json, 'OpenAI API 返回错误'));
-          } else if (!json.choices || !json.choices[0]) {
-            debugLog('响应格式异常');
-            reject(new Error(`[${res.statusCode}] OpenAI 响应格式异常`));
-          } else {
-            const content = json.choices[0].message && json.choices[0].message.content;
-            if (typeof content !== 'string') {
-              reject(new Error(`[${res.statusCode}] OpenAI 响应缺少文本内容`));
-              return;
-            }
-            debugLog('请求成功', { contentLength: content.length });
-            resolve(content);
+      (res) => {
+        debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          debugResponse(debugLabel, data);
+          if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
+            scheduleRetry(`服务器返回 ${res.statusCode}`, getRetryDelay(retries, res));
+            return;
           }
-        } catch (e) {
-          debugLog('解析响应失败', { error: e.message });
-          reject(new Error(`[${res.statusCode}] OpenAI 响应 JSON 解析失败`));
-        }
-      });
-    });
+          resolve({ statusCode: res.statusCode, body: data });
+        });
+      }
+    );
 
     req.on('timeout', () => {
       debugLog('请求超时', { timeout, retry: retries + 1 });
@@ -335,11 +305,71 @@ async function callOpenAIWithMessages(messages, options, retries = 0) {
   });
 }
 
-async function callOpenAI(prompt, options, retries = 0) {
-  return callOpenAIWithMessages([{ role: 'user', content: prompt }], options, retries);
+function parseJsonOrThrow(rawBody, statusCode, providerLabel) {
+  try {
+    return JSON.parse(rawBody);
+  } catch (e) {
+    debugLog('解析响应失败', { error: e.message });
+    throw new Error(`[${statusCode}] ${providerLabel} 响应 JSON 解析失败`);
+  }
 }
 
-async function callAnthropicWithMessages(messages, options, retries = 0) {
+async function callOpenAIWithMessages(messages, options) {
+  const {
+    apiKey,
+    baseUrl,
+    model,
+    maxTokens,
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
+  } = options;
+
+  const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
+  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+  const url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
+  const body = JSON.stringify({ model, max_tokens: maxTokens, messages });
+
+  debugLog('OpenAI请求开始', {
+    url: url.toString(),
+    model,
+    maxTokens,
+    timeout,
+    messagesCount: messages.length,
+    retry: 1
+  });
+
+  const { statusCode, body: rawBody } = await postJsonWithRetry({
+    url,
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    body,
+    timeout,
+    debugLabel: 'OpenAI 响应'
+  });
+
+  const json = parseJsonOrThrow(rawBody, statusCode, 'OpenAI');
+  if (json.error) {
+    debugLog('API返回错误', json.error);
+    throw createApiError(statusCode, json, 'OpenAI API 返回错误');
+  }
+  if (!json.choices || !json.choices[0]) {
+    debugLog('响应格式异常');
+    throw new Error(`[${statusCode}] OpenAI 响应格式异常`);
+  }
+  const content = json.choices[0].message && json.choices[0].message.content;
+  if (typeof content !== 'string') {
+    throw new Error(`[${statusCode}] OpenAI 响应缺少文本内容`);
+  }
+  debugLog('请求成功', { contentLength: content.length });
+  return content;
+}
+
+async function callOpenAI(prompt, options) {
+  return callOpenAIWithMessages([{ role: 'user', content: prompt }], options);
+}
+
+async function callAnthropicWithMessages(messages, options) {
   const {
     apiKey,
     baseUrl,
@@ -356,15 +386,10 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
   const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
   const anthropicPayload = normalizeAnthropicMessages(messages);
 
-  // 处理不同的 baseUrl 格式
-  let url;
-  if (normalizedBaseUrl.includes('/v1')) {
-    // 已经包含 /v1，直接拼接 /messages
-    url = new URL(`${normalizedBaseUrl}/messages`);
-  } else {
-    // 默认拼接 /v1/messages
-    url = new URL(`${normalizedBaseUrl}/v1/messages`);
-  }
+  // 处理不同的 baseUrl 格式：已含 /v1 直接拼 /messages，否则补默认 /v1/messages
+  const url = normalizedBaseUrl.includes('/v1')
+    ? new URL(`${normalizedBaseUrl}/messages`)
+    : new URL(`${normalizedBaseUrl}/v1/messages`);
 
   const requestBody = {
     model,
@@ -382,101 +407,42 @@ async function callAnthropicWithMessages(messages, options, retries = 0) {
     maxTokens,
     timeout,
     messagesCount: messages.length,
-    retry: retries + 1
+    retry: 1
   });
 
-  return new Promise((resolve, reject) => {
-    let retried = false;
-    const doRetry = (reason, res) => {
-      if (retried) return;
-      retried = true;
-      debugLog('准备重试', { reason, retry: retries + 1 });
-      if (retries < MAX_RETRIES) {
-        const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
-        console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-        setTimeout(() => callAnthropicWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
-      } else {
-        reject(new Error(reason));
-      }
-    };
-
-    const protocol = url.protocol === 'https:' ? https : http;
-
-    const req = protocol.request(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      timeout
-    }, (res) => {
-      debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        debugResponse('Anthropic 响应', data);
-        if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
-          retried = true;
-          const delay = getRetryDelay(retries, res);
-          console.log(`服务器返回 ${res.statusCode}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-          setTimeout(() => callAnthropicWithMessages(messages, options, retries + 1).then(resolve).catch(reject), delay);
-          return;
-        }
-        try {
-          const json = JSON.parse(data);
-          if (json.error) {
-            debugLog('API返回错误', json.error);
-            reject(createApiError(res.statusCode, json, 'Anthropic API 返回错误'));
-          } else if (!json.content || !json.content[0]) {
-            debugLog('响应格式异常');
-            reject(new Error(`[${res.statusCode}] Anthropic 响应格式异常`));
-          } else {
-            const text = json.content
-              .filter(block => block && typeof block.text === 'string')
-              .map(block => block.text)
-              .join('');
-            if (!text) {
-              reject(new Error(`[${res.statusCode}] Anthropic 响应缺少文本内容`));
-              return;
-            }
-            debugLog('请求成功', { contentLength: text.length });
-            resolve(text);
-          }
-        } catch (e) {
-          debugLog('解析响应失败', { error: e.message });
-          reject(new Error(`[${res.statusCode}] Anthropic 响应 JSON 解析失败`));
-        }
-      });
-    });
-
-    req.on('timeout', () => {
-      debugLog('请求超时', { timeout, retry: retries + 1 });
-      req.destroy();
-      if (retries < MAX_RETRIES) {
-        doRetry(`请求超时 (${timeout}ms)`);
-      } else {
-        reject(new Error(`请求超时 (${timeout}ms)`));
-      }
-    });
-
-    req.on('error', (err) => {
-      debugLog('请求错误', { code: err.code, message: err.message, stack: err.stack });
-      const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
-      if (retries < MAX_RETRIES && isRetryable) {
-        doRetry(`连接失败 (${err.code || err.message})`);
-      } else if (!retried) {
-        reject(err);
-      }
-    });
-
-    req.write(body);
-    req.end();
+  const { statusCode, body: rawBody } = await postJsonWithRetry({
+    url,
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01'
+    },
+    body,
+    timeout,
+    debugLabel: 'Anthropic 响应'
   });
+
+  const json = parseJsonOrThrow(rawBody, statusCode, 'Anthropic');
+  if (json.error) {
+    debugLog('API返回错误', json.error);
+    throw createApiError(statusCode, json, 'Anthropic API 返回错误');
+  }
+  if (!json.content || !json.content[0]) {
+    debugLog('响应格式异常');
+    throw new Error(`[${statusCode}] Anthropic 响应格式异常`);
+  }
+  const text = json.content
+    .filter(block => block && typeof block.text === 'string')
+    .map(block => block.text)
+    .join('');
+  if (!text) {
+    throw new Error(`[${statusCode}] Anthropic 响应缺少文本内容`);
+  }
+  debugLog('请求成功', { contentLength: text.length });
+  return text;
 }
 
-async function callAnthropic(prompt, options, retries = 0) {
-  return callAnthropicWithMessages([{ role: 'user', content: prompt }], options, retries);
+async function callAnthropic(prompt, options) {
+  return callAnthropicWithMessages([{ role: 'user', content: prompt }], options);
 }
 
 async function generateWithAI(prompt, options = {}) {

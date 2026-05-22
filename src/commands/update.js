@@ -10,6 +10,8 @@ const { filterSensitive } = require('../utils/sensitive-filter');
 const { hasGitRepo, getCurrentCommitHash, getChangedFilesSince, getChangedFilesWorkingTree, getUntrackedFiles, getLastScanCommit } = require('../utils/git-utils');
 const { findRelatedDoc, groupChangesByProject } = require('../core/doc-resolver');
 
+const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
+
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
   return crypto.createHash('md5').update(content).digest('hex');
@@ -30,7 +32,7 @@ function normalizeFileEntry(entry) {
   return { mtimeMs: null, hash: null };
 }
 
-function getAllFiles(dir, ignoreDirs = ['node_modules', '.git', 'dist', 'ai-docs']) {
+function getAllFiles(dir, ignoreDirs = IGNORE_DIRS) {
   const files = [];
   if (!fs.existsSync(dir)) return files;
 
@@ -47,13 +49,141 @@ function getAllFiles(dir, ignoreDirs = ['node_modules', '.git', 'dist', 'ai-docs
   return files;
 }
 
+function loadLastScan(lastScanPath) {
+  if (!fs.existsSync(lastScanPath)) {
+    return { timestamp: null, files: {} };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
+  } catch {
+    return { timestamp: null, files: {} };
+  }
+}
+
+function filterIgnored(files) {
+  return files.filter(f => {
+    const topDir = f.replace(/\\/g, '/').split('/')[0];
+    return !IGNORE_DIRS.includes(topDir);
+  });
+}
+
+function detectFromGit(rootDir) {
+  const lastCommit = getLastScanCommit(rootDir);
+
+  if (lastCommit) {
+    const diffFiles = getChangedFilesSince(rootDir, lastCommit);
+    if (diffFiles === null) {
+      return { changedFiles: [], detectionMethod: null, gitFailed: true };
+    }
+    const untracked = filterIgnored(getUntrackedFiles(rootDir));
+    return {
+      changedFiles: [...new Set([...diffFiles, ...untracked])],
+      detectionMethod: 'git-diff',
+      gitFailed: false
+    };
+  }
+
+  // First run with git: collect all untracked + modified tracked files
+  const untracked = getUntrackedFiles(rootDir);
+  const modified = getChangedFilesWorkingTree(rootDir) || [];
+  return {
+    changedFiles: filterIgnored([...new Set([...untracked, ...modified])]),
+    detectionMethod: 'git-first-run',
+    gitFailed: false
+  };
+}
+
+function detectFromHash(rootDir, lastScanPath) {
+  const lastScan = loadLastScan(lastScanPath);
+  const currentFiles = {};
+  const files = getAllFiles(rootDir);
+
+  for (const file of files) {
+    const relativePath = path.relative(rootDir, file);
+    const prev = normalizeFileEntry(lastScan.files && lastScan.files[relativePath]);
+    let stat;
+    try {
+      stat = fs.statSync(file);
+    } catch {
+      continue;
+    }
+    // Skip hash computation when mtime matches and we have a cached hash.
+    // Tradeoff: a content change that preserves mtime (rare in practice)
+    // would be missed; the speedup on unchanged trees is worth it.
+    if (prev.mtimeMs !== null && prev.hash && stat.mtimeMs === prev.mtimeMs) {
+      currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: prev.hash };
+    } else {
+      currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: getFileHash(file) };
+    }
+  }
+
+  const changedFiles = [];
+  for (const [file, entry] of Object.entries(currentFiles)) {
+    const prev = normalizeFileEntry(lastScan.files && lastScan.files[file]);
+    if (prev.hash !== entry.hash) {
+      changedFiles.push(file);
+    }
+  }
+  return { changedFiles, detectionMethod: 'hash', hashScanState: currentFiles };
+}
+
+function detectChangedFiles(rootDir, lastScanPath) {
+  const useGit = hasGitRepo(rootDir);
+
+  if (useGit) {
+    const gitResult = detectFromGit(rootDir);
+    if (!gitResult.gitFailed) {
+      return { ...gitResult, useGit, hashScanState: null };
+    }
+  }
+
+  // Hash fallback: triggered when !useGit, or git mode failed.
+  const hashResult = detectFromHash(rootDir, lastScanPath);
+  return { ...hashResult, useGit };
+}
+
+function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState) {
+  // Start from previously-stored entries (normalized to new format) so
+  // unchanged files keep their metadata; then layer in fresh entries.
+  const finalFiles = {};
+  const oldScan = loadLastScan(lastScanPath);
+  if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
+    for (const [file, entry] of Object.entries(oldScan.files)) {
+      finalFiles[file] = normalizeFileEntry(entry);
+    }
+  }
+
+  if (hashScanState) {
+    // Hash mode already walked every file — use it as the authoritative state.
+    for (const [file, entry] of Object.entries(hashScanState)) {
+      finalFiles[file] = entry;
+    }
+  } else {
+    // Git mode: only refresh entries for files git reported as changed.
+    for (const f of changedFiles) {
+      const absPath = path.join(rootDir, f);
+      if (!fs.existsSync(absPath)) continue;
+      try {
+        const stat = fs.statSync(absPath);
+        finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
+      } catch {}
+    }
+  }
+
+  const newScan = {
+    timestamp: new Date().toISOString(),
+    lastCommitHash: useGit ? getCurrentCommitHash(rootDir) : null,
+    files: finalFiles
+  };
+  fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
+}
+
 /**
  * Build per-section prompts for changed files.
  * Returns an array of { docName, sectionName, prompt } objects.
  */
 function buildSectionUpdatePrompts(rootDir, changedFiles) {
   const changesByProject = groupChangesByProject(changedFiles);
-
   const sectionUpdates = [];
 
   for (const [project, projFiles] of Object.entries(changesByProject)) {
@@ -75,15 +205,33 @@ function buildSectionUpdatePrompts(rootDir, changedFiles) {
         sectionContent
       });
 
-      sectionUpdates.push({
-        docName: relatedDoc.name,
-        sectionName,
-        prompt
-      });
+      sectionUpdates.push({ docName: relatedDoc.name, sectionName, prompt });
     }
   }
 
   return sectionUpdates;
+}
+
+function buildFullDocPrompt(rootDir, changedFiles) {
+  const changesByProject = groupChangesByProject(changedFiles);
+  const projectSections = [];
+
+  for (const [project, projFiles] of Object.entries(changesByProject)) {
+    const parts = [`### 子项目: ${project}`, '变化文件：'];
+    projFiles.forEach(f => parts.push(`- ${f}`));
+
+    const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
+    if (relatedDoc) {
+      parts.push(`\n当前文档内容（${relatedDoc.name}）：`);
+      parts.push('```markdown');
+      parts.push(relatedDoc.content);
+      parts.push('```');
+    }
+    projectSections.push(parts.join('\n'));
+  }
+
+  const tpl = loadTemplate('update-prompt-full.md');
+  return renderTemplate(tpl, { projectSections: projectSections.join('\n\n') });
 }
 
 /**
@@ -97,6 +245,15 @@ function applySectionUpdates(docPath, updates) {
     content = replaceSection(content, sectionName, newContent);
   }
   fs.writeFileSync(docPath, content);
+}
+
+function groupSectionUpdates(sectionUpdates) {
+  const updatesByDoc = {};
+  for (const update of sectionUpdates) {
+    if (!updatesByDoc[update.docName]) updatesByDoc[update.docName] = [];
+    updatesByDoc[update.docName].push(update);
+  }
+  return updatesByDoc;
 }
 
 /**
@@ -117,12 +274,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
   let failed = 0;
   let skipped = 0;
 
-  // Group updates by doc to avoid concurrent writes to same file
-  const updatesByDoc = {};
-  for (const update of sectionUpdates) {
-    if (!updatesByDoc[update.docName]) updatesByDoc[update.docName] = [];
-    updatesByDoc[update.docName].push(update);
-  }
+  const updatesByDoc = groupSectionUpdates(sectionUpdates);
 
   for (const [docName, updates] of Object.entries(updatesByDoc)) {
     const docPath = path.join(aiDocsDir, docName);
@@ -182,7 +334,6 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
         console.log(`  ✓ ${docName} 已更新 ${sectionResults.length} 个 section`);
       } catch (err) {
         console.error(`  ✗ 写入 ${docName} 失败: ${err.message}`);
-        // Restore from backup
         if (fs.existsSync(backupPath)) {
           try {
             fs.copyFileSync(backupPath, docPath);
@@ -200,153 +351,18 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
 
 async function updateCommand(rootDir, options = {}) {
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
-  const useGit = hasGitRepo(rootDir);
-  let changedFiles = [];
-  let detectionMethod = 'hash';
 
-  let gitFailed = false;
-  // Populated only in hash mode; used to write back full state without re-stat.
-  let hashScanState = null;
+  const { changedFiles, detectionMethod, useGit, hashScanState } =
+    detectChangedFiles(rootDir, lastScanPath);
 
-  if (useGit) {
-    // Git mode: use git diff
-    const lastCommit = getLastScanCommit(rootDir);
-    if (lastCommit) {
-      const diffFiles = getChangedFilesSince(rootDir, lastCommit);
-      if (diffFiles !== null) {
-        changedFiles = diffFiles;
-        // Also include untracked files
-        const untracked = getUntrackedFiles(rootDir);
-        const ignoreDirs = ['node_modules', '.git', 'dist', 'ai-docs'];
-        const filteredUntracked = untracked.filter(f => {
-          const topDir = f.replace(/\\/g, '/').split('/')[0];
-          return !ignoreDirs.includes(topDir);
-        });
-        changedFiles = [...new Set([...changedFiles, ...filteredUntracked])];
-        detectionMethod = 'git-diff';
-      } else {
-        gitFailed = true;
-      }
-    } else {
-      // First run with git: get all untracked + modified tracked files
-      const untracked = getUntrackedFiles(rootDir);
-      const modified = getChangedFilesWorkingTree(rootDir) || [];
-      const ignoreDirs = ['node_modules', '.git', 'dist', 'ai-docs'];
-      const allFiles = [...new Set([...untracked, ...modified])];
-      changedFiles = allFiles.filter(f => {
-        const topDir = f.replace(/\\/g, '/').split('/')[0];
-        return !ignoreDirs.includes(topDir);
-      });
-      detectionMethod = 'git-first-run';
-    }
-  }
-
-  // Fallback to hash-based detection if git not available, failed, or returned nothing
-  if (changedFiles.length === 0 && (!useGit || gitFailed)) {
-    let lastScan = { timestamp: null, files: {} };
-    if (fs.existsSync(lastScanPath)) {
-      try {
-        lastScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
-      } catch {}
-    }
-
-    const currentFiles = {};
-    const files = getAllFiles(rootDir);
-    for (const file of files) {
-      const relativePath = path.relative(rootDir, file);
-      const prev = normalizeFileEntry(lastScan.files && lastScan.files[relativePath]);
-      let stat;
-      try {
-        stat = fs.statSync(file);
-      } catch {
-        continue;
-      }
-      // Skip hash computation when mtime matches and we have a cached hash.
-      // Tradeoff: a content change that preserves mtime (rare in practice)
-      // would be missed; the speedup on unchanged trees is worth it.
-      if (prev.mtimeMs !== null && prev.hash && stat.mtimeMs === prev.mtimeMs) {
-        currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: prev.hash };
-      } else {
-        currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: getFileHash(file) };
-      }
-    }
-
-    for (const [file, entry] of Object.entries(currentFiles)) {
-      const prev = normalizeFileEntry(lastScan.files && lastScan.files[file]);
-      if (prev.hash !== entry.hash) {
-        changedFiles.push(file);
-      }
-    }
-    detectionMethod = 'hash';
-    hashScanState = currentFiles;
-  }
-
-  // Build section-aware update prompts
   const sectionUpdates = buildSectionUpdatePrompts(rootDir, changedFiles);
 
-  // Fallback: if no sections found, build a single full-doc prompt
-  let prompt = null;
-  if (sectionUpdates.length === 0 && changedFiles.length > 0) {
-    const changesByProject = groupChangesByProject(changedFiles);
-
-    const projectSections = [];
-    for (const [project, projFiles] of Object.entries(changesByProject)) {
-      const parts = [`### 子项目: ${project}`, '变化文件：'];
-      projFiles.forEach(f => parts.push(`- ${f}`));
-
-      const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
-      if (relatedDoc) {
-        parts.push(`\n当前文档内容（${relatedDoc.name}）：`);
-        parts.push('```markdown');
-        parts.push(relatedDoc.content);
-        parts.push('```');
-      }
-      projectSections.push(parts.join('\n'));
-    }
-
-    const tpl = loadTemplate('update-prompt-full.md');
-    prompt = renderTemplate(tpl, { projectSections: projectSections.join('\n\n') });
-  }
+  const prompt = sectionUpdates.length === 0 && changedFiles.length > 0
+    ? buildFullDocPrompt(rootDir, changedFiles)
+    : null;
 
   if (!options.dryRun) {
-    // Start from previously-stored entries (normalized to new format) so
-    // unchanged files keep their metadata; then layer in fresh entries.
-    const finalFiles = {};
-    if (fs.existsSync(lastScanPath)) {
-      try {
-        const oldScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
-        if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
-          for (const [file, entry] of Object.entries(oldScan.files)) {
-            finalFiles[file] = normalizeFileEntry(entry);
-          }
-        }
-      } catch {}
-    }
-
-    if (hashScanState) {
-      // Hash mode already walked every file — use it as the authoritative state.
-      for (const [file, entry] of Object.entries(hashScanState)) {
-        finalFiles[file] = entry;
-      }
-    } else {
-      // Git mode: only refresh entries for files git reported as changed.
-      for (const f of changedFiles) {
-        const absPath = path.join(rootDir, f);
-        if (fs.existsSync(absPath)) {
-          try {
-            const stat = fs.statSync(absPath);
-            finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
-          } catch {}
-        }
-      }
-    }
-
-    const newScan = {
-      timestamp: new Date().toISOString(),
-      lastCommitHash: useGit ? getCurrentCommitHash(rootDir) : null,
-      files: finalFiles
-    };
-    fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
+    saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState);
   }
 
   return { changedFiles, prompt, sectionUpdates, detectionMethod };

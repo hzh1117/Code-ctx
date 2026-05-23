@@ -11,7 +11,7 @@ const DEFAULT_PATTERNS = [
   { pattern: /(^|[^?&\w-])(private[_-]?key\s*[:=]\s*)["']?[^"'\s&]+/gi, replacement: '$1$2[FILTERED]' },
   { pattern: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, replacement: '[FILTERED]' },
   { pattern: /AKIA[0-9A-Z]{16}/g, replacement: '[FILTERED]' },
-  { pattern: /Bearer\s+[A-Za-z0-9\-._~+\/]{20,}/gi, replacement: 'Bearer [FILTERED]' },
+  { pattern: /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/gi, replacement: 'Bearer [FILTERED]' },
   { pattern: /([?&](?:key|token|secret|api_key|access_token)=)([^&\s]{8,})/gi, replacement: '$1[FILTERED]' },
   { pattern: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/gi, replacement: '$1://[FILTERED]' },
   { pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1\s+PRIVATE\s+KEY-----/g, replacement: '[FILTERED SSH PRIVATE KEY]' }
@@ -25,7 +25,7 @@ const DETECTION_PATTERNS = [
   { regex: /private[_-]?key\s*[:=]\s*["']?[^"'\s]+/i, name: 'private_key' },
   { regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, name: 'jwt_token' },
   { regex: /AKIA[0-9A-Z]{16}/, name: 'aws_access_key' },
-  { regex: /Bearer\s+[A-Za-z0-9\-._~+\/]{20,}/i, name: 'bearer_token' },
+  { regex: /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/i, name: 'bearer_token' },
   { regex: /[?&](key|token|secret|api_key|access_token)=([^&\s]{8,})/i, name: 'url_key_param' },
   { regex: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/i, name: 'connection_string' },
   { regex: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----/i, name: 'ssh_private_key' }

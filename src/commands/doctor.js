@@ -100,7 +100,9 @@ function checkDocsVsCode(rootDir, configResult) {
         issues.push({ type: 'unconfigured', directory: entry.name, message: `目录 ${entry.name} 看起来是子项目但未在配置中` });
       }
     }
-  } catch {}
+  } catch (err) {
+    console.debug(`[doctor] scan rootDir skipped: ${err.message}`);
+  }
 
   return issues;
 }

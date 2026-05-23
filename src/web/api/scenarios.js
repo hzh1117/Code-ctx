@@ -140,7 +140,9 @@ module.exports = function(rootDir) {
           try {
             const lastScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
             result.lastScanTime = lastScan.timestamp || null;
-          } catch {}
+          } catch (err) {
+            console.debug(`[scenarios] read lastScan skipped: ${err.message}`);
+          }
         }
 
         const history = getHistory(rootDir);

@@ -168,7 +168,9 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
       try {
         const stat = fs.statSync(absPath);
         finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
-      } catch {}
+      } catch (err) {
+        console.debug(`[update] stat/hash skipped for ${f}: ${err.message}`);
+      }
     }
   }
 

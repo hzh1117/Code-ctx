@@ -282,7 +282,7 @@ function inferPresetFromBaseUrl(baseUrl, protocol) {
   }) || null;
 }
 
-function providerFromLegacy(aiConfig, protocol) {
+function providerFromLegacy(aiConfig, _protocol) {
   if (!aiConfig || !aiConfig.baseUrl && !aiConfig.model && !aiConfig.maxTokens) {
     return {};
   }

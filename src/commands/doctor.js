@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { DETECTION_PATTERNS, scanDirectory } = require('../utils/sensitive-filter');
+const { scanDirectory } = require('../utils/sensitive-filter');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');

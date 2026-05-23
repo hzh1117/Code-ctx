@@ -10,6 +10,8 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 
 ### [Unreleased]
 
+### [1.0.0] - 2026-05-23
+
 #### Added
 
 - 新增 GitHub 社区文件、Issue 模板、PR 模板、CI 和 Dependabot 配置。
@@ -31,6 +33,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - **P28 Dashboard 安全状态页和 doctor 详情**：新增 `/api/doctor` 端点，复用 P14 的 doctor 缓存，返回 doctor issues/warnings、docQuality、敏感信息扫描、配置 schema 错误、已加载插件与加载错误。新增 Web 页面 `安全与健康`（路由 `/security`），可视化展示整体 OK/WARN/HIGH_RISK 徽章、各分类详情和文档质量明细表，仅显示敏感字段名与文件名不暴露原文；支持手动刷新。Sidebar 新增入口。
 - **P29 生成历史、prompt diff、任务历史轮转**：扩展 `src/utils/task-history.js`。每条记录加 `id` / `timestamp`，prompt 不落盘——只持久化 `promptHash` / `promptLength` 与经 `filterSensitive` 处理的 `promptPreview`；字段经白名单 sanitize，避免未知字段污染。新增 `MAX_ENTRIES=200` 与 `MAX_FILE_BYTES=256KB` 双轮转，写入后自动 trim 最早记录。`useCommand` 与 `updateCommand` 自动写入历史；Dashboard 时间轴展示场景与 preview。新增 API `GET /api/history` 与 `GET /api/history/diff`（按两个任务 ID 输出 scenario/hash/长度差异）。新增工具 `diffPrompts` 做简单文本 diff 摘要，不引入复杂依赖。
 - **P30 AI 客户端增强 MVP（provider preset + token budget）**：新增 `src/ai/presets.js`（OpenAI/Anthropic/DeepSeek/Kimi/MiniMax 五个默认值），新增 `GET /api/ai/presets` 端点。Dashboard `AI 配置` 页加入「服务商模板」一键填充 baseUrl/model/maxTokens，不保存 Key。新增 `src/utils/token-estimator.js`，并迁移 file-scanner 内的旧实现复用同一函数。`useCommand` 返回 `tokenBudget`（estimate / maxTokens / status: ok|warn|over）；CLI `code-ctx use` 与 Dashboard `/generate-prompt` 输出 token 估算与超限警告。不引入流式与取消，留待后续 MVP。
+- **P21–P27 发布前清理**：（1）`README.md` / `README_EN.md` Node 版本要求从 `>= 16.0.0` 同步到 `>= 20.0.0`，与 `engines.node` 对齐；（2）`.env.example` 新增 `CODE_CTX_PLUGINS_ALLOW(_ALL)` 说明段；（3）`docs/` 下 9 份历史审计报告统一加 2026-05-15 历史时间戳头部，避免新人误读；（4）ESLint 清零：`src/adapters/base.js` 抽象参数加 `_` 前缀，`src/commands/doctor.js` / `hook.js` 删未用 import，`src/core/section.js` 删未用常量，`src/generator/prompt-builder.js` 删未用 `labels`；（5）`qs` 间接依赖 moderate DoS 漏洞修复至 6.15.2；（6）`src/web/middleware/security.js` `tokenAuth` 改用 `crypto.timingSafeEqual` + 长度预检，规避时序旁路；（7）新增 `tests/commands/doctor-fix.test.js`（9 用例），`src/commands/doctor.js` 行覆盖 64% → 80.06%，整体覆盖率 86.78%。
 
 #### Known Issues
 
@@ -42,6 +45,8 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 ## English
 
 ### [Unreleased]
+
+### [1.0.0] - 2026-05-23
 
 #### Added
 
@@ -58,6 +63,7 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 - Expanded the security policy with current audit focus areas: local config execution, Dashboard APIs, AI credentials, and generated documentation leakage.
 - Synchronized SUPPORT and GitHub issue/PR templates with non-commercial-use, security-reporting, and submission-check guidance.
 - **Default AI models aligned with official deprecation docs.** OpenAI default changed from `gpt-4` to `gpt-5.5` (`gpt-4` retires on 2026-10-23). Anthropic default changed from `claude-3-5-sonnet-20241022` to `claude-sonnet-4-6` (the former was retired on 2025-10-28 and now fails). Users who explicitly set `OPENAI_MODEL` / `ANTHROPIC_MODEL` or specify `model` in `code-ctx.config.js` are unaffected; projects still relying on the old defaults should review `ai.openai.model` and `ai.anthropic.model` in `code-ctx.config.js`.
+- **Release-readiness cleanup (P21–P27).** (1) README Node requirement aligned with `engines.node >= 20.0.0`; (2) `.env.example` documents `CODE_CTX_PLUGINS_ALLOW(_ALL)`; (3) historical audit reports under `docs/` carry a 2026-05-15 snapshot header to prevent misreads; (4) ESLint warnings cleared in `adapters/base.js`, `commands/doctor.js`, `commands/hook.js`, `core/section.js`, `generator/prompt-builder.js`; (5) `qs` moderate DoS advisory fixed via dependency bump to 6.15.2; (6) `web/middleware/security.js` `tokenAuth` switched to `crypto.timingSafeEqual` with a length precheck to avoid timing side-channels; (7) New `tests/commands/doctor-fix.test.js` (9 cases) lifts `src/commands/doctor.js` line coverage from 64% to 80%; overall coverage 86.78%.
 
 #### Known Issues
 

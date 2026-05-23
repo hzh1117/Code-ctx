@@ -188,12 +188,11 @@ function categorizeFiles(keyFiles) {
 }
 
 function buildApiPrompt({ project, scanResult, language }) {
-  const labels = getLabels(language);
   const projectObj = project || {};
   const scanObj = scanResult || {};
-  
+
   const categories = categorizeFiles(scanObj.keyFiles || []);
-  
+
   const tpl = loadTemplate('java-api-prompt.md', language);
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',
@@ -206,7 +205,6 @@ function buildApiPrompt({ project, scanResult, language }) {
 }
 
 function buildDatabasePrompt({ project, scanResult, language }) {
-  const labels = getLabels(language);
   const projectObj = project || {};
   const scanObj = scanResult || {};
   

@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -24,9 +26,19 @@ function tokenAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const provided = authHeader.replace('Bearer ', '');
 
-  if (provided !== token) {
+  // 长度不等时直接拒绝，避免 timingSafeEqual 因长度不同抛错。
+  // 长度比较虽不是常量时间，但提供的与期望 token 长度差异不构成 secret 泄露面。
+  if (!provided || provided.length !== token.length) {
     return res.status(401).json({ error: '认证失败' });
   }
+
+  const providedBuf = Buffer.from(provided);
+  const tokenBuf = Buffer.from(token);
+
+  if (!crypto.timingSafeEqual(providedBuf, tokenBuf)) {
+    return res.status(401).json({ error: '认证失败' });
+  }
+
   next();
 }
 

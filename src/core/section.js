@@ -3,9 +3,6 @@
  * Sections are marked with HTML comments: <!-- section:xxx --> ... <!-- /section:xxx -->
  */
 
-const SECTION_OPEN_RE = /<!--\s*section:(\S+)\s*-->/;
-const SECTION_CLOSE_RE = /<!--\s*\/section:(\S+)\s*-->/;
-
 /**
  * Extract content between <!-- section:xxx --> and <!-- /section:xxx -->
  * @param {string} content - Full document content

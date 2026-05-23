@@ -3,7 +3,7 @@ class BaseAdapter {
     throw new Error('Adapter must implement type getter');
   }
 
-  detect(pkg, files) {
+  detect(_pkg, _files) {
     throw new Error('Adapter must implement detect()');
   }
 
@@ -37,7 +37,7 @@ class BaseAdapter {
     return '';
   }
 
-  extractKeyFiles(dir) {
+  extractKeyFiles(_dir) {
     return [];
   }
 }

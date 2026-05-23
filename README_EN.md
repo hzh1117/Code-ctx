@@ -6,7 +6,7 @@
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
 English | [中文](README.md)
@@ -46,8 +46,7 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 
 ### Requirements
 
-- Node.js >= 16.0.0
-- npm >= 8.0.0
+- **Node.js >= 20.0.0** (this project uses commander 14, express 5, and other modern dependencies — Node 20+ is required)
 - Git
 
 ### Install and Build

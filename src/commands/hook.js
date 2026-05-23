@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { hasGitRepo, getChangedFilesSince, getCurrentCommitHash } = require('../utils/git-utils');
+const { hasGitRepo } = require('../utils/git-utils');
 
 const HOOK_SCRIPT = `#!/bin/sh
 # code-ctx post-commit hook

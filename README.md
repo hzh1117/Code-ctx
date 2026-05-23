@@ -6,7 +6,7 @@
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D16.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
 [English](README_EN.md) | 中文
@@ -46,8 +46,7 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 
 ### 环境要求
 
-- Node.js >= 16.0.0
-- npm >= 8.0.0
+- **Node.js >= 20.0.0**（项目使用 commander 14、express 5 等现代依赖，需 Node 20+）
 - Git
 
 ### 安装和构建

@@ -50,7 +50,10 @@ module.exports = new Command('dashboard')
 
     if (!options.dev) {
       console.log('[CodeCtx] 构建前端资源...');
-      const buildResult = spawnSync('npm', ['run', 'build'], { cwd: webDir, stdio: 'inherit', shell: true });
+      // shell: false — 参数已数组化，无需 shell 解释器，减少攻击面
+      // Windows 下 npm 实际是 npm.cmd，需平台感知
+      const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+      const buildResult = spawnSync(npmCmd, ['run', 'build'], { cwd: webDir, stdio: 'inherit', shell: false });
       if (buildResult.error || buildResult.status !== 0) {
         console.error('前端构建失败');
         process.exit(1);

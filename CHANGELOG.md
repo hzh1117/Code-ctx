@@ -2,13 +2,17 @@
 
 All notable changes to Code-ctx are documented here.
 
-Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
+Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 ---
 
 ## 中文
 
 ### [Unreleased]
+
+#### Changed
+
+- 项目许可证从 Code-ctx Non-Commercial Source License 切换回 MIT License，允许个人和商业自由使用、修改和分发。同步更新 README、README_EN、CONTRIBUTING、SUPPORT、CODE_OF_CONDUCT、Issue 模板和 `package.json` 的 license 字段。
 
 ### [1.0.0] - 2026-05-23
 
@@ -45,6 +49,10 @@ Code-ctx is source-available for non-commercial use. See [LICENSE](LICENSE).
 ## English
 
 ### [Unreleased]
+
+#### Changed
+
+- Switched the project license from the Code-ctx Non-Commercial Source License back to the MIT License. The project is now free for personal and commercial use, modification, and redistribution. README, README_EN, CONTRIBUTING, SUPPORT, CODE_OF_CONDUCT, the issue template, and the `package.json` license field were updated accordingly.
 
 ### [1.0.0] - 2026-05-23
 

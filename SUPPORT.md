@@ -8,7 +8,7 @@
 2. 搜索已有 GitHub issues。
 3. 使用对应模板提交新的 issue。
 
-Code-ctx 源码公开但仅允许非商业使用。商业使用、SaaS 托管、付费集成或商业产品再分发不属于社区支持范围，请先取得维护者书面授权。
+Code-ctx 采用 MIT 许可证开源，允许个人和商业自由使用。社区支持由维护者尽力提供，不保证响应时间或解决问题。
 
 提问时请包含：
 
@@ -32,7 +32,7 @@ For help using Code-ctx:
 2. Search existing GitHub issues.
 3. Open a new issue with the relevant template.
 
-Code-ctx is source-available for non-commercial use only. Commercial use, SaaS hosting, paid integration, or redistribution as part of a commercial product is outside community support; obtain written permission from the maintainer first.
+Code-ctx is released under the MIT License and is free for personal and commercial use. Community support is provided on a best-effort basis with no response-time or resolution guarantees.
 
 When asking for help, include:
 

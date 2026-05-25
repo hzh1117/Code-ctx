@@ -2,7 +2,7 @@
 
 ## 中文
 
-感谢你帮助改进 Code-ctx。本项目源码公开但仅允许非商业使用，提交贡献即表示你确认自己的贡献可以按 [LICENSE](LICENSE) 中的非商业源码许可发布。
+感谢你帮助改进 Code-ctx。本项目采用 MIT 许可证，提交贡献即表示你确认自己的贡献可以按 [LICENSE](LICENSE) 中的 MIT 许可发布。
 
 ### 当前优先级
 
@@ -48,7 +48,6 @@ node bin/cli.js dashboard
 - 修改 CLI、Dashboard、配置、环境变量或用户流程时，同步更新 README 或相关文档。
 - 修改安全逻辑时，附上负向用例或手动验证命令。
 - 不要提交 `.env`、API Key、Token、SSH Key、私有项目文档、生成的 prompt 文件或本地调试脚本。
-- 商业使用相关请求不要通过普通 PR 处理，请联系维护者获取书面授权。
 
 ### 项目结构提示
 
@@ -78,7 +77,7 @@ node bin/cli.js dashboard
 
 ## English
 
-Thanks for helping improve Code-ctx. The project is source-available for non-commercial use only. By contributing, you confirm that your contribution may be published under the non-commercial source license in [LICENSE](LICENSE).
+Thanks for helping improve Code-ctx. The project is released under the MIT License. By contributing, you confirm that your contribution may be published under the MIT terms in [LICENSE](LICENSE).
 
 ### Current Priorities
 
@@ -124,7 +123,6 @@ node bin/cli.js dashboard
 - Update README or related docs when changing CLI commands, Dashboard behavior, config, environment variables, or workflows.
 - For security changes, include negative tests or manual verification commands.
 - Do not commit `.env`, API keys, tokens, SSH keys, private project docs, generated prompt files, or local debug scripts.
-- Commercial-use requests should not be handled through normal PRs; contact the maintainer for written permission.
 
 ### Project Notes
 

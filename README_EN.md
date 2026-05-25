@@ -5,7 +5,7 @@
 **AI development context tool for helping AI coding assistants understand your codebase quickly**
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
-[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
@@ -15,11 +15,9 @@ English | [中文](README.md)
 
 ---
 
-> **Project status: active development.** The core CLI and local Dashboard are usable, but security, test coverage, and release engineering still need work before public deployment, team rollout, or commercial-license evaluation.
+> **Project status:** v1.0.0 has shipped. The CLI, local Dashboard, plugin system, JSON config, document quality scoring, task history, and token budgeting are all in place. For production deployment, please review "Known Risks" below and harden as needed.
 
-> **License notice:** This project is source-available for non-commercial use only. Commercial use, SaaS hosting, paid integration, paid support, and redistribution as part of a commercial product are prohibited. See [LICENSE](LICENSE).
-
-> **Terminology:** Because this project prohibits commercial use, it is not an OSI-defined open source license. Use "source-available / non-commercial use" in public wording. Reference: [Open Source Definition](https://opensource.org/osd).
+> **License:** Released under the [MIT License](LICENSE). Free for personal and commercial use, modification, and redistribution.
 
 ## What Is Code-ctx?
 
@@ -35,11 +33,16 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 |---------|------------------------|
 | Project detection | Built-in adapters for Vue 2/3, React, Next.js, uni-app, Java, Node.js, Go, Python, and more |
 | Documentation generation | `code-ctx init` scans projects and writes `ai-docs/` |
-| Prompt generation | `code-ctx use "task"` builds context-aware prompts |
+| Prompt generation | `code-ctx use "task"` matches scenarios and builds context-aware prompts; 8 built-in scenarios (A–H) |
 | Incremental updates | `code-ctx update` detects changes using Git diff or hash fallback |
 | Health checks | `code-ctx doctor` checks documentation completeness and consistency; supports `--fix` |
-| Local Dashboard | Vue 3 + Express dashboard for config, AI generation, projects, and document status |
-| AI protocols | OpenAI-compatible and Anthropic-compatible protocols; works with DeepSeek, Kimi, MiniMax, and similar providers |
+| Document quality scoring | Completeness, freshness, and risk scoring with an overall `OK / WARN / HIGH_RISK` verdict and 0–100 score |
+| Local Dashboard | Vue 3 + Express dashboard for config, AI generation, project status, doc quality, security & health, and task history |
+| AI protocols | OpenAI-compatible and Anthropic-compatible protocols; built-in presets for OpenAI, Anthropic, DeepSeek, Kimi, MiniMax |
+| Token budgeting | `code-ctx use` and the Dashboard report prompt token estimates and over-budget warnings |
+| Task history | `use` / `update` automatically append history entries; raw prompts are never written to disk — only hash, length, and a sanitized preview are kept, with automatic rotation |
+| Config format | Recommended `code-ctx.config.json` (schema-validated, non-executable); read-only compatibility with `code-ctx.config.js` |
+| Plugin system | Mount local paths or npm packages via `plugins: [...]`; contribute adapters, scenarios, and sensitive-pattern rules |
 | Sensitive filtering | Basic filtering for passwords, API keys, JWTs, SSH keys, database URLs, and related secrets |
 
 ## Quick Start
@@ -204,11 +207,12 @@ The default URL is `http://localhost:3456`. The Dashboard reads the managed proj
 Current Dashboard pages include:
 
 - Configuration management
-- AI configuration and connection testing
-- Scenario selection and prompt generation
-- Sub-project status
+- AI configuration and connection testing (with one-click provider presets)
+- Scenario selection and prompt generation (with token-budget hints)
+- Sub-project status and document quality scores
 - Scenario template preview
-- Document status and health-check entry
+- Security & Health (aggregates doctor output, doc quality, sensitive scan, config schema errors, and plugin status)
+- Task history (with prompt diff; raw prompts are never persisted)
 
 The Dashboard is intended for local development and should not be exposed directly to the public internet.
 
@@ -230,7 +234,8 @@ codecontext/
 │   ├── matcher/          # scenario matching
 │   ├── template/         # template engine
 │   ├── core/             # sections and document mapping
-│   ├── utils/            # config, Git, filtering, clipboard, etc.
+│   ├── plugins/          # plugin loading and state merging
+│   ├── utils/            # config, Git, filtering, token estimator, task history, etc.
 │   └── web/              # Express Dashboard API
 ├── web/                  # Vue 3 Dashboard frontend
 ├── templates/            # prompt templates and scenarios
@@ -239,17 +244,15 @@ codecontext/
 
 ## Roadmap
 
-Recommended order:
+Post-1.0.0 priorities:
 
-1. Complete pre-publication security hardening for config loading, command execution, path access, and Web API error handling.
-2. Add core tests and coverage output for config, Git, section updates, Web APIs, and the AI client.
-3. Improve AI context-generation performance for `init`, `update --apply`, status pages, and frontend build experience.
-4. Clean up architecture by splitting large functions, removing hard-coded behavior, and unifying shared utilities.
-5. Complete release engineering: CI, release checklist, npm pack verification, and default model/config review. See [`docs/release-checklist.md`](docs/release-checklist.md).
-6. Add product capabilities as needed: JSON config, plugin system, document quality scoring, Dashboard improvements, and E2E smoke tests.
+1. Continue tightening the security surface: `loadConfigWithVM()` sandbox boundaries, command construction in dashboard dev mode and Git utilities, unified Web API error handling, and finer-grained token/IP rate-limit policies.
+2. Close test gaps in `core/`, `web/middleware/`, `utils/git-utils.js`, built-in adapters, and plugin loading.
+3. Performance: serial AI calls in `init` and `update --apply`, mtime prefiltering in the scanner, Dashboard status-page caching.
+4. AI client enhancements: streaming, request cancellation, and automatic truncation or chunking when prompts exceed the token budget.
+5. Plugin ecosystem: example plugins, official adapter templates, and plugin schema validation.
 
 Maintainers may keep `docs/` locally for planning and audit material; `docs/` is ignored by Git by default and is not included in the npm package.
-`docs/release-checklist.md` is an explicit exception, published as the public release-gating reference.
 
 ## Development
 
@@ -272,15 +275,17 @@ For security, path, config, or Web API changes, add matching tests.
 
 ## Known Risks
 
+Hardened in v1.0.0: AI `baseUrl` rejects non-HTTPS, loopback, private, link-local, and metadata addresses by default and validates DNS resolution results; saving API keys via the Dashboard validates protocol, base URL, model name, and newline injection; sensitive AI endpoints have basic in-memory rate limiting; `tokenAuth` uses `crypto.timingSafeEqual` with length pre-check to mitigate timing side channels.
+
 Current priority risks:
 
-- `loadConfigWithVM()` config execution safety.
+- Sandbox boundaries of `loadConfigWithVM()` config execution.
 - Command construction in dashboard dev mode and Git utilities.
-- Dashboard config write whitelisting and input validation.
-- AI base URLs and sensitive AI APIs have baseline protection; finer token/IP rate-limit policies and distributed deployment support still need follow-up work.
-- Web API error disclosure and missing rate limiting.
-- Test gaps in `core/`, `web/middleware/`, and `utils/git-utils.js`.
+- Unified Web API error handling and finer-grained rate limiting (for multi-process / distributed deployments).
+- Test gaps in `core/`, `web/middleware/`, `utils/git-utils.js`, and built-in adapters.
 - Serial AI calls in `init` and `update --apply`.
+
+The Dashboard is intended for local development and should not be exposed directly to the public internet.
 
 ## Contributing
 
@@ -300,6 +305,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-[Code-ctx Non-Commercial Source License](LICENSE) © hzh1117. Non-commercial use only.
-
-This is not an OSI-approved open source license. Obtain written permission from the maintainer before commercial use, commercial integration, or SaaS hosting.
+[MIT License](LICENSE) © 2026 hzh1117.

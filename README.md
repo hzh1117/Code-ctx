@@ -5,7 +5,7 @@
 **AI 开发上下文工具，让 AI 编程助手快速理解你的代码库**
 
 [![npm version](https://img.shields.io/npm/v/code-ctx.svg)](https://www.npmjs.com/package/code-ctx)
-[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![CI](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml/badge.svg)](https://github.com/hzh1117/Code-ctx/actions/workflows/ci.yml)
 
@@ -15,11 +15,9 @@
 
 ---
 
-> **项目状态：积极开发中。** 核心 CLI 和本地 Dashboard 已可用，但公开部署、团队推广或商业授权评估前，仍需要继续补齐安全、测试和发布工程。
+> **项目状态：** v1.0.0 已发布，CLI、本地 Dashboard、插件系统、JSON 配置、文档质量评分、任务历史与 token 预算等核心能力已上线。生产部署仍建议参考下文「已知风险」按需加固。
 
-> **许可说明：** 本项目源码公开，但仅允许非商业使用。禁止商业使用、SaaS 托管、付费集成、付费支持或作为商业产品的一部分再分发。详见 [LICENSE](LICENSE)。
-
-> **术语说明：** 因本项目禁止商业使用，它不属于 OSI 定义下的开源许可；对外请使用“源码公开 / 非商业使用”表述。参考：[Open Source Definition](https://opensource.org/osd)。
+> **许可说明：** 本项目采用 [MIT 许可证](LICENSE)，允许个人和商业自由使用、修改、分发，无需支付费用或取得额外授权。
 
 ## 什么是 Code-ctx？
 
@@ -35,11 +33,16 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 |------|----------|
 | 项目探测 | 内置 Vue 2/3、React、Next.js、uni-app、Java、Node.js、Go、Python 等项目类型适配器 |
 | 文档生成 | `code-ctx init` 扫描项目并生成 `ai-docs/` |
-| Prompt 生成 | `code-ctx use "任务"` 根据场景和文档生成上下文 prompt |
+| Prompt 生成 | `code-ctx use "任务"` 按场景匹配文档生成上下文 prompt，内置 8 个场景（A–H） |
 | 增量更新 | `code-ctx update` 通过 Git diff 或 hash 检测变化 |
 | 健康检查 | `code-ctx doctor` 检查文档完整性和一致性，支持 `--fix` |
-| 本地 Dashboard | Vue 3 + Express，可视化配置、AI 生成、项目和文档状态 |
-| AI 协议 | OpenAI 兼容协议和 Anthropic 协议，支持 DeepSeek、Kimi、MiniMax 等兼容服务 |
+| 文档质量评分 | 完整度、新鲜度、风险三维度评分，输出 `OK / WARN / HIGH_RISK` 与 0–100 综合分 |
+| 本地 Dashboard | Vue 3 + Express，可视化配置、AI 生成、项目状态、文档评分、安全与健康、任务历史 |
+| AI 协议 | OpenAI 兼容协议和 Anthropic 协议，内置 OpenAI / Anthropic / DeepSeek / Kimi / MiniMax 五个服务商模板 |
+| Token 预算 | `code-ctx use` 和 Dashboard 输出 prompt token 估算与超限警告 |
+| 任务历史 | `use` / `update` 自动写入历史；不落盘原始 prompt，仅保留 hash、长度和脱敏 preview，自动轮转 |
+| 配置格式 | 推荐 `code-ctx.config.json`（schema 校验、不可执行），兼容只读 `code-ctx.config.js` |
+| 插件系统 | 通过 `plugins: [...]` 挂载本地路径或 npm 包，可贡献 adapters、scenarios、敏感词规则 |
 | 安全过滤 | 对密码、API Key、JWT、SSH Key、数据库连接串等敏感信息做基础过滤 |
 
 ## 快速开始
@@ -204,11 +207,12 @@ code-ctx dashboard
 Dashboard 当前包含：
 
 - 配置管理
-- AI 配置和连接测试
-- 场景选择和 prompt 生成
-- 子项目状态
+- AI 配置和连接测试（含服务商模板一键填充）
+- 场景选择和 prompt 生成（含 token 预算提示）
+- 子项目状态和文档质量评分
 - 场景模板预览
-- 文档状态和健康检查入口
+- 安全与健康页（doctor、文档质量、敏感扫描、配置 schema、插件状态汇总）
+- 任务历史（含 prompt diff，原始 prompt 不落盘）
 
 Dashboard 面向本机开发使用，不建议直接暴露到公网。
 
@@ -230,7 +234,8 @@ codecontext/
 │   ├── matcher/          # 场景匹配
 │   ├── template/         # 模板引擎
 │   ├── core/             # section 和文档映射
-│   ├── utils/            # 配置、Git、过滤、剪贴板等工具
+│   ├── plugins/          # 插件加载和状态合并
+│   ├── utils/            # 配置、Git、过滤、token 估算、任务历史等工具
 │   └── web/              # Express Dashboard API
 ├── web/                  # Vue 3 Dashboard 前端
 ├── templates/            # Prompt 模板和场景定义
@@ -239,17 +244,15 @@ codecontext/
 
 ## 路线图
 
-建议执行顺序：
+v1.0.0 后的优先方向：
 
-1. 完成配置加载、命令执行、路径访问、Web API 错误处理等公开前安全加固。
-2. 补齐核心测试和覆盖率输出，重点覆盖配置、Git、section 更新、Web API 和 AI 客户端。
-3. 优化 AI 上下文生成性能，包括 `init`、`update --apply`、状态页和前端构建体验。
-4. 做架构整理，拆分大函数、清理硬编码、统一公共能力。
-5. 补齐发布工程，包括 CI、release checklist、npm pack 校验和默认模型配置复核。详见 [`docs/release-checklist.md`](docs/release-checklist.md)。
-6. 按需建设产品能力：JSON 配置、插件系统、文档质量评分、Dashboard 体验和 E2E smoke。
+1. 收紧仍待加固的安全面：`loadConfigWithVM()` 沙箱、dashboard dev 与 Git 工具的命令构造、Web API 统一错误处理与更细的 token/IP 限流策略。
+2. 补齐覆盖缺口：`core/`、`web/middleware/`、`utils/git-utils.js`、内置适配器和插件加载的直接测试。
+3. 性能优化：`init` 与 `update --apply` 的 AI 串行调用、扫描阶段的 mtime 预筛选与 Dashboard 状态页缓存。
+4. AI 客户端增强：流式输出、请求取消、超出 token 时的自动截断或分段策略。
+5. 插件生态：示例插件、官方适配器模板和插件 schema 校验。
 
-维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包；
-`docs/release-checklist.md` 是显式例外，作为公开发布门槛说明。
+维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包。
 
 ## 开发
 
@@ -272,15 +275,17 @@ npm run build:web
 
 ## 已知风险
 
+v1.0.0 已加固：AI baseUrl 默认拒绝非 HTTPS / 本机 / 内网 / metadata 地址并校验 DNS 解析结果；Dashboard 保存 API Key 时校验协议、baseUrl、模型名与换行注入；敏感 AI API 加入内存级基础限流；`tokenAuth` 使用 `crypto.timingSafeEqual` + 长度预检规避时序旁路。
+
 当前版本仍需重点处理：
 
-- `loadConfigWithVM()` 配置执行安全。
+- `loadConfigWithVM()` 配置执行的沙箱边界。
 - dashboard dev 命令和 Git 工具的命令构造。
-- Dashboard 配置写入白名单和输入验证。
-- AI baseUrl 和敏感 AI API 已有基础防护，后续仍需更细的 token/IP 限流策略和分布式部署方案。
-- Web API 错误信息泄露和速率限制。
-- `core/`、`web/middleware/`、`utils/git-utils.js` 的测试缺口。
+- Web API 统一错误处理与更细粒度的速率限制（多进程 / 分布式部署场景）。
+- `core/`、`web/middleware/`、`utils/git-utils.js` 与内置适配器的测试缺口。
 - `init` 和 `update --apply` 的 AI 串行调用性能瓶颈。
+
+Dashboard 面向本机开发使用，不建议直接暴露到公网。
 
 ## 参与贡献
 
@@ -300,6 +305,4 @@ npm run check
 
 ## 许可证
 
-[Code-ctx Non-Commercial Source License](LICENSE) © hzh1117。仅允许非商业使用。
-
-这不是 OSI 批准的开源许可证；如需商业使用、商业集成或 SaaS 托管，请先取得维护者书面授权。
+[MIT License](LICENSE) © 2026 hzh1117。

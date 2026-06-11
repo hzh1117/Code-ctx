@@ -380,6 +380,9 @@ async function updateCommand(rootDir, options = {}) {
     });
   } catch (err) {
     // History writes are best-effort.
+    if (process.env.AI_DEBUG === 'true') {
+      console.debug('[update] addTask failed:', err.message);
+    }
   }
 
   return { changedFiles, prompt, sectionUpdates, detectionMethod };

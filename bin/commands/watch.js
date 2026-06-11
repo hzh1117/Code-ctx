@@ -7,8 +7,13 @@ const watch = new Command('watch')
   .option('--apply', '自动调用 AI 更新文档（需配置 API Key）')
   .action(async (options) => {
     try {
+      const debounce = parseInt(options.debounce, 10);
+      if (isNaN(debounce) || debounce < 0) {
+        console.error(`❌ --debounce 必须是非负整数，当前值: ${options.debounce}`);
+        process.exit(1);
+      }
       await watchCommand(process.cwd(), {
-        debounce: parseInt(options.debounce, 10),
+        debounce,
         autoApply: options.apply
       });
     } catch (err) {

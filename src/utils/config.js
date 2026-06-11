@@ -378,8 +378,10 @@ function getAIConfig(rootDir) {
     : (envConfig.OPENAI_API_KEY || aiConfig.apiKey || '');
 
   // 获取 timeout 配置
-  const timeout = aiConfig.timeout || envConfig.AI_TIMEOUT
-    ? parseInt(envConfig.AI_TIMEOUT || aiConfig.timeout, 10)
+  const rawTimeout = aiConfig.timeout || envConfig.AI_TIMEOUT;
+  const parsedTimeout = rawTimeout != null ? parseInt(rawTimeout, 10) : NaN;
+  const timeout = Number.isFinite(parsedTimeout) && parsedTimeout > 0
+    ? parsedTimeout
     : AI_CLIENT.DEFAULT_TIMEOUT;
 
   return {
@@ -399,12 +401,14 @@ function getProjectLimits(rootDir) {
   const limits = projectConfig.projectLimits || {};
 
   return {
-    maxFiles: limits.maxFiles || envConfig.MAX_FILES_PER_PROJECT
-      ? parseInt(envConfig.MAX_FILES_PER_PROJECT || limits.maxFiles, 10)
-      : PROJECT_LIMITS.MAX_FILES_PER_PROJECT,
-    maxTokens: limits.maxTokens || envConfig.MAX_PROJECT_TOKENS
-      ? parseInt(envConfig.MAX_PROJECT_TOKENS || limits.maxTokens, 10)
-      : PROJECT_LIMITS.MAX_PROJECT_TOKENS
+    maxFiles: parseInt(
+      limits.maxFiles || envConfig.MAX_FILES_PER_PROJECT || PROJECT_LIMITS.MAX_FILES_PER_PROJECT,
+      10
+    ),
+    maxTokens: parseInt(
+      limits.maxTokens || envConfig.MAX_PROJECT_TOKENS || PROJECT_LIMITS.MAX_PROJECT_TOKENS,
+      10
+    )
   };
 }
 

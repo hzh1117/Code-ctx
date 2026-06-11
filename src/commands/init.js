@@ -20,30 +20,43 @@ async function asyncPool(poolSize, items, fn) {
     const p = fn(item).then(result => {
       executing.delete(p);
       return result;
+    }, err => {
+      executing.delete(p);
+      throw err;
     });
+    // Prevent unhandled rejection warnings — Promise.allSettled below
+    // will capture the actual rejection status.
+    p.catch(() => {});
     executing.add(p);
     results.push(p);
     if (executing.size >= poolSize) {
-      await Promise.race(executing);
+      // Wait for any item to settle (resolve OR reject) so we can start
+      // the next one. Rejections are captured by allSettled, not here.
+      await Promise.race(executing).catch(() => {});
     }
   }
   return Promise.allSettled(results);
 }
 
-let verboseMode = false;
+let _verboseMode = false;
 
 function log(...args) {
   console.log(...args);
 }
 
 function logVerbose(...args) {
-  if (verboseMode) {
+  if (_verboseMode) {
     console.log('[详细]', ...args);
   }
 }
 
 function logStep(step, ...args) {
   console.log(`\n[${step}]`, ...args);
+}
+
+/** @param {boolean} verbose */
+function setVerbose(verbose) {
+  _verboseMode = !!verbose;
 }
 
 function getExpectedSectionsFromTemplate(templateName) {
@@ -140,7 +153,7 @@ function detectSubProjects(rootDir, options) {
   const detectTime = Date.now() - startTime;
   log(`检测到 ${projects.length} 个子项目 (耗时 ${detectTime}ms)`);
 
-  if (verboseMode) {
+  if (_verboseMode) {
     projects.forEach(p => {
       logVerbose(`  - ${p.alias}: ${p.name} (${p.type}) → ${p.path}`);
     });
@@ -194,7 +207,7 @@ function scanAllProjects(projects, projectLimits, state, options) {
     scanResults[project.alias] = scanResult;
 
     log(`扫描 ${project.name} 完成 (耗时 ${scanTime}ms)`);
-    logVerbose(`  - 文件数: ${scanResult.scannedFiles}/${scanResult.totalFiles}`);
+    logVerbose(`  - 文件数: ${scanResult.limitedTo}/${scanResult.totalFiles}`);
     logVerbose(`  - 预估 tokens: ${scanResult.estimatedTokens}`);
 
     if (scanResult.totalFiles > scanResult.limitedTo) {
@@ -308,7 +321,7 @@ async function generateTypeSpecificDocs(ctx) {
       saveInitState(outputDir, state);
     } catch (err) {
       console.error(`  ${project.alias}-${options.docType}.md 生成失败:`, err.message);
-      if (verboseMode) {
+      if (_verboseMode) {
         console.error('  错误详情:', err.stack);
       }
       failedDocs.push({ error: err.message });
@@ -380,14 +393,17 @@ async function generateBatchMinimalDocs(ctx) {
     fs.writeFileSync(path.join(outputDir, `${alias}.md`), safeDoc);
     return { alias, doc: safeDoc };
   });
-  for (const result of settled) {
+  for (let j = 0; j < settled.length; j++) {
+    const result = settled[j];
     if (result.status === 'fulfilled') {
       generatedDocs[result.value.alias] = result.value.doc;
       state.projects[result.value.alias] = { status: 'completed' };
       log(`  ${result.value.alias}.md 生成完成`);
     } else {
-      console.error(`  生成失败:`, result.reason?.message);
-      failedDocs.push({ error: result.reason?.message });
+      const alias = pendingProjects[j]?.alias || 'unknown';
+      console.error(`  ${alias}.md 生成失败:`, result.reason?.message);
+      failedDocs.push({ alias, error: result.reason?.message });
+      state.projects[alias] = { status: 'failed', error: result.reason?.message };
     }
     saveInitState(outputDir, state);
   }
@@ -395,11 +411,20 @@ async function generateBatchMinimalDocs(ctx) {
 
 async function generateBatchWithContextDocs(ctx) {
   const { projects, scanResults, aiConfig, outputDir, options, state, generatedDocs, failedDocs, projectExpectedSections } = ctx;
-  for (const project of projects) {
-    if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
+  const pendingProjects = projects.filter(p =>
+    !(state.projects[p.alias]?.status === 'completed' && !options.force)
+  );
 
-    logVerbose(`\n生成 ${project.alias}.md...`);
-    try {
+  if (pendingProjects.length === 0) return;
+
+  // BATCH_WITH_CONTEXT uses otherDocs as context. We process in waves of
+  // CONCURRENCY so each wave's results are available as context for the next.
+  log(`\n分批生成 ${pendingProjects.length} 个子项目文档 (并发度 ${CONCURRENCY}, 含上下文)...`);
+
+  for (let i = 0; i < pendingProjects.length; i += CONCURRENCY) {
+    const wave = pendingProjects.slice(i, i + CONCURRENCY);
+    const settled = await asyncPool(CONCURRENCY, wave, async (project) => {
+      logVerbose(`\n生成 ${project.alias}.md...`);
       const otherDocs = Object.fromEntries(
         Object.entries(generatedDocs).filter(([k]) => k !== project.alias)
       );
@@ -409,11 +434,10 @@ async function generateBatchWithContextDocs(ctx) {
         otherDocs
       });
       logVerbose('Prompt 长度:', projectPrompt.length, '字符');
-      logVerbose('开始调用 AI...');
       const aiStartTime = Date.now();
       const doc = await generateDocument(projectPrompt, aiConfig, project.alias);
       const aiTime = Date.now() - aiStartTime;
-      logVerbose('AI 调用完成 (耗时', aiTime, 'ms)');
+      logVerbose(`${project.alias} AI 调用完成 (耗时 ${aiTime}ms)`);
       const safeDoc = await completeMissingSections(
         filterSensitive(doc).content,
         projectExpectedSections,
@@ -421,16 +445,24 @@ async function generateBatchWithContextDocs(ctx) {
         project.alias
       );
       fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
-      generatedDocs[project.alias] = safeDoc;
-      state.projects[project.alias] = { status: 'completed' };
-      saveInitState(outputDir, state);
-    } catch (err) {
-      console.error(`  ${project.alias}.md 生成失败:`, err.message);
-      if (verboseMode) {
-        console.error('  错误详情:', err.stack);
+      return { alias: project.alias, doc: safeDoc };
+    });
+
+    for (let j = 0; j < settled.length; j++) {
+      const result = settled[j];
+      if (result.status === 'fulfilled') {
+        generatedDocs[result.value.alias] = result.value.doc;
+        state.projects[result.value.alias] = { status: 'completed' };
+        log(`  ${result.value.alias}.md 生成完成`);
+      } else {
+        const alias = wave[j]?.alias || 'unknown';
+        console.error(`  ${alias}.md 生成失败:`, result.reason?.message);
+        if (_verboseMode) {
+          console.error('  错误详情:', result.reason?.stack);
+        }
+        failedDocs.push({ alias, error: result.reason?.message });
+        state.projects[alias] = { status: 'failed', error: result.reason?.message };
       }
-      failedDocs.push({ alias: project.alias, error: err.message });
-      state.projects[project.alias] = { status: 'failed', error: err.message };
       saveInitState(outputDir, state);
     }
   }
@@ -526,7 +558,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
     await generateOverviewDoc({ ...ctx, overviewExpectedSections });
   } catch (err) {
     console.error('\n文档生成失败:', err.message);
-    if (verboseMode) {
+    if (_verboseMode) {
       console.error('错误详情:', err.stack);
     }
   }
@@ -574,7 +606,7 @@ function finalizeInit(rootDir, outputDir, projects, state) {
 }
 
 async function initCommand(rootDir, options = {}) {
-  verboseMode = options.verbose || false;
+  setVerbose(options.verbose);
 
   validateRootDir(rootDir);
   initPlugins(rootDir);
@@ -601,4 +633,4 @@ async function initCommand(rootDir, options = {}) {
   return { projects, config, warnings };
 }
 
-module.exports = { initCommand };
+module.exports = { initCommand, setVerbose };

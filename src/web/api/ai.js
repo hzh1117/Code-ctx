@@ -98,13 +98,25 @@ function getKeyInfo(rootDir) {
 
 function updateEnvValue(content, key, value) {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  if (content.includes(key + '=')) {
-    return content.replace(new RegExp(`${escapedKey}=.*`, 'g'), `${key}=${value}`);
+  if (new RegExp(`^${escapedKey}=`, 'm').test(content)) {
+    return content.replace(new RegExp(`^${escapedKey}=.*`, 'gm'), `${key}=${value}`);
   } else {
     if (content && !content.endsWith('\n')) {
       content += '\n';
     }
     return content + `${key}=${value}\n`;
+  }
+}
+
+function isEnvInGitignore(rootDir) {
+  try {
+    const gitignorePath = path.join(rootDir, '.gitignore');
+    if (!fs.existsSync(gitignorePath)) return false;
+    const content = fs.readFileSync(gitignorePath, 'utf8');
+    const lines = content.split('\n').map(l => l.trim());
+    return lines.some(l => l === '.env' || l === '.env*' || l === '.env.*');
+  } catch {
+    return false;
   }
 }
 
@@ -217,7 +229,12 @@ module.exports = function(rootDir) {
       validateModelName(model);
 
       const envPath = path.join(rootDir, '.env');
-      
+
+      // Warn if .env is not in .gitignore — API keys could be committed
+      if (!isEnvInGitignore(rootDir)) {
+        console.warn('[code-ctx] 警告: .env 文件不在 .gitignore 中，API key 可能被提交到版本控制');
+      }
+
       // Backup before writing
       if (fs.existsSync(envPath)) {
         try {

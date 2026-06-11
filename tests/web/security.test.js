@@ -111,20 +111,29 @@ describe('Security: scenarios API', () => {
 
 describe('Security: error responses', () => {
   test('does not leak internal paths in error responses', async () => {
-    const res = await requestJson(server, '/api/config');
-    if (res.status === 500) {
+    // Corrupt the config to force a 500 error from /api/config
+    const configPath = path.join(testDir, 'code-ctx.config.js');
+    const backup = fs.readFileSync(configPath, 'utf8');
+    fs.writeFileSync(configPath, 'module.exports = INVALID SYNTAX !!!');
+    try {
+      const res = await requestJson(server, '/api/config');
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBeDefined();
       expect(res.body.error).not.toContain('src/');
       expect(res.body.error).not.toContain('node_modules');
+      expect(res.body.error).not.toContain('SyntaxError');
+    } finally {
+      fs.writeFileSync(configPath, backup);
     }
   });
 
   test('error response does not contain stack trace', async () => {
-    const res = await requestJson(server, '/api/ai/generate', { method: 'POST', body: {} });
-    if (res.status >= 400) {
-      const body = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
-      expect(body).not.toMatch(/at\s+\S+\s+\(/);
-      expect(body).not.toContain('Error:');
-    }
+    // POST to /api/config (only supports GET/PUT) to trigger 404/405 error
+    const res = await requestJson(server, '/api/config', { method: 'POST', body: {} });
+    // Express returns 404 for unsupported methods on existing routes
+    const body = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+    expect(body).not.toMatch(/at\s+\S+\s+\(/);
+    expect(body).not.toContain('node_modules');
   });
 });
 

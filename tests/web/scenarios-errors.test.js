@@ -130,8 +130,8 @@ describe('web/api/scenarios — error & boundary paths', () => {
       expect(res.body.error).toMatch(/10000/);
     });
 
-    test('无效 scenario ID（不在 A-H 且不在 scenarios.json）→ 400', async () => {
-      const res = await requestJson(server, '/api/scenarios/Z', {
+    test('无效 scenario ID（不在 A-Z 且不在 scenarios.json）→ 400', async () => {
+      const res = await requestJson(server, '/api/scenarios/1', {
         method: 'PUT',
         body: { template: 'whatever' }
       });

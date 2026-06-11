@@ -28,6 +28,10 @@ module.exports = function(rootDir) {
   router.get('/', (req, res) => {
     try {
       const config = loadProjectConfig(rootDir);
+      // Mask any apiKey stored in the config to avoid leaking secrets
+      if (config.ai && typeof config.ai.apiKey === 'string' && config.ai.apiKey) {
+        config.ai = { ...config.ai, apiKey: '***' + config.ai.apiKey.slice(-4) };
+      }
       res.json(config);
     } catch (err) {
       console.error('Config load error:', err.message);

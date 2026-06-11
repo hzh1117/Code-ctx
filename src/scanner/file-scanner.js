@@ -86,18 +86,29 @@ function limitByTokens(files, maxTokens) {
 function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
   if (depth >= maxDepth) return prefix + '└── ...\n';
 
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return prefix + '└── (无法读取目录)\n';
+  }
+
+  // Filter hidden dirs/files and node_modules, preserving entry objects
+  const visible = entries.filter(e => !e.name.startsWith('.') && e.name !== 'node_modules');
   let tree = '';
 
-  for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+  for (let i = 0; i < visible.length; i++) {
+    const entry = visible[i];
+    const isLast = i === visible.length - 1;
+    const connector = isLast ? '└── ' : '├── ';
+    const childPrefix = isLast ? prefix + '    ' : prefix + '│   ';
 
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      tree += `${prefix}├── ${entry.name}/\n`;
-      tree += buildTree(fullPath, prefix + '│   ', depth + 1, maxDepth);
+      tree += `${prefix}${connector}${entry.name}/\n`;
+      tree += buildTree(fullPath, childPrefix, depth + 1, maxDepth);
     } else {
-      tree += `${prefix}├── ${entry.name}\n`;
+      tree += `${prefix}${connector}${entry.name}\n`;
     }
   }
 

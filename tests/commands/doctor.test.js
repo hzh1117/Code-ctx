@@ -144,15 +144,18 @@ describe('doctorCommand', () => {
 
 describe('doctorFix', () => {
   const testDir = path.join(__dirname, '../fixtures/doctor-fix-test');
+  let logSpy;
 
   beforeEach(() => {
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(testDir, { recursive: true });
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   afterEach(() => {
+    logSpy.mockRestore();
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
@@ -160,7 +163,8 @@ describe('doctorFix', () => {
 
   test('should report missing config', async () => {
     await doctorFix(testDir);
-    // 没有配置文件应该打印错误信息
+    const logged = logSpy.mock.calls.flat().map(String).join('\n');
+    expect(logged).toMatch(/未找到 code-ctx\.config/);
   });
 
   test('should report missing API key', async () => {
@@ -179,6 +183,8 @@ describe('doctorFix', () => {
 
     try {
       await doctorFix(testDir);
+      const logged = logSpy.mock.calls.flat().map(String).join('\n');
+      expect(logged).toMatch(/未配置 API Key/);
     } finally {
       // 恢复环境变量
       if (originalEnv) process.env.ANTHROPIC_API_KEY = originalEnv;

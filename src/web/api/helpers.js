@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { listSections } = require('../../core/section');
+const { getLatestMtime } = require('../../utils/mtime-utils');
 
 const MAX_TEMPLATE_LENGTH = 10000;
-const VALID_SCENARIO_ID_PATTERN = /^[A-H]$/;
+const VALID_SCENARIO_ID_PATTERN = /^[A-Z]$/;
 
 // Section list is the only piece of doc-content the /api/status endpoint
 // needs. Cache by (path, mtimeMs) so unchanged docs only cost a stat call
@@ -65,7 +66,7 @@ function buildDocumentsList(aiDocsDir, projectsArray, expectedDocs, rootDir, isW
     if (project && project.path) {
       const projectDir = path.resolve(rootDir, project.path);
       if (isWithinDir(projectDir, rootDir) && fs.existsSync(projectDir)) {
-        const latestMtime = getLatestMtime(projectDir);
+        const latestMtime = getLatestMtime(projectDir, Date.now() + 2000);
         if (latestMtime > docMtime) {
           doc.stale = true;
         }
@@ -88,29 +89,6 @@ function buildDocumentsList(aiDocsDir, projectsArray, expectedDocs, rootDir, isW
   }
 
   return documents;
-}
-
-function getLatestMtime(dirPath) {
-  let latest = 0;
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        if (['node_modules', '.git', 'dist', 'build'].includes(entry.name)) continue;
-        const subMtime = getLatestMtime(fullPath);
-        if (subMtime > latest) latest = subMtime;
-      } else {
-        const stats = fs.statSync(fullPath);
-        if (stats.mtimeMs > latest) latest = stats.mtimeMs;
-      }
-    }
-  } catch (err) {
-    if (err.code !== 'ENOENT' && err.code !== 'EACCES') {
-      console.error('getLatestMtime error:', err.message);
-    }
-  }
-  return latest;
 }
 
 module.exports = {

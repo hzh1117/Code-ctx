@@ -1,6 +1,7 @@
 const { detectProjects } = require('../../src/scanner/project-detector');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 describe('detectProjects', () => {
   const testDir = path.join(__dirname, '../fixtures/projects');
@@ -112,5 +113,103 @@ describe('detectProjects', () => {
     const projects = detectProjects(testDir);
     const matched = projects.filter(p => p.name === 'multi-check');
     expect(matched).toHaveLength(1);
+  });
+});
+
+describe('detectProjects — monorepo deep scan', () => {
+  let testDir;
+
+  beforeEach(() => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-mono-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('detects projects in packages/ subdirectory (monorepo layout)', () => {
+    // Simulate: packages/app-web/package.json with vue
+    const pkgDir = path.join(testDir, 'packages', 'app-web');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({
+      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    expect(projects.length).toBeGreaterThanOrEqual(1);
+    expect(projects.some(p => p.type === 'vue3-admin')).toBe(true);
+  });
+
+  test('detects projects in apps/ subdirectory', () => {
+    const appDir = path.join(testDir, 'apps', 'web');
+    fs.mkdirSync(appDir, { recursive: true });
+    fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({
+      dependencies: { 'react': '^18.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    expect(projects.some(p => p.type === 'react')).toBe(true);
+  });
+
+  test('generates hierarchical alias for nested projects', () => {
+    const pkgDir = path.join(testDir, 'packages', 'my-app');
+    fs.mkdirSync(pkgDir, { recursive: true });
+    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({
+      dependencies: { 'react': '^18.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    const found = projects.find(p => p.type === 'react');
+    expect(found).toBeDefined();
+    // Alias should include the parent path segment
+    expect(found.alias).toContain('my-app');
+  });
+
+  test('skips node_modules in nested directories', () => {
+    const nmDir = path.join(testDir, 'packages', 'app', 'node_modules', 'fake-pkg');
+    fs.mkdirSync(nmDir, { recursive: true });
+    fs.writeFileSync(path.join(nmDir, 'package.json'), JSON.stringify({
+      dependencies: { 'react': '^18.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    // node_modules should be skipped
+    expect(projects.every(p => !p.path.includes('node_modules'))).toBe(true);
+  });
+
+  test('respects maxDepth option', () => {
+    // Create a deeply nested project: a/b/c/d/app
+    const deepDir = path.join(testDir, 'a', 'b', 'c', 'd', 'app');
+    fs.mkdirSync(deepDir, { recursive: true });
+    fs.writeFileSync(path.join(deepDir, 'package.json'), JSON.stringify({
+      dependencies: { 'react': '^18.0.0' }
+    }));
+
+    // With default depth (3), this should NOT be found (depth 4)
+    const projectsDefault = detectProjects(testDir);
+    expect(projectsDefault.some(p => p.path.includes(path.join('d', 'app')))).toBe(false);
+
+    // With increased depth, it should be found
+    const projectsDeep = detectProjects(testDir, { maxDepth: 5 });
+    expect(projectsDeep.some(p => p.path.includes(path.join('d', 'app')))).toBe(true);
+  });
+
+  test('deduplicates aliases when names conflict', () => {
+    // Two directories with the same leaf name
+    const dir1 = path.join(testDir, 'packages', 'app');
+    const dir2 = path.join(testDir, 'apps', 'app');
+    fs.mkdirSync(dir1, { recursive: true });
+    fs.mkdirSync(dir2, { recursive: true });
+    fs.writeFileSync(path.join(dir1, 'package.json'), JSON.stringify({
+      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
+    }));
+    fs.writeFileSync(path.join(dir2, 'package.json'), JSON.stringify({
+      dependencies: { 'react': '^18.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    const aliases = projects.map(p => p.alias);
+    // All aliases should be unique
+    expect(new Set(aliases).size).toBe(aliases.length);
   });
 });

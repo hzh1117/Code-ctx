@@ -3,7 +3,7 @@ const path = require('path');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
-const { generateWithAI } = require('../ai/client');
+const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
@@ -38,7 +38,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   if (aiConfig.apiKey) {
     console.log(`正在重新生成 ${projectAlias}.md...`);
     try {
-      const doc = await generateWithAI(prompt, aiConfig);
+      const doc = await generateWithContinuation(prompt, aiConfig);
       const safeDoc = filterSensitive(doc).content;
 
       const docDir = path.join(rootDir, config.outputDir || 'ai-docs');

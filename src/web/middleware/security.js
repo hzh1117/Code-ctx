@@ -24,7 +24,7 @@ function tokenAuth(req, res, next) {
   if (!token) return next();
 
   const authHeader = req.headers.authorization || '';
-  const provided = authHeader.replace('Bearer ', '');
+  const provided = authHeader.replace(/^Bearer\s+/i, '');
 
   // 长度不等时直接拒绝，避免 timingSafeEqual 因长度不同抛错。
   // 长度比较虽不是常量时间，但提供的与期望 token 长度差异不构成 secret 泄露面。

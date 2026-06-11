@@ -65,6 +65,7 @@ function loadContextDocs(rootDir, selectedScenario) {
 
   if (selectedScenario.relatedProjects) {
     for (const alias of selectedScenario.relatedProjects) {
+      if (typeof alias !== 'string' || !alias || alias.includes('/') || alias.includes('\\') || alias.includes('..')) continue;
       const docPath = path.join(aiDocsDir, `${alias}.md`);
       if (fs.existsSync(docPath)) {
         relatedDocs[`${alias}.md`] = fs.readFileSync(docPath, 'utf8');
@@ -214,6 +215,9 @@ async function useCommand(options = {}) {
     } catch (err) {
       // History writes are best-effort; never fail the user-facing prompt
       // build because of a disk hiccup.
+      if (process.env.AI_DEBUG === 'true') {
+        console.debug('[use] addTask failed:', err.message);
+      }
     }
   }
 

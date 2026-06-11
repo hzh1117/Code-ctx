@@ -13,10 +13,14 @@ Key Files:
 {{otherDocsSection}}
 
 Please generate the following content, each section must be wrapped with section markers:
-1. Project Overview
-2. Directory Structure Explanation
-3. Core Modules Explanation
-4. Development Notes
+
+1. **Project Overview** — Project positioning, core features, tech stack
+2. **Directory Structure Explanation** — Key directories and files
+3. **Core Modules Explanation** — Main module responsibilities, entry files, key functions
+4. **API/Interface List** — Exposed API endpoints (routes, methods, parameters, return values); if none, describe data flow
+5. **Data Model/Storage** — Data structures, database tables, file storage formats; if none, describe state management
+6. **Dependencies** — Which other sub-projects or external libraries this project depends on, and who depends on it
+7. **Development Notes** — Common pitfalls, configuration requirements, environment dependencies
 
 Output Format Requirements:
 - Each section must be wrapped with HTML comment markers, format: <!-- section:section-name --> ... <!-- /section:section-name -->
@@ -33,8 +37,20 @@ Directory structure explanation...
 Core modules explanation...
 <!-- /section:modules -->
 
+<!-- section:api -->
+API/interface list...
+<!-- /section:api -->
+
+<!-- section:data -->
+Data model/storage...
+<!-- /section:data -->
+
+<!-- section:dependencies -->
+Dependencies...
+<!-- /section:dependencies -->
+
 <!-- section:notes -->
 Development notes...
 <!-- /section:notes -->
 
-Please output in Markdown format.
+Please output in Markdown format. Ensure content is complete and accurate for developers to get started quickly.

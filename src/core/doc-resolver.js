@@ -11,6 +11,9 @@ function findRelatedDoc(rootDir, changedFile) {
     if (doc === 'OVERVIEW.md') continue;
     const docContent = readFileUTF8(path.join(aiDocsDir, doc));
     const dirName = path.dirname(changedFile).replace(/\\/g, '/').split('/')[0];
+    // Skip empty dirName (root-level files) — they would match any doc
+    // since docContent.includes('') is always true.
+    if (!dirName) continue;
     if (docContent.includes(dirName)) {
       return { name: doc, content: docContent };
     }

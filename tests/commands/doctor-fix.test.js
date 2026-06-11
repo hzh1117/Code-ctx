@@ -8,7 +8,8 @@
 // 这些用例的目标是把 doctor.js 的行覆盖从 64% 抬到 ≥ 80%。
 
 jest.mock('../../src/ai/client', () => ({
-  generateWithAI: jest.fn()
+  generateWithAI: jest.fn(),
+  generateWithContinuation: jest.fn()
 }));
 jest.mock('../../src/utils/config', () => {
   const actual = jest.requireActual('../../src/utils/config');
@@ -53,8 +54,8 @@ describe('doctorFix --fix 分支', () => {
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    aiClient.generateWithAI.mockReset();
-    aiClient.generateWithAI.mockResolvedValue(MOCK_AI_OUTPUT);
+    aiClient.generateWithContinuation.mockReset();
+    aiClient.generateWithContinuation.mockResolvedValue(MOCK_AI_OUTPUT);
 
     configUtils.getAIConfig.mockReset();
     configUtils.getAIConfig.mockReturnValue(configWithKey());
@@ -79,7 +80,7 @@ describe('doctorFix --fix 分支', () => {
     await expect(doctorFix(testDir)).resolves.toBeUndefined();
 
     expect(loggedText()).toMatch(/未找到 code-ctx\.config/);
-    expect(aiClient.generateWithAI).not.toHaveBeenCalled();
+    expect(aiClient.generateWithContinuation).not.toHaveBeenCalled();
     // 也未应创建 ai-docs/
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(false);
   });
@@ -90,7 +91,7 @@ describe('doctorFix --fix 分支', () => {
     await expect(doctorFix(testDir)).resolves.toBeUndefined();
 
     expect(loggedText()).toMatch(/解析失败/);
-    expect(aiClient.generateWithAI).not.toHaveBeenCalled();
+    expect(aiClient.generateWithContinuation).not.toHaveBeenCalled();
   });
 
   test('无 API Key 时输出提示并退出，不调用 AI', async () => {
@@ -104,7 +105,7 @@ describe('doctorFix --fix 分支', () => {
     await expect(doctorFix(testDir)).resolves.toBeUndefined();
 
     expect(loggedText()).toMatch(/未配置 API Key/);
-    expect(aiClient.generateWithAI).not.toHaveBeenCalled();
+    expect(aiClient.generateWithContinuation).not.toHaveBeenCalled();
   });
 
   test('文档不存在时调用 AI 重新生成 + 同时生成 OVERVIEW.md', async () => {
@@ -122,7 +123,7 @@ describe('doctorFix --fix 分支', () => {
     await doctorFix(testDir);
 
     // 应为 web.md 调用一次，再为 OVERVIEW.md 调用一次
-    expect(aiClient.generateWithAI).toHaveBeenCalledTimes(2);
+    expect(aiClient.generateWithContinuation).toHaveBeenCalledTimes(2);
     const webDoc = path.join(testDir, 'ai-docs/web.md');
     expect(fs.existsSync(webDoc)).toBe(true);
     expect(fs.readFileSync(webDoc, 'utf8')).toContain('Auto Doc');
@@ -148,7 +149,7 @@ describe('doctorFix --fix 分支', () => {
 
     await doctorFix(testDir, { force: true });
 
-    expect(aiClient.generateWithAI).toHaveBeenCalledTimes(2);
+    expect(aiClient.generateWithContinuation).toHaveBeenCalledTimes(2);
     const updated = fs.readFileSync(path.join(testDir, 'ai-docs/web.md'), 'utf8');
     expect(updated).not.toContain('旧版');
     expect(updated).toContain('Auto Doc');
@@ -179,7 +180,7 @@ describe('doctorFix --fix 分支', () => {
       JSON.stringify({ projects: [{ alias: 'web', path: './web', type: 'react' }] })
     );
 
-    aiClient.generateWithAI.mockRejectedValue(new Error('boom-from-mock-ai'));
+    aiClient.generateWithContinuation.mockRejectedValue(new Error('boom-from-mock-ai'));
 
     await expect(doctorFix(testDir)).resolves.toBeUndefined();
 
@@ -199,7 +200,7 @@ describe('doctorFix --fix 分支', () => {
 
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(true);
     // projects 为空，所以只会生成 OVERVIEW.md 一次
-    expect(aiClient.generateWithAI).toHaveBeenCalledTimes(1);
+    expect(aiClient.generateWithContinuation).toHaveBeenCalledTimes(1);
   });
 
   test('已存在但匹配度低的文档会触发"过期"分支重新生成', async () => {
@@ -230,6 +231,6 @@ describe('doctorFix --fix 分支', () => {
     // api.md 应被重写为 mock 内容；OVERVIEW.md 已存在且无 --force，不再重生
     expect(fs.readFileSync(path.join(testDir, 'ai-docs/api.md'), 'utf8')).toContain('Auto Doc');
     expect(fs.readFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'), 'utf8')).toContain('已存在的 Overview');
-    expect(aiClient.generateWithAI).toHaveBeenCalledTimes(1);
+    expect(aiClient.generateWithContinuation).toHaveBeenCalledTimes(1);
   });
 });

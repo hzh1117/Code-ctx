@@ -13,6 +13,35 @@ describe('token-estimator', () => {
     expect(cn).toBeGreaterThan(en);
   });
 
+  test('returns at least 1 for non-empty content', () => {
+    expect(estimateTokensForContent('x')).toBeGreaterThanOrEqual(1);
+  });
+
+  test('returns 0 for empty string', () => {
+    expect(estimateTokensForContent('')).toBe(0);
+  });
+
+  test('handles mixed English/Chinese/code content', () => {
+    const mixed = 'function hello() { return "你好世界"; }';
+    const tokens = estimateTokensForContent(mixed);
+    expect(tokens).toBeGreaterThan(5);
+    expect(tokens).toBeLessThan(50);
+  });
+
+  test('numbers are estimated at ~1 token per 3 digits', () => {
+    const digits = estimateTokensForContent('1234567890');
+    // 10 digits → ~4 tokens (ceil(10/3))
+    expect(digits).toBeGreaterThanOrEqual(3);
+    expect(digits).toBeLessThanOrEqual(6);
+  });
+
+  test('short words are 1 token each', () => {
+    const tokens = estimateTokensForContent('I am a test');
+    // 4 short words → ~4 tokens
+    expect(tokens).toBeGreaterThanOrEqual(3);
+    expect(tokens).toBeLessThanOrEqual(8);
+  });
+
   test('evaluatePromptBudget returns ok below 80% of budget', () => {
     const result = evaluatePromptBudget('a'.repeat(100), 10000);
     expect(result.status).toBe('ok');
@@ -39,5 +68,11 @@ describe('token-estimator', () => {
     const result = evaluatePromptBudget('abc', null);
     expect(result.status).toBe('ok');
     expect(result.maxTokens).toBe(null);
+  });
+
+  test('evaluatePromptBudget handles null prompt', () => {
+    const result = evaluatePromptBudget(null, 1000);
+    expect(result.status).toBe('ok');
+    expect(result.estimate).toBe(0);
   });
 });

@@ -539,8 +539,173 @@ async function generateWithContinuation(prompt, options = {}) {
   return combined;
 }
 
+/**
+ * Streaming variant of generateWithAI. Returns a readable event interface:
+ *   const stream = generateWithAIStream(prompt, options);
+ *   stream.on('token', (chunk) => process.stdout.write(chunk));
+ *   stream.on('done', (fullText) => { ... });
+ *   stream.on('error', (err) => { ... });
+ *
+ * Internally uses chunked transfer-encoding parsing on the HTTP response
+ * to emit partial tokens as they arrive.
+ */
+function generateWithAIStream(prompt, options = {}) {
+  const EventEmitter = require('events');
+  const emitter = new EventEmitter();
+
+  const {
+    apiKey,
+    protocol = 'openai',
+    baseUrl = 'https://api.openai.com/v1',
+    model = 'gpt-5.5',
+    maxTokens = 4096,
+    timeout = DEFAULT_TIMEOUT,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup
+  } = options;
+
+  if (!apiKey) {
+    process.nextTick(() => emitter.emit('error', new Error('需要配置 API key')));
+    return emitter;
+  }
+
+  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
+
+  const doStream = async () => {
+    try {
+      let parsedBaseUrl, url, headers, body;
+
+      if (protocol === 'openai') {
+        parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
+        await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+        url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        };
+        body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }], stream: true });
+      } else if (protocol === 'anthropic') {
+        parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
+        await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+        const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
+        url = normalizedBaseUrl.includes('/v1')
+          ? new URL(`${normalizedBaseUrl}/messages`)
+          : new URL(`${normalizedBaseUrl}/v1/messages`);
+        headers = {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        };
+        body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }], stream: true });
+      } else {
+        throw new Error(`不支持的协议: ${protocol}`);
+      }
+
+      const httpsModule = require('https');
+      const httpModule = require('http');
+      const protocolModule = url.protocol === 'https:' ? httpsModule : httpModule;
+
+      const req = protocolModule.request(url, {
+        method: 'POST',
+        headers,
+        timeout
+      }, (res) => {
+        if (res.statusCode >= 400) {
+          let errData = '';
+          res.on('data', chunk => errData += chunk);
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(errData);
+              emitter.emit('error', createApiError(res.statusCode, json, 'AI API 返回错误'));
+            } catch {
+              emitter.emit('error', new Error(`[${res.statusCode}] AI API 返回错误`));
+            }
+          });
+          return;
+        }
+
+        let fullText = '';
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data:')) continue;
+            const data = trimmed.slice(5).trim();
+            if (data === '[DONE]') continue;
+
+            try {
+              const json = JSON.parse(data);
+              let token = '';
+              if (protocol === 'openai') {
+                token = json.choices?.[0]?.delta?.content || '';
+              } else {
+                // Anthropic streaming: content_block_delta events
+                if (json.type === 'content_block_delta') {
+                  token = json.delta?.text || '';
+                }
+              }
+              if (token) {
+                fullText += token;
+                emitter.emit('token', token);
+              }
+            } catch {
+              // ignore parse errors in stream chunks
+            }
+          }
+        });
+
+        res.on('end', () => {
+          // Process any remaining buffer
+          if (buffer.trim()) {
+            const trimmed = buffer.trim();
+            if (trimmed.startsWith('data:') && trimmed.slice(5).trim() !== '[DONE]') {
+              try {
+                const json = JSON.parse(trimmed.slice(5).trim());
+                let token = '';
+                if (protocol === 'openai') {
+                  token = json.choices?.[0]?.delta?.content || '';
+                } else if (json.type === 'content_block_delta') {
+                  token = json.delta?.text || '';
+                }
+                if (token) {
+                  fullText += token;
+                  emitter.emit('token', token);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+          emitter.emit('done', fullText);
+        });
+      });
+
+      req.on('error', (err) => emitter.emit('error', err));
+      req.on('timeout', () => {
+        req.destroy();
+        emitter.emit('error', new Error(`请求超时 (${timeout}ms)`));
+      });
+
+      req.write(body);
+      req.end();
+    } catch (err) {
+      emitter.emit('error', err);
+    }
+  };
+
+  doStream();
+  return emitter;
+}
+
 module.exports = {
   generateWithAI,
+  generateWithAIStream,
   generateWithContinuation,
   callOpenAI,
   callAnthropic,

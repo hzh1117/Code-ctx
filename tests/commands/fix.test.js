@@ -3,10 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 jest.mock('../../src/ai/client', () => ({
-  generateWithAI: jest.fn().mockResolvedValue('# Generated Doc\n\nproject: web')
+  generateWithAI: jest.fn().mockResolvedValue('# Generated Doc\n\nproject: web'),
+  generateWithContinuation: jest.fn().mockResolvedValue('# Generated Doc\n\nproject: web')
 }));
 
-const { generateWithAI } = require('../../src/ai/client');
+const { generateWithContinuation } = require('../../src/ai/client');
 
 describe('fixCommand', () => {
   const testDir = path.join(__dirname, '../fixtures/fix-test');

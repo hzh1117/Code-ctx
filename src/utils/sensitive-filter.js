@@ -36,13 +36,16 @@ const DETECTION_PATTERNS = [
 // constructing a new one per pattern per call.
 const DEFAULT_PATTERNS_PRECOMPILED = DEFAULT_PATTERNS.map(({ pattern, replacement }) => {
   const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
-  const globalRegex = flags === pattern.flags ? pattern : new RegExp(pattern.source, flags);
+  // Always create a new RegExp to avoid sharing lastIndex state with the
+  // original pattern object (matchAll/replace advance lastIndex on g-flag regexes).
+  const globalRegex = new RegExp(pattern.source, flags);
   return { pattern, replacement, globalRegex };
 });
 
 function precompileCustom(pattern, replacement) {
   const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
-  const globalRegex = flags === pattern.flags ? pattern : new RegExp(pattern.source, flags);
+  // Always create a new RegExp to avoid sharing lastIndex state with the caller's pattern.
+  const globalRegex = new RegExp(pattern.source, flags);
   return { pattern, replacement, globalRegex };
 }
 
@@ -82,6 +85,8 @@ function scanDirectory(dir) {
     try {
       const content = readFileUTF8(path.join(dir, file));
       for (const { regex, name } of allDetections) {
+        // Reset lastIndex to prevent alternating true/false for g-flag patterns
+        regex.lastIndex = 0;
         if (regex.test(content)) {
           warnings.push({ file, field: name });
         }

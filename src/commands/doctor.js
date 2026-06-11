@@ -4,7 +4,7 @@ const { scanDirectory } = require('../utils/sensitive-filter');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
-const { generateWithAI } = require('../ai/client');
+const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
@@ -61,11 +61,11 @@ function checkSectionIntegrity(aiDocsDir) {
 function checkDocsVsCode(rootDir, configResult) {
   const issues = [];
   if (configResult.error === 'no-config') {
-    issues.push({ type: 'no-config', message: 'code-ctx.config.js 不存在，请先运行 code-ctx init' });
+    issues.push({ type: 'no-config', message: 'code-ctx.config.json/js 不存在，请先运行 code-ctx init' });
     return issues;
   }
   if (configResult.error === 'config-error') {
-    issues.push({ type: 'config-error', message: 'code-ctx.config.js 解析失败' });
+    issues.push({ type: 'config-error', message: 'code-ctx.config.json/js 解析失败' });
     return issues;
   }
 
@@ -476,7 +476,7 @@ async function doctorFix(rootDir, options = {}) {
 
       const scanResult = scanProject(projectDir, project.type);
       const prompt = buildInitPrompt({ project, scanResult });
-      const doc = await generateWithAI(prompt, aiConfig);
+      const doc = await generateWithContinuation(prompt, aiConfig);
       const safeDoc = filterSensitive(doc).content;
       fs.writeFileSync(docPath, safeDoc);
       console.log(`    ✓ 已重新生成 ${project.alias}.md`);
@@ -499,7 +499,7 @@ async function doctorFix(rootDir, options = {}) {
       }
 
       const overviewPrompt = buildInitPrompt({ type: 'overview', config, generatedDocs });
-      const overview = await generateWithAI(overviewPrompt, aiConfig);
+      const overview = await generateWithContinuation(overviewPrompt, aiConfig);
       fs.writeFileSync(overviewPath, filterSensitive(overview).content);
       console.log('    ✓ 已生成 OVERVIEW.md');
       fixedCount++;

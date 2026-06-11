@@ -5,6 +5,7 @@ const { readFileUTF8, isWithinDir } = require('./file-reader');
 const { DETECTION_PATTERNS } = require('./sensitive-filter');
 const { loadProjectConfig } = require('./config');
 const { STATE_FILES } = require('./constants');
+const { getLatestMtime } = require('./mtime-utils');
 
 // Per-doc expectations. Overview and per-project use different templates.
 const EXPECTED_PROJECT_SECTIONS = ['overview', 'structure', 'modules', 'api', 'data', 'dependencies', 'notes'];
@@ -12,40 +13,11 @@ const EXPECTED_OVERVIEW_SECTIONS = ['overview', 'subprojects', 'tech-stack', 'ar
 
 const MIN_CONTENT_LINES = 5;
 const SPARSE_CONTENT_LINES = 12;
-// Skip very-large trees when checking freshness so doctor on a node_modules-
-// adjacent repo doesn't crawl the world.
-const FRESHNESS_DIR_IGNORES = new Set(['node_modules', '.git', 'dist', 'build', 'ai-docs', 'coverage']);
 
 function getLevel(score) {
   if (score >= 80) return 'OK';
   if (score >= 50) return 'WARN';
   return 'HIGH_RISK';
-}
-
-function getLatestMtime(dir, deadline) {
-  let latest = 0;
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return 0;
-  }
-  for (const entry of entries) {
-    if (Date.now() > deadline) break;
-    if (entry.isDirectory()) {
-      if (FRESHNESS_DIR_IGNORES.has(entry.name) || entry.name.startsWith('.')) continue;
-      const sub = getLatestMtime(path.join(dir, entry.name), deadline);
-      if (sub > latest) latest = sub;
-    } else if (entry.isFile()) {
-      try {
-        const m = fs.statSync(path.join(dir, entry.name)).mtimeMs;
-        if (m > latest) latest = m;
-      } catch {
-        // ignore
-      }
-    }
-  }
-  return latest;
 }
 
 function countContentLines(content) {
@@ -55,6 +27,8 @@ function countContentLines(content) {
 function detectSensitive(content) {
   const hits = [];
   for (const { regex, name } of DETECTION_PATTERNS) {
+    // Reset lastIndex to prevent alternating true/false for g-flag patterns
+    regex.lastIndex = 0;
     if (regex.test(content)) hits.push(name);
   }
   return hits;

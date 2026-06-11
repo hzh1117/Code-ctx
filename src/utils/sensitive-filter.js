@@ -62,6 +62,8 @@ function filterSensitive(content, customPatterns = []) {
       ];
 
   for (const { pattern, replacement, globalRegex } of merged) {
+    // 基于原始 content 统计匹配数：count 反映"检测到多少种敏感模式"，
+    // 而非"实际替换了多少处"。同一段内容可能被多个模式命中（如 token + JWT）。
     for (const _ of content.matchAll(globalRegex)) {
       count++;
     }

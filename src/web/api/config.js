@@ -1,7 +1,7 @@
 const express = require('express');
 const { loadProjectConfig, saveProjectConfig, validateProjectConfig } = require('../../utils/config');
 
-const ALLOWED_KEYS = ['projectName', 'outputDir', 'aiMode', 'projects', 'excludeDirs', 'gitTrack', 'ai', 'plugins'];
+const ALLOWED_KEYS = ['projectName', 'outputDir', 'aiMode', 'projects', 'excludeDirs', 'gitTrack', 'ai', 'projectLimits', 'plugins'];
 const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
 
 function sanitizeConfig(input) {

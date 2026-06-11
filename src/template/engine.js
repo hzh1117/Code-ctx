@@ -78,7 +78,7 @@ function readCachedScenarios(filePath) {
     return scenarios;
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw new Error(`Invalid JSON in scenarios file: ${filePath}`);
+      throw new Error(`Invalid JSON in scenarios file: ${filePath}`, { cause: err });
     }
     throw err;
   }

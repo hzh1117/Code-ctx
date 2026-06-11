@@ -1,13 +1,16 @@
 const path = require('path');
 
 jest.mock('clipboardy', () => ({
-  write: jest.fn(),
-  read: jest.fn()
+  __esModule: true,
+  default: {
+    write: jest.fn(),
+    read: jest.fn()
+  }
 }));
 jest.mock('fs');
 jest.mock('os');
 
-const clipboardy = require('clipboardy');
+const { default: clipboardy } = require('clipboardy');
 const fs = require('fs');
 const os = require('os');
 const { writeToClipboard } = require('../../src/utils/clipboard');

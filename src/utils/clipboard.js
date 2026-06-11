@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const clipboardy = require('clipboardy');
+const { default: clipboardy } = require('clipboardy');
 
 async function writeToClipboard(content) {
   try {

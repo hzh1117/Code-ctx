@@ -34,9 +34,10 @@ module.exports = new Command('dashboard')
     const port = validatePort(options.port);
     const rootDir = options.dir ? validateDir(options.dir) : process.cwd();
 
-    const configPath = path.join(rootDir, 'code-ctx.config.js');
-    if (!fs.existsSync(configPath)) {
-      console.warn(`⚠️  未找到 ${configPath}，请确认已在该目录运行 code-ctx init`);
+    const configJsonPath = path.join(rootDir, 'code-ctx.config.json');
+    const configJsPath = path.join(rootDir, 'code-ctx.config.js');
+    if (!fs.existsSync(configJsonPath) && !fs.existsSync(configJsPath)) {
+      console.warn(`⚠️  未找到 code-ctx.config.json 或 code-ctx.config.js，请确认已在该目录运行 code-ctx init`);
     }
 
     const webDir = path.join(__dirname, '../../web');
@@ -45,6 +46,7 @@ module.exports = new Command('dashboard')
     console.log('启动 Dashboard...');
     console.log(`[CodeCtx] 项目目录: ${rootDir}`);
     console.log(`[CodeCtx] ai-docs 路径: ${path.join(rootDir, 'ai-docs')}`);
+    const configPath = fs.existsSync(configJsonPath) ? configJsonPath : fs.existsSync(configJsPath) ? configJsPath : '未找到';
     console.log(`[CodeCtx] 配置文件: ${configPath}`);
     console.log(`[CodeCtx] 访问地址: ${accessUrl}`);
 
@@ -71,7 +73,7 @@ module.exports = new Command('dashboard')
     console.log(`访问地址: ${accessUrl}`);
 
     const serverModulePath = path.join(__dirname, '../../src/web/server');
-    const concurrently = require('concurrently');
+    const { default: concurrently } = require('concurrently');
     const { result } = concurrently([
       {
         command: 'node -e "const { startServer } = require(process.env.SERVER_MODULE); startServer(process.env.ROOT_DIR, Number(process.env.PORT));"',

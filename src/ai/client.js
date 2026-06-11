@@ -310,7 +310,7 @@ function parseJsonOrThrow(rawBody, statusCode, providerLabel) {
     return JSON.parse(rawBody);
   } catch (e) {
     debugLog('解析响应失败', { error: e.message });
-    throw new Error(`[${statusCode}] ${providerLabel} 响应 JSON 解析失败`);
+    throw new Error(`[${statusCode}] ${providerLabel} 响应 JSON 解析失败`, { cause: e });
   }
 }
 
@@ -569,8 +569,6 @@ function generateWithAIStream(prompt, options = {}) {
     process.nextTick(() => emitter.emit('error', new Error('需要配置 API key')));
     return emitter;
   }
-
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
 
   const doStream = async () => {
     try {

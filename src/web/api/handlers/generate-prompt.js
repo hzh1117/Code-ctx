@@ -1,5 +1,5 @@
 const { filterSensitive } = require('../../../utils/sensitive-filter');
-const { buildContext, useCommand } = require('../../../commands/use');
+const { useCommand } = require('../../../commands/use');
 const { evaluatePromptBudget } = require('../../../utils/token-estimator');
 const { getAIConfig } = require('../../../utils/config');
 
@@ -21,18 +21,17 @@ module.exports = function register(router, rootDir) {
         return res.json({ success: false, ...result });
       }
 
-      const prompt = await buildContext(safeTask, result.matchedScenario, {
-        rootDir,
-        noAiMatch: true,
-        language: 'zh'
-      });
+      // useCommand 已返回完整 prompt，无需重复调用 buildContext
+      const prompt = result.prompt;
 
-      let tokenBudget = null;
-      try {
-        const aiConfig = getAIConfig(rootDir);
-        tokenBudget = evaluatePromptBudget(prompt, aiConfig?.maxTokens);
-      } catch {
-        // tokenBudget is optional — never block the prompt response on it
+      let tokenBudget = result.tokenBudget || null;
+      if (!tokenBudget) {
+        try {
+          const aiConfig = getAIConfig(rootDir);
+          tokenBudget = evaluatePromptBudget(prompt, aiConfig?.maxTokens);
+        } catch {
+          // tokenBudget is optional — never block the prompt response on it
+        }
       }
 
       res.json({

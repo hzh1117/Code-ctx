@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const { extractSection, replaceSection, listSections } = require('../core/section');
 const { readFileUTF8, isWithinDir } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
@@ -16,7 +16,7 @@ const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
-  return crypto.createHash('md5').update(content).digest('hex');
+  return nodeCrypto.createHash('md5').update(content).digest('hex');
 }
 
 // Backward-compatible: old .last-scan stored value as raw hash string;
@@ -126,6 +126,12 @@ function detectFromHash(rootDir, lastScanPath) {
       changedFiles.push(file);
     }
   }
+  // 检测已删除文件：旧扫描中存在但当前不存在的文件
+  for (const file of Object.keys(lastScan.files || {})) {
+    if (!currentFiles[file]) {
+      changedFiles.push(file);
+    }
+  }
   return { changedFiles, detectionMethod: 'hash', hashScanState: currentFiles };
 }
 
@@ -145,22 +151,22 @@ function detectChangedFiles(rootDir, lastScanPath) {
 }
 
 function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState) {
-  // Start from previously-stored entries (normalized to new format) so
-  // unchanged files keep their metadata; then layer in fresh entries.
-  const finalFiles = {};
-  const oldScan = loadLastScan(lastScanPath);
-  if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
-    for (const [file, entry] of Object.entries(oldScan.files)) {
-      finalFiles[file] = normalizeFileEntry(entry);
-    }
-  }
+  let finalFiles = {};
 
   if (hashScanState) {
     // Hash mode already walked every file — use it as the authoritative state.
-    for (const [file, entry] of Object.entries(hashScanState)) {
-      finalFiles[file] = entry;
-    }
+    // Do NOT merge with old entries: files deleted since last scan must be
+    // absent so the next detectFromHash sees them as removals.
+    finalFiles = { ...hashScanState };
   } else {
+    // Git mode: start from previously-stored entries (normalized to new format)
+    // so unchanged files keep their metadata; then layer in fresh entries.
+    const oldScan = loadLastScan(lastScanPath);
+    if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
+      for (const [file, entry] of Object.entries(oldScan.files)) {
+        finalFiles[file] = normalizeFileEntry(entry);
+      }
+    }
     // Git mode: only refresh entries for files git reported as changed.
     for (const f of changedFiles) {
       const absPath = path.join(rootDir, f);

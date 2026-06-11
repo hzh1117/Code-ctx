@@ -186,9 +186,9 @@ module.exports = function(rootDir) {
       }
       
       if (!config.baseUrl) {
-        return res.json({ 
-          success: false, 
-          error: '未配置 API 地址，请在 code-ctx.config.js 中配置 ai.baseUrl' 
+        return res.json({
+          success: false,
+          error: '未配置 API 地址，请在 code-ctx.config.json 或 code-ctx.config.js 中配置 ai.baseUrl'
         });
       }
       

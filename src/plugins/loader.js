@@ -148,7 +148,7 @@ function resolvePluginPath(spec, rootDir) {
   try {
     return require.resolve(spec, { paths: [rootDir] });
   } catch (err) {
-    throw new Error(`无法解析插件 ${spec}: ${err.message}`);
+    throw new Error(`无法解析插件 ${spec}: ${err.message}`, { cause: err });
   }
 }
 

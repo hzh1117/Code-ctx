@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 const { loadProjectConfig } = require('./config');
 const { filterSensitive } = require('./sensitive-filter');
 const { STATE_FILES } = require('./constants');
@@ -19,11 +19,11 @@ function getHistoryPath(rootDir) {
 }
 
 function shortId() {
-  return crypto.randomBytes(6).toString('hex');
+  return nodeCrypto.randomBytes(6).toString('hex');
 }
 
 function hashPrompt(prompt) {
-  return crypto.createHash('sha256').update(prompt).digest('hex').slice(0, 16);
+  return nodeCrypto.createHash('sha256').update(prompt).digest('hex').slice(0, 16);
 }
 
 function makePreview(prompt) {

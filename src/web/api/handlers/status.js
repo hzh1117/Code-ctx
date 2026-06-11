@@ -38,7 +38,7 @@ module.exports = function register(router, rootDir) {
             const lastScan = JSON.parse(fs.readFileSync(lastScanPath, 'utf8'));
             result.lastScanTime = lastScan.timestamp || null;
           } catch (err) {
-            console.debug(`[scenarios] read lastScan skipped: ${err.message}`);
+            console.debug(`[status] read lastScan skipped: ${err.message}`);
           }
         }
 

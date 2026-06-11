@@ -88,7 +88,7 @@ function loadJsonConfig(configPath) {
     return parsed;
   } catch (err) {
     if (err instanceof SyntaxError) {
-      throw new Error('配置文件 JSON 解析失败');
+      throw new Error('配置文件 JSON 解析失败', { cause: err });
     }
     throw err;
   }
@@ -138,7 +138,7 @@ function loadConfigWithVM(configPath) {
     vm.runInNewContext(code, sandbox, { filename: configPath });
     return module.exports;
   } catch (err) {
-    throw new Error(`配置文件解析失败`);
+    throw new Error(`配置文件解析失败`, { cause: err });
   }
 }
 

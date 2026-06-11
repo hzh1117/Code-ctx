@@ -16,9 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Node 16 已 EOL（2023-09），不再纳入测试矩阵；package.json engines 仍声明 >=16，
-        # 仅作为安装兼容下限，未保证持续验证。
-        node-version: [18.x, 20.x, 22.x]
+        # Node 18/20 已 EOL；package.json engines 声明 >=22.12.0。
+        node-version: [22.x, 24.x]
 
     steps:
       - name: Checkout
@@ -61,7 +60,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 20.x
+          node-version: 22.x
           cache: npm
 
       - name: Audit CLI dependencies

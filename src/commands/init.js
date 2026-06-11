@@ -292,7 +292,9 @@ async function generateTypeSpecificDocs(ctx) {
     if (options.docType === 'api') {
       return projectType.includes('backend') || projectType.includes('java');
     }
-    return projectType.includes('backend') || projectType.includes('java');
+    // database 文档适用于所有后端类型
+    return projectType.includes('backend') || projectType.includes('java')
+      || projectType.includes('python') || projectType.includes('go');
   });
 
   if (pendingProjects.length === 0) {

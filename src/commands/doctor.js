@@ -95,7 +95,11 @@ function checkDocsVsCode(rootDir, configResult) {
       const hasProjectFile = files.some(f => ['package.json', 'pom.xml', 'build.gradle', 'go.mod', 'requirements.txt', 'pyproject.toml'].includes(f));
       if (!hasProjectFile) continue;
 
-      const isConfigured = configProjects.some(p => p.path === `./${entry.name}` || p.path === entry.name);
+      const absSubDir = path.resolve(subDir);
+      const isConfigured = configProjects.some(p => {
+        const configAbs = path.resolve(rootDir, p.path);
+        return configAbs === absSubDir || p.path === `./${entry.name}` || p.path === entry.name;
+      });
       if (!isConfigured) {
         issues.push({ type: 'unconfigured', directory: entry.name, message: `目录 ${entry.name} 看起来是子项目但未在配置中` });
       }

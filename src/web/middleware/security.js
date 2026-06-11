@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const nodeCrypto = require('crypto');
 
 function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -35,7 +35,7 @@ function tokenAuth(req, res, next) {
   const providedBuf = Buffer.from(provided);
   const tokenBuf = Buffer.from(token);
 
-  if (!crypto.timingSafeEqual(providedBuf, tokenBuf)) {
+  if (!nodeCrypto.timingSafeEqual(providedBuf, tokenBuf)) {
     return res.status(401).json({ error: '认证失败' });
   }
 

@@ -151,7 +151,7 @@ function detectSubProjects(rootDir, options) {
   const startTime = Date.now();
   let projects = detectProjects(rootDir);
   const detectTime = Date.now() - startTime;
-  log(`检测到 ${projects.length} 个子项目 (耗时 ${detectTime}ms)`);
+  log(`检测到 ${projects.length} 个项目 (耗时 ${detectTime}ms)`);
 
   if (_verboseMode) {
     projects.forEach(p => {

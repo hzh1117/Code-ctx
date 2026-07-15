@@ -255,6 +255,25 @@ describe('scanProject', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('unknown fallback scans common source files and manifests', () => {
+    const dir = createTmpDir();
+    try {
+      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"custom"}');
+      fs.writeFileSync(path.join(dir, 'src', 'main.ts'), 'export const value = 1;');
+
+      const result = scanProject(dir, 'unknown');
+      const relativeFiles = result.keyFiles.map(file => path.relative(dir, file).replace(/\\/g, '/'));
+
+      expect(relativeFiles).toEqual(expect.arrayContaining(['package.json', 'src/main.ts']));
+      expect(result.sourceFiles).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: 'src/main.ts', content: 'export const value = 1;' })
+      ]));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('adapter priorityKeywords', () => {

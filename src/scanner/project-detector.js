@@ -16,7 +16,17 @@ const SKIP_DIRS = new Set([
 const MAX_SCAN_DEPTH = 3;
 
 function generateAlias(name) {
-  return name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20);
+  const alias = name.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 20);
+  return alias || 'root';
+}
+
+function createProject(dirPath, type, name) {
+  return {
+    alias: generateAlias(name),
+    path: path.resolve(dirPath),
+    type,
+    name
+  };
 }
 
 function deduplicateAliases(projects) {
@@ -77,6 +87,12 @@ function detectProjects(rootDir, options = {}) {
   const projects = [];
   const visited = new Set();
 
+  const resolvedRoot = path.resolve(rootDir);
+  const rootType = detectProjectInDir(resolvedRoot);
+  if (rootType) {
+    projects.push(createProject(resolvedRoot, rootType, path.basename(resolvedRoot)));
+  }
+
   function scanDir(dirPath, depth, prefix) {
     if (depth > maxDepth) return;
     const realPath = path.resolve(dirPath);
@@ -99,12 +115,7 @@ function detectProjects(rootDir, options = {}) {
 
       if (type) {
         const name = prefix ? `${prefix}/${entry.name}` : entry.name;
-        projects.push({
-          alias: generateAlias(name),
-          path: projectDir,
-          type,
-          name
-        });
+        projects.push(createProject(projectDir, type, name));
       } else if (depth < maxDepth) {
         // Recurse into non-project subdirectories that might contain
         // monorepo packages (e.g. packages/app1/, apps/web/).
@@ -113,12 +124,11 @@ function detectProjects(rootDir, options = {}) {
     }
   }
 
-  // First pass: scan top-level (depth 0)
+  // Root projects and monorepo children can coexist.
   scanDir(rootDir, 0, '');
 
-  // If no projects found at top level, do a deeper scan (monorepo support)
-  if (projects.length === 0 && maxDepth > 0) {
-    scanDir(rootDir, 1, '');
+  if (projects.length === 0) {
+    projects.push(createProject(resolvedRoot, 'unknown', path.basename(resolvedRoot)));
   }
 
   deduplicateAliases(projects);

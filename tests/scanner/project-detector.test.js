@@ -212,4 +212,35 @@ describe('detectProjects — monorepo deep scan', () => {
     // All aliases should be unique
     expect(new Set(aliases).size).toBe(aliases.length);
   });
+
+  test('detects the repository root and monorepo children together', () => {
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
+      dependencies: { express: '^5.0.0' }
+    }));
+    const childDir = path.join(testDir, 'packages', 'web');
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(childDir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+
+    expect(projects).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: path.resolve(testDir), type: 'node-backend' }),
+      expect.objectContaining({ path: path.resolve(childDir), type: 'react' })
+    ]));
+  });
+
+  test('falls back to a scannable unknown root instead of returning no projects', () => {
+    fs.writeFileSync(path.join(testDir, 'main.xyz'), 'custom source');
+
+    const projects = detectProjects(testDir);
+
+    expect(projects).toHaveLength(1);
+    expect(projects[0]).toEqual(expect.objectContaining({
+      alias: expect.any(String),
+      path: path.resolve(testDir),
+      type: 'unknown'
+    }));
+  });
 });

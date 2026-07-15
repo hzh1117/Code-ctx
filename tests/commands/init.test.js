@@ -83,6 +83,31 @@ describe('initCommand', () => {
     expect(result.projects[0].type).toBe('react');
   });
 
+  test('should initialize a single project from the repository root', async () => {
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
+      dependencies: { express: '^5.0.0' }
+    }));
+    fs.writeFileSync(path.join(testDir, 'app.js'), 'module.exports = {};');
+
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0]).toEqual(expect.objectContaining({
+      path: path.resolve(testDir),
+      type: 'node-backend'
+    }));
+    expect(result.success).toBe(true);
+  });
+
+  test('uses an unknown root project when no framework is recognizable', async () => {
+    fs.writeFileSync(path.join(testDir, 'main.ts'), 'export const value = 1;');
+
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0].type).toBe('unknown');
+  });
+
   test('should preserve detected project path in generated config', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });

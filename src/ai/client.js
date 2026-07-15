@@ -362,7 +362,12 @@ async function callOpenAIWithMessages(messages, options) {
     throw new Error(`[${statusCode}] OpenAI 响应缺少文本内容`);
   }
   debugLog('请求成功', { contentLength: content.length });
-  return content;
+  const result = {
+    content,
+    stopReason: json.choices[0].finish_reason || null,
+    truncated: json.choices[0].finish_reason === 'length'
+  };
+  return options.returnMetadata ? result : content;
 }
 
 async function callOpenAI(prompt, options) {
@@ -438,7 +443,12 @@ async function callAnthropicWithMessages(messages, options) {
     throw new Error(`[${statusCode}] Anthropic 响应缺少文本内容`);
   }
   debugLog('请求成功', { contentLength: text.length });
-  return text;
+  const result = {
+    content: text,
+    stopReason: json.stop_reason || null,
+    truncated: json.stop_reason === 'max_tokens'
+  };
+  return options.returnMetadata ? result : text;
 }
 
 async function callAnthropic(prompt, options) {
@@ -490,7 +500,11 @@ async function generateFromMessages(messages, options = {}) {
     throw new Error('需要配置 API key');
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
+  const callOptions = {
+    apiKey, baseUrl, model, maxTokens, timeout,
+    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup,
+    returnMetadata: true
+  };
 
   if (protocol === 'openai') {
     return callOpenAIWithMessages(messages, callOptions);
@@ -499,6 +513,42 @@ async function generateFromMessages(messages, options = {}) {
   } else {
     throw new Error(`不支持的协议: ${protocol}`);
   }
+}
+
+function inspectOutputStructure(content) {
+  const reasons = [];
+  if (content.includes('<<<CONTINUE>>>')) reasons.push('continuation-marker');
+
+  const fenceCount = (content.match(/```/g) || []).length;
+  if (fenceCount % 2 !== 0) reasons.push('unclosed-code-fence');
+
+  const openedSections = [...content.matchAll(/<!--\s*section:([\w-]+)\s*-->/g)].map(match => match[1]);
+  const closedSections = [...content.matchAll(/<!--\s*\/section:([\w-]+)\s*-->/g)].map(match => match[1]);
+  const sectionBalance = new Map();
+  for (const name of openedSections) sectionBalance.set(name, (sectionBalance.get(name) || 0) + 1);
+  for (const name of closedSections) sectionBalance.set(name, (sectionBalance.get(name) || 0) - 1);
+  if ([...sectionBalance.values()].some(balance => balance !== 0)) {
+    reasons.push('unbalanced-sections');
+  }
+
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      JSON.parse(trimmed);
+    } catch {
+      reasons.push('invalid-json-structure');
+    }
+  }
+
+  return { complete: reasons.length === 0, reasons };
+}
+
+function continuationReasons(response, combined) {
+  const structure = inspectOutputStructure(combined);
+  const reasons = [...structure.reasons];
+  if (response.content.includes('<<<CONTINUE>>>')) reasons.push('continuation-marker');
+  if (response.truncated) reasons.unshift(`provider:${response.stopReason || 'length'}`);
+  return [...new Set(reasons)];
 }
 
 async function generateWithContinuation(prompt, options = {}) {
@@ -516,11 +566,18 @@ async function generateWithContinuation(prompt, options = {}) {
   baseMessages.push({ role: 'user', content: continuationPrompt });
 
   let messages = [...baseMessages];
-  let content = await generateFromMessages(messages, options);
+  let response = await generateFromMessages(messages, options);
+  let content = response.content;
   let combined = content.replace(/<<<CONTINUE>>>/g, '');
   let continuationCount = 0;
+  let reasons = continuationReasons(response, content);
 
-  while (content.includes('<<<CONTINUE>>>') && continuationCount < maxContinuations) {
+  while (reasons.length > 0) {
+    if (continuationCount >= maxContinuations) {
+      throw new Error(
+        `AI 输出在 ${continuationCount} 次续写后仍被截断或结构不完整: ${reasons.join(', ')}`
+      );
+    }
     continuationCount++;
     const attempt = continuationCount + 1;
     if (onProgress) {
@@ -528,12 +585,14 @@ async function generateWithContinuation(prompt, options = {}) {
     }
 
     messages = [
-      ...baseMessages,
+      ...messages,
       { role: 'assistant', content },
-      { role: 'user', content: '请从 <<<CONTINUE>>> 处继续，不要重复' }
+      { role: 'user', content: `请从上次中断处继续，不要重复。待完成原因: ${reasons.join(', ')}` }
     ];
-    content = await generateFromMessages(messages, options);
+    response = await generateFromMessages(messages, options);
+    content = response.content;
     combined += content.replace(/<<<CONTINUE>>>/g, '');
+    reasons = continuationReasons(response, combined);
   }
 
   return combined;
@@ -711,5 +770,6 @@ module.exports = {
   callAnthropic,
   validateBaseUrl,
   validateResolvedBaseUrl,
-  normalizeAnthropicMessages
+  normalizeAnthropicMessages,
+  inspectOutputStructure
 };

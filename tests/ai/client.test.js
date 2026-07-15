@@ -113,9 +113,146 @@ describe('generateWithAI', () => {
       expect(requests[1].messages).toEqual([
         { role: 'user', content: 'write docs\n\n若回答因长度限制被截断，请在截断位置输出 <<<CONTINUE>>> 标记' },
         { role: 'assistant', content: 'part one <<<CONTINUE>>>' },
-        { role: 'user', content: '请从 <<<CONTINUE>>> 处继续，不要重复' }
+        { role: 'user', content: '请从上次中断处继续，不要重复。待完成原因: continuation-marker' }
       ]);
       expect(progress).toEqual([{ attempt: 2, maxAttempts: 5 }]);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('continues OpenAI output when finish_reason is length without a marker', async () => {
+    let requestCount = 0;
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        requestCount++;
+        res.setHeader('Content-Type', 'application/json');
+        const first = requestCount === 1;
+        res.end(JSON.stringify({
+          choices: [{
+            message: { content: first ? 'part one ' : 'part two' },
+            finish_reason: first ? 'length' : 'stop'
+          }]
+        }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const { port } = server.address();
+      const result = await generateWithContinuation('write docs', {
+        apiKey: 'key',
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 10,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
+      });
+
+      expect(result).toBe('part one part two');
+      expect(requestCount).toBe(2);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('continues Anthropic output when stop_reason is max_tokens', async () => {
+    let requestCount = 0;
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        requestCount++;
+        res.setHeader('Content-Type', 'application/json');
+        const first = requestCount === 1;
+        res.end(JSON.stringify({
+          content: [{ type: 'text', text: first ? 'alpha ' : 'omega' }],
+          stop_reason: first ? 'max_tokens' : 'end_turn'
+        }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const { port } = server.address();
+      const result = await generateWithContinuation('write docs', {
+        apiKey: 'key',
+        protocol: 'anthropic',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 10,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
+      });
+
+      expect(result).toBe('alpha omega');
+      expect(requestCount).toBe(2);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('continues structurally incomplete sections even after a normal stop', async () => {
+    let requestCount = 0;
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        requestCount++;
+        res.setHeader('Content-Type', 'application/json');
+        const content = requestCount === 1
+          ? '<!-- section:overview -->\npartial'
+          : '\ncomplete\n<!-- /section:overview -->';
+        res.end(JSON.stringify({
+          choices: [{ message: { content }, finish_reason: 'stop' }]
+        }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const { port } = server.address();
+      const result = await generateWithContinuation('write docs', {
+        apiKey: 'key',
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 10,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
+      });
+
+      expect(result).toContain('<!-- /section:overview -->');
+      expect(requestCount).toBe(2);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('fails explicitly when the continuation limit is exhausted', async () => {
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on('end', () => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({
+          choices: [{ message: { content: 'truncated' }, finish_reason: 'length' }]
+        }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    try {
+      const { port } = server.address();
+      await expect(generateWithContinuation('write docs', {
+        apiKey: 'key',
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 10,
+        maxContinuations: 1,
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true
+      })).rejects.toThrow(/1 次续写后仍被截断/);
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

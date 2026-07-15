@@ -4,10 +4,20 @@ const {
   generateWithContinuation,
   validateBaseUrl,
   validateResolvedBaseUrl,
-  normalizeAnthropicMessages
+  normalizeAnthropicMessages,
+  assertMessagesWithinBudget
 } = require('../../src/ai/client');
 
 describe('generateWithAI', () => {
+  test('rejects serialized messages that exceed the input budget', () => {
+    expect(() => assertMessagesWithinBudget([
+      { role: 'user', content: 'x'.repeat(10000) }
+    ], {
+      maxInputTokens: 10,
+      maxTokens: 200,
+      safetyMargin: 1
+    })).toThrow(/输入 Prompt 超出预算/);
+  });
   test('should throw error without API key', async () => {
     await expect(generateWithAI('test', { protocol: 'openai' }))
       .rejects.toThrow('API key');

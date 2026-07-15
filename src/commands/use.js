@@ -8,7 +8,7 @@ const { extractSection } = require('../core/section');
 const { PROMPT_MAX_CHARS } = require('../utils/constants');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
-const { evaluatePromptBudget } = require('../utils/token-estimator');
+const { evaluateContextBudget } = require('../utils/token-estimator');
 
 const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
 const LOW_CONFIDENCE_THRESHOLD = 50;
@@ -230,7 +230,10 @@ async function useCommand(options = {}) {
     matchMethod,
     aiReason,
     loadedDocs,
-    tokenBudget: evaluatePromptBudget(prompt, aiConfig?.maxTokens)
+    tokenBudget: evaluateContextBudget(prompt, {
+      maxInputTokens: aiConfig?.maxInputTokens,
+      maxOutputTokens: aiConfig?.maxTokens
+    })
   };
 }
 

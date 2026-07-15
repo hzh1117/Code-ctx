@@ -1,4 +1,5 @@
 const { renderTemplate, loadTemplate } = require('../template/engine');
+const { CONTEXT_LIMITS } = require('../utils/constants');
 
 const LABELS = {
   zh: {
@@ -35,6 +36,12 @@ const LABELS = {
 
 function getLabels(language) {
   return LABELS[language] || LABELS.zh;
+}
+
+function limitText(value, maxChars, label) {
+  const text = String(value || '');
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n[${label} truncated at ${maxChars} chars]`;
 }
 
 function formatSourceFiles(sourceFiles) {
@@ -107,11 +114,11 @@ function buildOverviewPrompt({ config, generatedDocs, language } = {}) {
   const projects = configObj.projects || [];
   const docs = generatedDocs || {};
 
-  const projectSummaries = projects.map(p => {
+  const projectSummaries = limitText(projects.map(p => {
     const doc = docs[p.alias] || '';
     const summary = doc.split('\n').slice(0, 20).join('\n');
     return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
-  }).join('\n');
+  }).join('\n'), CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS, 'project summaries');
 
   const tpl = loadTemplate('scan-prompt-overview.md', language);
   return renderTemplate(tpl, {
@@ -134,7 +141,7 @@ ${labels.projectType}：${p.type}
 ${labels.projectPath}：${p.path}
 
 ${labels.dirStructure}：
-${result.tree || ''}
+${limitText(result.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree')}
 
 ${labels.keyFiles}：
 ${(result.sourceFiles || []).map(file => file.path).join('\n') || (result.keyFiles || []).join('\n')}
@@ -159,6 +166,11 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
       const summary = doc.split('\n').slice(0, 15).join('\n');
       otherDocsSection += `\n\n### ${alias}\n${summary}`;
     }
+    otherDocsSection = limitText(
+      otherDocsSection,
+      CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS,
+      'other docs'
+    );
   }
 
   const tpl = loadTemplate('scan-prompt.md', language);
@@ -166,7 +178,7 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
     projectName: projectObj.name || '',
     projectType: projectObj.type || '',
     projectPath: projectObj.path || '',
-    tree: scanObj.tree || '',
+    tree: limitText(scanObj.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree'),
     keyFiles: (scanObj.sourceFiles || []).map(file => file.path).join('\n') || (scanObj.keyFiles || []).join('\n'),
     sourceEvidence: formatSourceFiles(scanObj.sourceFiles),
     otherDocsSection

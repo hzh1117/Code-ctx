@@ -430,12 +430,20 @@ function getAIConfig(rootDir) {
   const timeout = Number.isFinite(parsedTimeout) && parsedTimeout > 0
     ? parsedTimeout
     : AI_CLIENT.DEFAULT_TIMEOUT;
+  const configuredInputTokens = parseInt(
+    aiConfig.maxInputTokens || envConfig.AI_MAX_INPUT_TOKENS,
+    10
+  );
+  const maxInputTokens = Number.isFinite(configuredInputTokens) && configuredInputTokens > 0
+    ? configuredInputTokens
+    : require('./constants').CONTEXT_LIMITS.MAX_INPUT_TOKENS;
 
   return {
     protocol,
     baseUrl: activeProvider.baseUrl,
     model: activeProvider.model,
     maxTokens: activeProvider.maxTokens,
+    maxInputTokens,
     apiKey,
     timeout,
     providers

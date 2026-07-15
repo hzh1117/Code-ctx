@@ -3,6 +3,7 @@ const http = require('http');
 const net = require('net');
 const dns = require('dns').promises;
 const { AI_CLIENT } = require('../utils/constants');
+const { evaluateContextBudget } = require('../utils/token-estimator');
 
 const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
 const MAX_RETRIES = AI_CLIENT.MAX_RETRIES;
@@ -326,6 +327,7 @@ async function callOpenAIWithMessages(messages, options) {
     dnsLookup
   } = options;
 
+  assertMessagesWithinBudget(messages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
   await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
   const url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
@@ -386,6 +388,7 @@ async function callAnthropicWithMessages(messages, options) {
     dnsLookup
   } = options;
 
+  assertMessagesWithinBudget(messages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
   await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
   const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
@@ -462,6 +465,7 @@ async function generateWithAI(prompt, options = {}) {
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-5.5',
     maxTokens = 4096,
+    maxInputTokens,
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
@@ -472,7 +476,10 @@ async function generateWithAI(prompt, options = {}) {
     throw new Error('需要配置 API key');
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
+  const callOptions = {
+    apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
+    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup
+  };
 
   if (protocol === 'openai') {
     return callOpenAI(prompt, callOptions);
@@ -490,6 +497,7 @@ async function generateFromMessages(messages, options = {}) {
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-5.5',
     maxTokens = 4096,
+    maxInputTokens,
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
@@ -501,7 +509,7 @@ async function generateFromMessages(messages, options = {}) {
   }
 
   const callOptions = {
-    apiKey, baseUrl, model, maxTokens, timeout,
+    apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
     allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup,
     returnMetadata: true
   };
@@ -513,6 +521,20 @@ async function generateFromMessages(messages, options = {}) {
   } else {
     throw new Error(`不支持的协议: ${protocol}`);
   }
+}
+
+function assertMessagesWithinBudget(messages, options) {
+  const budget = evaluateContextBudget(JSON.stringify(messages), {
+    maxInputTokens: options.maxInputTokens,
+    maxOutputTokens: options.maxTokens,
+    safetyMargin: options.safetyMargin
+  });
+  if (budget.status === 'over') {
+    throw new Error(
+      `AI 输入 Prompt 超出预算: 预计 ${budget.input.estimate} tokens，安全上限 ${budget.input.safeLimit} tokens`
+    );
+  }
+  return budget;
 }
 
 function inspectOutputStructure(content) {
@@ -618,6 +640,7 @@ function generateWithAIStream(prompt, options = {}) {
     baseUrl = 'https://api.openai.com/v1',
     model = 'gpt-5.5',
     maxTokens = 4096,
+    maxInputTokens,
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
@@ -629,11 +652,13 @@ function generateWithAIStream(prompt, options = {}) {
     return emitter;
   }
 
-  const callOptions = { apiKey, baseUrl, model, maxTokens, timeout, allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup };
-
   const doStream = async () => {
     try {
       let parsedBaseUrl, url, headers, body;
+      assertMessagesWithinBudget([{ role: 'user', content: prompt }], {
+        maxInputTokens,
+        maxTokens
+      });
 
       if (protocol === 'openai') {
         parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
@@ -771,5 +796,6 @@ module.exports = {
   validateBaseUrl,
   validateResolvedBaseUrl,
   normalizeAnthropicMessages,
-  inspectOutputStructure
+  inspectOutputStructure,
+  assertMessagesWithinBudget
 };

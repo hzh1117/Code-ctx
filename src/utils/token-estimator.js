@@ -90,4 +90,29 @@ function evaluatePromptBudget(prompt, maxTokens) {
   };
 }
 
-module.exports = { estimateTokensForContent, evaluatePromptBudget };
+function evaluateContextBudget(prompt, options = {}) {
+  const { CONTEXT_LIMITS } = require('./constants');
+  const maxInputTokens = Number.isFinite(options.maxInputTokens)
+    ? Number(options.maxInputTokens)
+    : CONTEXT_LIMITS.MAX_INPUT_TOKENS;
+  const maxOutputTokens = Number.isFinite(options.maxOutputTokens)
+    ? Number(options.maxOutputTokens)
+    : null;
+  const safetyMargin = Number.isFinite(options.safetyMargin)
+    ? Number(options.safetyMargin)
+    : CONTEXT_LIMITS.SAFETY_MARGIN;
+  const inputLimit = Math.floor(maxInputTokens * safetyMargin);
+  const estimate = estimateTokensForContent(prompt || '');
+  const ratio = inputLimit > 0 ? estimate / inputLimit : null;
+  const status = ratio === null ? 'ok' : ratio >= 1 ? 'over' : ratio >= 0.8 ? 'warn' : 'ok';
+
+  return {
+    estimate,
+    status,
+    ratio,
+    input: { estimate, maxTokens: maxInputTokens, safeLimit: inputLimit, safetyMargin },
+    output: { maxTokens: maxOutputTokens }
+  };
+}
+
+module.exports = { estimateTokensForContent, evaluatePromptBudget, evaluateContextBudget };

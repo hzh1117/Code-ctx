@@ -297,6 +297,17 @@ describe('prompt-builder', () => {
   });
 
   describe('buildSubprojectPrompt 边界', () => {
+    test('tree and sibling context limits are enforced in the final prompt', () => {
+      const result = buildSubprojectPrompt({
+        project: { name: 'bounded', type: 'generic-js-ts' },
+        scanResult: { tree: 't'.repeat(20000), keyFiles: [] },
+        otherDocs: { sibling: 'd'.repeat(30000) }
+      });
+
+      expect(result).toContain('[tree truncated at 8000 chars]');
+      expect(result).toContain('[other docs truncated at 10000 chars]');
+      expect(result).not.toContain('t'.repeat(9000));
+    });
     test('keyFiles / tree 缺失时不出现 undefined', () => {
       const result = buildSubprojectPrompt({ project: { name: 'x' }, scanResult: {} });
       expect(result).not.toContain('undefined');

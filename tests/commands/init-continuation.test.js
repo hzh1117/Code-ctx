@@ -70,13 +70,19 @@ describe('initCommand AI continuation', () => {
 
   test('one project failure does not stop others', async () => {
     const largeContent = 'x'.repeat(200000);
-    for (const name of ['app-a', 'app-b']) {
+    for (const name of ['app-a', 'app-b', 'app-c']) {
       const dir = path.join(testDir, name);
-      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.mkdirSync(path.join(dir, 'src', 'components'), { recursive: true });
       fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({
         dependencies: { react: '^18.0.0' }
       }));
       fs.writeFileSync(path.join(dir, 'src', 'App.jsx'), `// ${name}\n${largeContent}`);
+      for (let i = 0; i < 4; i++) {
+        fs.writeFileSync(
+          path.join(dir, 'src', 'components', `Part${i}.jsx`),
+          `// ${name}-${i}\n${largeContent}`
+        );
+      }
     }
 
     const allSections = [

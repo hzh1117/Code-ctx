@@ -1,4 +1,6 @@
-const { estimateTokensForContent, evaluatePromptBudget } = require('../../src/utils/token-estimator');
+const {
+  estimateTokensForContent, evaluatePromptBudget, evaluateContextBudget
+} = require('../../src/utils/token-estimator');
 
 describe('token-estimator', () => {
   test('estimates more tokens for longer text', () => {
@@ -74,5 +76,18 @@ describe('token-estimator', () => {
     const result = evaluatePromptBudget(null, 1000);
     expect(result.status).toBe('ok');
     expect(result.estimate).toBe(0);
+  });
+
+  test('evaluateContextBudget separates serialized input and output budgets', () => {
+    const result = evaluateContextBudget('a'.repeat(1000), {
+      maxInputTokens: 100,
+      maxOutputTokens: 25,
+      safetyMargin: 0.5
+    });
+
+    expect(result.input.maxTokens).toBe(100);
+    expect(result.input.safeLimit).toBe(50);
+    expect(result.output.maxTokens).toBe(25);
+    expect(result.status).toBe('over');
   });
 });

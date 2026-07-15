@@ -37,6 +37,19 @@ describe('config', () => {
     // Protocol may be overridden by tool-level config
     expect(['openai', 'anthropic']).toContain(config.protocol);
     expect(config.maxTokens).toBeDefined();
+    expect(config.maxInputTokens).toBe(120000);
+  });
+
+  test('should allow a separate input token budget', () => {
+    fs.writeFileSync(path.join(testDir, '.env'), [
+      'OPENAI_API_KEY=test-key',
+      'AI_MAX_INPUT_TOKENS=32000'
+    ].join('\n'));
+
+    const config = getAIConfig(testDir);
+
+    expect(config.maxInputTokens).toBe(32000);
+    expect(config.maxTokens).not.toBe(config.maxInputTokens);
   });
 
   test('should use Kimi Code defaults when ANTHROPIC_BASE_URL points to Kimi', () => {

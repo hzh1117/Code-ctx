@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
-const { scanProject, estimateTokens } = require('../scanner/file-scanner');
+const { scanProject } = require('../scanner/file-scanner');
 const {
   getAIConfig, getProjectLimits, getConfigFile, loadProjectConfig, saveProjectConfig
 } = require('../utils/config');
@@ -11,6 +11,7 @@ const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
 const { generateDeterministicDocs } = require('../generator/deterministic-docs');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
+const { evaluateContextBudget } = require('../utils/token-estimator');
 const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
 const { listSections } = require('../core/section');
 
@@ -287,22 +288,26 @@ function generateProjectConfig(rootDir, projects, options) {
   return config;
 }
 
-function pickStrategy(projects, scanResults) {
-  let totalTokens = 0;
-  for (const project of projects) {
-    const result = scanResults[project.alias];
-    if (result) {
-      const tokens = result.estimatedTokens || estimateTokens(result.keyFiles);
-      totalTokens += tokens;
-      logVerbose(`  ${project.alias}: ~${tokens} tokens`);
-    }
-  }
-  console.log(`总计: ~${totalTokens} tokens`);
-
+function pickStrategy(projects, scanResults, aiConfig) {
+  const budgetOptions = {
+    maxInputTokens: aiConfig.maxInputTokens,
+    maxOutputTokens: aiConfig.maxTokens
+  };
+  const oneShotPrompt = buildInitPrompt({ projects, scanResults, type: 'one-shot' });
+  const oneShotBudget = evaluateContextBudget(oneShotPrompt, budgetOptions);
+  const batchBudgets = projects.map(project => evaluateContextBudget(buildInitPrompt({
+    project,
+    scanResult: scanResults[project.alias]
+  }), budgetOptions));
+  const largestBatchInput = Math.max(0, ...batchBudgets.map(budget => budget.input.estimate));
+  console.log(
+    `Prompt 预算: one-shot ~${oneShotBudget.input.estimate} input tokens；` +
+    `batch 最大 ~${largestBatchInput}；output 上限 ${aiConfig.maxTokens}`
+  );
   let strategy;
-  if (totalTokens < TOKEN_THRESHOLDS.ONE_SHOT) {
+  if (oneShotBudget.status !== 'over' && oneShotBudget.input.estimate < TOKEN_THRESHOLDS.ONE_SHOT) {
     strategy = 'ONE_SHOT';
-  } else if (totalTokens <= TOKEN_THRESHOLDS.BATCH) {
+  } else if (batchBudgets.every(budget => budget.status !== 'over') && largestBatchInput <= TOKEN_THRESHOLDS.BATCH) {
     strategy = 'BATCH_WITH_CONTEXT';
   } else {
     strategy = 'BATCH_MINIMAL';
@@ -567,8 +572,6 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
   }
 
   logStep('6/7', '生成项目文档');
-  const strategy = pickStrategy(projects, scanResults);
-
   try {
     logVerbose('加载 AI 配置...');
     const aiConfig = getAIConfig(rootDir);
@@ -588,6 +591,8 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
       saveInitState(outputDir, state);
       return { generatedDocs, failedDocs, status: 'failed', success: false };
     }
+
+    const strategy = pickStrategy(projects, scanResults, aiConfig);
 
     if (options.docType && ['api', 'database'].includes(options.docType)) {
       await generateTypeSpecificDocs({

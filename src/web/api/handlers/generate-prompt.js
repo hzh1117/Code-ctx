@@ -1,6 +1,6 @@
 const { filterSensitive } = require('../../../utils/sensitive-filter');
 const { buildContext, useCommand } = require('../../../commands/use');
-const { evaluatePromptBudget } = require('../../../utils/token-estimator');
+const { evaluateContextBudget } = require('../../../utils/token-estimator');
 const { getAIConfig } = require('../../../utils/config');
 
 module.exports = function register(router, rootDir) {
@@ -30,7 +30,10 @@ module.exports = function register(router, rootDir) {
       let tokenBudget = null;
       try {
         const aiConfig = getAIConfig(rootDir);
-        tokenBudget = evaluatePromptBudget(prompt, aiConfig?.maxTokens);
+        tokenBudget = evaluateContextBudget(prompt, {
+          maxInputTokens: aiConfig?.maxInputTokens,
+          maxOutputTokens: aiConfig?.maxTokens
+        });
       } catch {
         // tokenBudget is optional — never block the prompt response on it
       }

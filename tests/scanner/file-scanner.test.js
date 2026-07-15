@@ -105,6 +105,55 @@ describe('scanProject', () => {
     }
   });
 
+  test('should return redacted structured source snapshots', () => {
+    const dir = createTmpDir();
+    setupBaseFixtures(dir);
+    const appPath = path.join(dir, 'src/App.jsx');
+    fs.writeFileSync(appPath, 'const apiKey = "top-secret-value";\nexport function boot() { return 42; }');
+    try {
+      const result = scanProject(dir, 'react');
+      const source = result.sourceFiles.find(file => file.path === 'src/App.jsx');
+
+      expect(source).toEqual(expect.objectContaining({
+        path: 'src/App.jsx',
+        language: 'javascript',
+        hashAlgorithm: 'sha256',
+        redactions: 1
+      }));
+      expect(source.hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(source.content).toContain('export function boot()');
+      expect(source.content).toContain('[FILTERED]');
+      expect(source.content).not.toContain('top-secret-value');
+      expect(source.truncation).toEqual(expect.objectContaining({
+        truncated: false,
+        originalChars: source.content.length,
+        includedChars: source.content.length
+      }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('should report deterministic source truncation metadata', () => {
+    const dir = createTmpDir();
+    setupBaseFixtures(dir);
+    fs.writeFileSync(path.join(dir, 'src/App.jsx'), 'export const value = "' + 'x'.repeat(100) + '";');
+    try {
+      const result = scanProject(dir, 'react', { maxSourceChars: 1000, maxSourceFileChars: 10 });
+      const source = result.sourceFiles.find(file => file.path === 'src/App.jsx');
+
+      expect(source.content).toHaveLength(10);
+      expect(source.truncation).toEqual(expect.objectContaining({
+        truncated: true,
+        includedChars: 10,
+        reason: 'file-limit'
+      }));
+      expect(source.truncation.originalChars).toBeGreaterThan(10);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('should scan uniapp-miniprogram project files', () => {
     const dir = createTmpDir();
     setupUniappFixtures(dir);

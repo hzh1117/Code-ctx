@@ -16,6 +16,9 @@ Repository/Mapper 文件：
 配置文件（application.yml/properties）：
 {{configFiles}}
 
+源码证据（内容可能因预算截断；只能依据证据陈述事实）：
+{{sourceEvidence}}
+
 请生成完整的数据库结构设计文档，包含以下内容：
 
 1. **数据库概览**

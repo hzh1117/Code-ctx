@@ -1,9 +1,43 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { globSync } = require('glob');
 const { defaultRegistry } = require('../adapters');
-const { PROJECT_LIMITS } = require('../utils/constants');
+const { CONTEXT_LIMITS, PROJECT_LIMITS } = require('../utils/constants');
 const { estimateTokensForContent } = require('../utils/token-estimator');
+const { filterSensitive } = require('../utils/sensitive-filter');
+
+const LANGUAGE_BY_EXTENSION = {
+  '.c': 'c',
+  '.cc': 'cpp',
+  '.cpp': 'cpp',
+  '.cs': 'csharp',
+  '.css': 'css',
+  '.go': 'go',
+  '.gradle': 'groovy',
+  '.html': 'html',
+  '.java': 'java',
+  '.js': 'javascript',
+  '.json': 'json',
+  '.jsx': 'javascript',
+  '.kt': 'kotlin',
+  '.md': 'markdown',
+  '.php': 'php',
+  '.properties': 'properties',
+  '.py': 'python',
+  '.rb': 'ruby',
+  '.rs': 'rust',
+  '.scss': 'scss',
+  '.sh': 'shell',
+  '.sql': 'sql',
+  '.svelte': 'svelte',
+  '.ts': 'typescript',
+  '.tsx': 'typescript',
+  '.vue': 'vue',
+  '.xml': 'xml',
+  '.yaml': 'yaml',
+  '.yml': 'yaml'
+};
 
 function scanProject(projectDir, projectType, options = {}) {
   if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
@@ -12,6 +46,8 @@ function scanProject(projectDir, projectType, options = {}) {
 
   const maxFiles = options.maxFiles || PROJECT_LIMITS.MAX_FILES_PER_PROJECT;
   const maxTokens = options.maxTokens || PROJECT_LIMITS.MAX_PROJECT_TOKENS;
+  const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
+  const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   
   const patterns = defaultRegistry.getScanPatterns(projectType);
   const keyFiles = [];
@@ -36,14 +72,69 @@ function scanProject(projectDir, projectType, options = {}) {
 
   // 限制 token 数量
   const result = limitByTokens(limitedFiles, maxTokens);
+  const sourceFiles = buildSourceSnapshots(
+    result.files,
+    projectDir,
+    maxSourceChars,
+    maxSourceFileChars
+  );
 
   return {
     tree,
     keyFiles: result.files,
+    sourceFiles,
     totalFiles: uniqueFiles.length,
     limitedTo: result.files.length,
     estimatedTokens: result.tokens
   };
+}
+
+function detectLanguage(filePath) {
+  const basename = path.basename(filePath).toLowerCase();
+  if (basename === 'dockerfile') return 'dockerfile';
+  if (basename === 'makefile') return 'makefile';
+  return LANGUAGE_BY_EXTENSION[path.extname(basename)] || 'text';
+}
+
+function buildSourceSnapshots(files, projectDir, maxTotalChars, maxFileChars) {
+  let remainingChars = Math.max(0, maxTotalChars);
+
+  return files.map(filePath => {
+    let content = '';
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      return null;
+    }
+
+    const safe = filterSensitive(content);
+    const originalChars = safe.content.length;
+    const includedChars = Math.min(originalChars, maxFileChars, remainingChars);
+    const snippet = safe.content.slice(0, includedChars);
+    remainingChars -= includedChars;
+
+    let reason = null;
+    if (includedChars < originalChars) {
+      reason = remainingChars === 0 && includedChars < Math.min(originalChars, maxFileChars)
+        ? 'total-budget'
+        : 'file-limit';
+    }
+
+    return {
+      path: path.relative(projectDir, filePath).split(path.sep).join('/'),
+      language: detectLanguage(filePath),
+      hash: crypto.createHash('sha256').update(content).digest('hex'),
+      hashAlgorithm: 'sha256',
+      content: snippet,
+      redactions: safe.count,
+      truncation: {
+        truncated: includedChars < originalChars,
+        originalChars,
+        includedChars,
+        reason
+      }
+    };
+  }).filter(Boolean);
 }
 
 function prioritizeFiles(files, projectType) {

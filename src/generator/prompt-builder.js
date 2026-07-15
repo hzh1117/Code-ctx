@@ -13,7 +13,8 @@ const LABELS = {
     projectType: '项目类型',
     projectPath: '项目路径',
     dirStructure: '目录结构',
-    keyFiles: '关键文件'
+    keyFiles: '关键文件',
+    sourceEvidence: '源码证据'
   },
   en: {
     part1: '[Part 1: Project Context]',
@@ -27,12 +28,33 @@ const LABELS = {
     projectType: 'Project Type',
     projectPath: 'Project Path',
     dirStructure: 'Directory Structure',
-    keyFiles: 'Key Files'
+    keyFiles: 'Key Files',
+    sourceEvidence: 'Source Evidence'
   }
 };
 
 function getLabels(language) {
   return LABELS[language] || LABELS.zh;
+}
+
+function formatSourceFiles(sourceFiles) {
+  if (!Array.isArray(sourceFiles) || sourceFiles.length === 0) return '';
+
+  return sourceFiles.map(file => {
+    const truncation = file.truncation || {};
+    const metadata = [
+      `path=${JSON.stringify(file.path || '')}`,
+      `language=${JSON.stringify(file.language || 'text')}`,
+      `sha256=${JSON.stringify(file.hash || '')}`,
+      `truncated=${truncation.truncated === true}`,
+      `includedChars=${truncation.includedChars ?? String(file.content || '').length}`,
+      `originalChars=${truncation.originalChars ?? String(file.content || '').length}`
+    ];
+    if (truncation.reason) metadata.push(`reason=${JSON.stringify(truncation.reason)}`);
+    if (file.redactions) metadata.push(`redactions=${file.redactions}`);
+
+    return `<source ${metadata.join(' ')}>\n${file.content || ''}\n</source>`;
+  }).join('\n\n');
 }
 
 function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template, language }) {
@@ -115,7 +137,10 @@ ${labels.dirStructure}：
 ${result.tree || ''}
 
 ${labels.keyFiles}：
-${(result.keyFiles || []).join('\n')}`;
+${(result.sourceFiles || []).map(file => file.path).join('\n') || (result.keyFiles || []).join('\n')}
+
+${labels.sourceEvidence}：
+${formatSourceFiles(result.sourceFiles)}`;
   }).join('\n\n---\n\n');
 
   const tpl = loadTemplate('scan-prompt-one-shot.md', language);
@@ -142,7 +167,8 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
     projectType: projectObj.type || '',
     projectPath: projectObj.path || '',
     tree: scanObj.tree || '',
-    keyFiles: (scanObj.keyFiles || []).join('\n'),
+    keyFiles: (scanObj.sourceFiles || []).map(file => file.path).join('\n') || (scanObj.keyFiles || []).join('\n'),
+    sourceEvidence: formatSourceFiles(scanObj.sourceFiles),
     otherDocsSection
   });
 }
@@ -191,7 +217,8 @@ function buildApiPrompt({ project, scanResult, language }) {
   const projectObj = project || {};
   const scanObj = scanResult || {};
 
-  const categories = categorizeFiles(scanObj.keyFiles || []);
+  const displayFiles = (scanObj.sourceFiles || []).map(file => file.path);
+  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : (scanObj.keyFiles || []));
 
   const tpl = loadTemplate('java-api-prompt.md', language);
   return renderTemplate(tpl, {
@@ -200,7 +227,8 @@ function buildApiPrompt({ project, scanResult, language }) {
     projectPath: projectObj.path || '',
     tree: scanObj.tree || '',
     controllerFiles: categories.controllerFiles.join('\n') || '未找到 Controller 文件',
-    serviceFiles: categories.serviceFiles.join('\n') || '未找到 Service 文件'
+    serviceFiles: categories.serviceFiles.join('\n') || '未找到 Service 文件',
+    sourceEvidence: formatSourceFiles(scanObj.sourceFiles)
   });
 }
 
@@ -208,7 +236,8 @@ function buildDatabasePrompt({ project, scanResult, language }) {
   const projectObj = project || {};
   const scanObj = scanResult || {};
   
-  const categories = categorizeFiles(scanObj.keyFiles || []);
+  const displayFiles = (scanObj.sourceFiles || []).map(file => file.path);
+  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : (scanObj.keyFiles || []));
   
   const tpl = loadTemplate('java-database-prompt.md', language);
   return renderTemplate(tpl, {
@@ -218,7 +247,8 @@ function buildDatabasePrompt({ project, scanResult, language }) {
     tree: scanObj.tree || '',
     entityFiles: categories.entityFiles.join('\n') || '未找到 Entity/Model 文件',
     repositoryFiles: categories.repositoryFiles.join('\n') || '未找到 Repository/Mapper 文件',
-    configFiles: categories.configFiles.join('\n') || '未找到配置文件'
+    configFiles: categories.configFiles.join('\n') || '未找到配置文件',
+    sourceEvidence: formatSourceFiles(scanObj.sourceFiles)
   });
 }
 
@@ -230,5 +260,6 @@ module.exports = {
   buildSubprojectPrompt,
   buildApiPrompt,
   buildDatabasePrompt,
+  formatSourceFiles,
   getLabels
 };

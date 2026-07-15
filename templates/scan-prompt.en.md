@@ -10,6 +10,9 @@ Directory Structure:
 Key Files:
 {{keyFiles}}
 
+Source Evidence (content may be truncated by budget; only state facts supported by evidence, do not guess from file names):
+{{sourceEvidence}}
+
 {{otherDocsSection}}
 
 Please generate the following content, each section must be wrapped with section markers:

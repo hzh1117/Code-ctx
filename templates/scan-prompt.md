@@ -10,6 +10,9 @@
 关键文件：
 {{keyFiles}}
 
+源码证据（内容可能因预算截断；只能依据证据陈述事实，不要根据文件名猜测）：
+{{sourceEvidence}}
+
 {{otherDocsSection}}
 
 请生成以下内容，每个部分必须用 section 标记包裹：

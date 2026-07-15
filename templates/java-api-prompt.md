@@ -13,6 +13,9 @@ Controller 文件：
 Service 文件：
 {{serviceFiles}}
 
+源码证据（内容可能因预算截断；只能依据证据陈述事实）：
+{{sourceEvidence}}
+
 请生成完整的 API 接口文档，包含以下内容：
 
 1. **API 概览**

@@ -208,6 +208,29 @@ describe('prompt-builder', () => {
       expect(result).toContain('src/index.vue');
     });
 
+    test('将结构化源码内容而非仅文件名写入 prompt', () => {
+      const result = buildSubprojectPrompt({
+        project: { name: 'my-app', type: 'node', path: 'apps/my' },
+        scanResult: {
+          tree: 'src/',
+          keyFiles: ['C:\\private\\repo\\src\\routes.js'],
+          sourceFiles: [{
+            path: 'src/routes.js',
+            language: 'javascript',
+            hash: 'abc123',
+            content: 'router.get("/users", listUsers);',
+            redactions: 0,
+            truncation: { truncated: false, originalChars: 32, includedChars: 32, reason: null }
+          }]
+        }
+      });
+
+      expect(result).toContain('path="src/routes.js"');
+      expect(result).toContain('router.get("/users", listUsers);');
+      expect(result).toContain('sha256="abc123"');
+      expect(result).not.toContain('C:\\private\\repo');
+    });
+
     test('otherDocs 非空时包含摘要', () => {
       const result = buildSubprojectPrompt({
         project: { name: 'app', type: 'react' },

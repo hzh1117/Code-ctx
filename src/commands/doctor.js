@@ -309,6 +309,7 @@ function printDocQuality(quality) {
   if (!quality) return;
   console.log('\n📊 文档质量评分');
   console.log(`  整体：${formatLevelLabel(quality.overall)}（综合分 ${quality.score}）`);
+  console.log(`  格式健康 ${quality.summary.formatHealth} / 事实可信 ${quality.summary.factualConfidence}`);
   console.log(`  完整度 ${quality.summary.completeness} / 新鲜度 ${quality.summary.freshness} / 风险 ${quality.summary.risk}`);
   const notOk = quality.perDoc.filter(d => d.level !== 'OK');
   if (notOk.length > 0) {
@@ -318,7 +319,8 @@ function printDocQuality(quality) {
         ? `，缺失 section：${d.completeness.missing.join(', ')}`
         : '';
       const risk = (d.risks || []).map(r => r.message).join('；');
-      console.log(`    - ${d.name} ${formatLevelLabel(d.level)}（${d.score}）${missing}${risk ? '；' + risk : ''}`);
+      const facts = d.factualConfidence ? `，事实可信 ${d.factualConfidence.score}` : '';
+      console.log(`    - ${d.name} ${formatLevelLabel(d.level)}（${d.score}${facts}）${missing}${risk ? '；' + risk : ''}`);
     }
   }
 }

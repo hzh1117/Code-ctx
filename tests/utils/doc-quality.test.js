@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 
 const { scoreDocs, scoreOneDoc, EXPECTED_PROJECT_SECTIONS } = require('../../src/utils/doc-quality');
 const { _clearCache } = require('../../src/utils/config');
@@ -41,7 +42,7 @@ describe('doc-quality', () => {
     expect(result.aiDocsExists).toBe(false);
   });
 
-  test('returns OK when configured docs are complete', () => {
+  test('complete docs without a manifest remain unverified', () => {
     fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
       projects: [{ alias: 'web', path: './web', type: 'react' }]
     }));
@@ -49,9 +50,87 @@ describe('doc-quality', () => {
     writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
 
     const result = scoreDocs(root);
+    expect(result.overall).toBe('WARN');
+    expect(result.summary.formatHealth).toBeGreaterThanOrEqual(80);
+    expect(result.summary.factualConfidence).toBe(0);
+    expect(result.perDoc.find(d => d.name === 'web.md').factualConfidence.status).toBe('unverified');
+  });
+
+  test('returns OK only when source facts and citations verify against the manifest', () => {
+    const projectDir = path.join(root, 'web');
+    fs.mkdirSync(projectDir);
+    const source = [
+      "const express = require('express');",
+      "router.get('/users', listUsers);",
+      'function listUsers() {}'
+    ].join('\n');
+    fs.writeFileSync(path.join(projectDir, 'index.js'), source);
+    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'web', path: './web', type: 'node-backend' }]
+    }));
+    const hash = crypto.createHash('sha256').update(source).digest('hex');
+    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
+      version: 1,
+      projects: [{
+        id: 'web',
+        sourcePath: './web',
+        document: 'web.md',
+        keyFiles: [{ path: 'index.js', hash }]
+      }]
+    }));
+    const projectDoc = fullDoc(EXPECTED_PROJECT_SECTIONS) + [
+      '',
+      `Source: \`index.js\` sha256:${hash}`,
+      'Symbol: `index.js#listUsers`',
+      'Route: GET /users'
+    ].join('\n');
+    writeDoc(aiDocs, 'web.md', projectDoc);
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']) +
+        '\nweb ./web web.md\n'
+    );
+
+    const result = scoreDocs(root);
+
     expect(result.overall).toBe('OK');
-    expect(result.score).toBeGreaterThanOrEqual(80);
-    expect(result.perDoc.find(d => d.name === 'web.md').level).toBe('OK');
+    expect(result.summary.factualConfidence).toBe(100);
+    expect(result.perDoc.find(d => d.name === 'web.md').factualConfidence).toEqual(
+      expect.objectContaining({ status: 'verified', score: 100 })
+    );
+  });
+
+  test('marks changed source hashes as factual risk even when formatting is complete', () => {
+    const projectDir = path.join(root, 'web');
+    fs.mkdirSync(projectDir);
+    fs.writeFileSync(path.join(projectDir, 'index.js'), 'current source');
+    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'web', path: './web', type: 'generic-js-ts' }]
+    }));
+    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
+      projects: [{
+        id: 'web', sourcePath: './web', document: 'web.md',
+        keyFiles: [{ path: 'index.js', hash: 'stale-hash' }]
+      }]
+    }));
+    writeDoc(aiDocs, 'web.md', fullDoc(EXPECTED_PROJECT_SECTIONS) + '\n`index.js` stale-hash\n');
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']) +
+        '\nweb ./web web.md\n'
+    );
+
+    const result = scoreDocs(root);
+    const web = result.perDoc.find(d => d.name === 'web.md');
+
+    expect(result.overall).toBe('HIGH_RISK');
+    expect(web.formatHealth.score).toBeGreaterThanOrEqual(80);
+    expect(web.factualConfidence.metrics.referenceResolution).toBe(0);
+    expect(web.risks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'source-reference-invalid' })
+    ]));
   });
 
   test('marks doc as HIGH_RISK when sensitive info present', () => {

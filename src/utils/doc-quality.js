@@ -6,6 +6,9 @@ const { DETECTION_PATTERNS } = require('./sensitive-filter');
 const { loadProjectConfig } = require('./config');
 const { STATE_FILES } = require('./constants');
 const { getLatestMtime } = require('./mtime-utils');
+const {
+  loadProjectManifest, verifyOverviewFacts, verifyProjectFacts
+} = require('./fact-verifier');
 
 // Per-doc expectations. Overview and per-project use different templates.
 const EXPECTED_PROJECT_SECTIONS = ['overview', 'structure', 'modules', 'api', 'data', 'dependencies', 'notes'];
@@ -42,7 +45,9 @@ function scoreCompleteness(presentSections, expectedSections) {
   return { score, present, missing };
 }
 
-function scoreOneDoc({ filePath, docName, expectedSections, projectDir, freshnessDeadline }) {
+function scoreOneDoc({
+  filePath, docName, expectedSections, projectDir, freshnessDeadline, factualConfidence
+}) {
   if (!fs.existsSync(filePath)) {
     return {
       name: docName,
@@ -51,6 +56,8 @@ function scoreOneDoc({ filePath, docName, expectedSections, projectDir, freshnes
       score: 0,
       completeness: { score: 0, present: [], missing: expectedSections },
       freshness: { score: 0, stale: false, reason: 'doc-missing' },
+      formatHealth: { score: 0 },
+      factualConfidence: factualConfidence || { status: 'invalid', score: 0, metrics: {}, issues: [] },
       risks: [{ type: 'doc-missing', message: `${docName} 不存在` }]
     };
   }
@@ -88,15 +95,32 @@ function scoreOneDoc({ filePath, docName, expectedSections, projectDir, freshnes
   // High-risk findings hard-cap the score below the OK threshold so the level
   // calculation reflects them even if completeness/freshness are perfect.
   const hardRisk = risks.some(r => r.type === 'sensitive' || r.type === 'too-short');
-  const score = hardRisk
+  const formatScore = hardRisk
     ? Math.min(49, Math.round((completeness.score * 0.6 + freshnessScore * 0.4)))
     : Math.round(completeness.score * 0.6 + freshnessScore * 0.4);
+  const facts = factualConfidence || {
+    status: 'unverified',
+    score: 0,
+    metrics: {},
+    issues: [{ type: 'facts-unverified', message: '文档事实未验证' }]
+  };
+  for (const issue of facts.issues || []) risks.push(issue);
+  let score = Math.round(formatScore * 0.45 + facts.score * 0.55);
+  if (facts.status === 'unverified') score = Math.min(score, 79);
+  if (facts.status === 'invalid') score = Math.min(score, 49);
 
   return {
     name: docName,
     exists: true,
     level: getLevel(score),
     score,
+    formatHealth: {
+      score: formatScore,
+      completeness: completeness.score,
+      freshness: freshnessScore,
+      risk: hardRisk ? 0 : 100
+    },
+    factualConfidence: facts,
     completeness,
     freshness: { score: freshnessScore, stale, reason: staleReason },
     risks,
@@ -110,7 +134,7 @@ function scoreDocs(rootDir, options = {}) {
     overall: 'HIGH_RISK',
     score: 0,
     perDoc: [],
-    summary: { completeness: 0, freshness: 0, risk: 100 },
+    summary: { completeness: 0, freshness: 0, risk: 100, formatHealth: 0, factualConfidence: 0 },
     lastScanTime: null,
     aiDocsExists: fs.existsSync(aiDocsDir)
   };
@@ -143,6 +167,7 @@ function scoreDocs(rootDir, options = {}) {
     // config errors: handled by doctor proper
   }
   const projects = Array.isArray(config.projects) ? config.projects : [];
+  const { manifest } = loadProjectManifest(aiDocsDir);
 
   // Bound the freshness walk so a large monorepo doesn't make doctor crawl
   // for too long; configurable, defaults to 1.5s budget across all projects.
@@ -154,22 +179,27 @@ function scoreDocs(rootDir, options = {}) {
     const projectDir = project.path && isWithinDir(path.resolve(rootDir, project.path), rootDir)
       ? path.resolve(rootDir, project.path)
       : null;
+    const content = fs.existsSync(filePath) ? readFileUTF8(filePath) : '';
     result.perDoc.push(scoreOneDoc({
       filePath,
       docName: `${project.alias}.md`,
       expectedSections: EXPECTED_PROJECT_SECTIONS,
       projectDir,
-      freshnessDeadline
+      freshnessDeadline,
+      factualConfidence: verifyProjectFacts(rootDir, content, project, manifest)
     }));
   }
 
   // OVERVIEW.md
+  const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
+  const overviewContent = fs.existsSync(overviewPath) ? readFileUTF8(overviewPath) : '';
   result.perDoc.push(scoreOneDoc({
-    filePath: path.join(aiDocsDir, 'OVERVIEW.md'),
+    filePath: overviewPath,
     docName: 'OVERVIEW.md',
     expectedSections: EXPECTED_OVERVIEW_SECTIONS,
     projectDir: null,
-    freshnessDeadline
+    freshnessDeadline,
+    factualConfidence: verifyOverviewFacts(overviewContent, manifest)
   }));
 
   if (result.perDoc.length === 0) {
@@ -179,6 +209,8 @@ function scoreDocs(rootDir, options = {}) {
   // Aggregate scores
   const completenessAvg = average(result.perDoc.map(d => d.completeness?.score ?? 0));
   const freshnessAvg = average(result.perDoc.map(d => d.freshness?.score ?? 0));
+  const formatHealthAvg = average(result.perDoc.map(d => d.formatHealth?.score ?? 0));
+  const factualConfidenceAvg = average(result.perDoc.map(d => d.factualConfidence?.score ?? 0));
 
   const anySensitive = result.perDoc.some(d => (d.risks || []).some(r => r.type === 'sensitive'));
   const anyMissing = result.perDoc.some(d => !d.exists);
@@ -194,13 +226,18 @@ function scoreDocs(rootDir, options = {}) {
   result.summary = {
     completeness: Math.round(completenessAvg),
     freshness: Math.round(freshnessAvg),
-    risk: riskScore
+    risk: riskScore,
+    formatHealth: Math.round(formatHealthAvg),
+    factualConfidence: Math.round(factualConfidenceAvg)
   };
-  result.score = Math.round(completenessAvg * 0.4 + freshnessAvg * 0.2 + riskScore * 0.4);
+  result.score = Math.round(formatHealthAvg * 0.35 + factualConfidenceAvg * 0.45 + riskScore * 0.2);
 
-  if (anySensitive || anyMissing) {
+  const anyInvalidFacts = result.perDoc.some(d => d.factualConfidence?.status === 'invalid');
+  const anyUnverifiedFacts = result.perDoc.some(d => d.factualConfidence?.status === 'unverified');
+
+  if (anySensitive || anyMissing || anyInvalidFacts) {
     result.overall = 'HIGH_RISK';
-  } else if (result.score < 80 || result.perDoc.some(d => d.level === 'WARN' || d.freshness?.stale)) {
+  } else if (anyUnverifiedFacts || result.score < 80 || result.perDoc.some(d => d.level === 'WARN' || d.freshness?.stale)) {
     result.overall = 'WARN';
   } else {
     result.overall = 'OK';

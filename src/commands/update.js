@@ -76,6 +76,10 @@ function filterIgnored(files) {
   });
 }
 
+function getProjectFromPath(filePath) {
+  return String(filePath).replace(/\\/g, '/').split('/')[0] || '.';
+}
+
 function detectFromGit(rootDir) {
   const lastCommit = getLastScanCommit(rootDir);
   const baseRef = lastCommit || 'HEAD';
@@ -104,6 +108,7 @@ function detectFromGit(rootDir) {
   });
   const changes = changedFiles.map(file => ({
     path: file,
+    project: getProjectFromPath(file),
     status: untrackedSet.has(file) ? 'added' : (fs.existsSync(path.join(rootDir, file)) ? 'modified' : 'deleted')
   }));
 
@@ -146,6 +151,7 @@ function detectFromHash(rootDir, lastScanPath) {
     if (prev.hash !== entry.hash) {
       changes.push({
         path: file,
+        project: getProjectFromPath(file),
         status: prev.hash ? 'modified' : 'added',
         oldHash: prev.hash,
         newHash: entry.hash
@@ -157,6 +163,7 @@ function detectFromHash(rootDir, lastScanPath) {
     if (!Object.prototype.hasOwnProperty.call(currentFiles, file)) {
       changes.push({
         path: file,
+        project: getProjectFromPath(file),
         status: 'deleted',
         oldHash: normalizeFileEntry(oldEntry).hash,
         newHash: null
@@ -256,6 +263,7 @@ function getSectionKey(docName, sectionName) {
 function buildChangeSetId(changes) {
   const normalized = changes.map(change => ({
     path: change.path,
+    project: change.project,
     status: change.status,
     oldHash: change.oldHash || null,
     newHash: change.newHash || null,
@@ -285,8 +293,9 @@ function prepareUpdateState(rootDir, changeSetId, changes, sectionUpdates, detec
     detectedAt: canResume ? previous.detectedAt : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     detectionMethod,
-    changes: changes.map(({ path: filePath, status, oldHash, newHash }) => ({
+    changes: changes.map(({ path: filePath, project, status, oldHash, newHash }) => ({
       path: filePath,
+      project,
       status,
       oldHash: oldHash || null,
       newHash: newHash || null
@@ -352,6 +361,7 @@ function attachChangeEvidence(rootDir, changes, options = {}) {
 function formatChangeEvidence(change) {
   const metadata = [
     `path=${JSON.stringify(change.path)}`,
+    `project=${JSON.stringify(change.project || getProjectFromPath(change.path))}`,
     `status=${JSON.stringify(change.status)}`,
     `evidence=${JSON.stringify(change.evidenceType)}`,
     `truncated=${change.truncation?.truncated === true}`

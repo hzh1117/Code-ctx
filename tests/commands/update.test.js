@@ -181,13 +181,39 @@ describe('updateCommand', () => {
     expect(result.changes).toEqual(expect.arrayContaining([
       expect.objectContaining({
         path: deletedPath,
+        project: 'src',
         status: 'deleted',
         oldHash: 'old-hash',
         evidenceType: 'deletion'
       })
     ]));
     expect(result.sectionUpdates[0].prompt).toContain('status="deleted"');
+    expect(result.sectionUpdates[0].prompt).toContain('project="src"');
     expect(result.sectionUpdates[0].prompt).toContain('File deleted from the current project.');
+  });
+
+  test('hash deletion is removed from committed baseline after docs succeed', async () => {
+    const deletedPath = path.join('src', 'removed.js');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
+    }));
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '# src project',
+      '<!-- section:modules -->',
+      'removed.js module',
+      '<!-- /section:modules -->'
+    ].join('\n'));
+    generateWithAI.mockResolvedValueOnce('module removed');
+
+    const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
+    const execution = await executeUpdateTransaction(testDir, detection, {});
+
+    expect(execution.committed).toBe(true);
+    const baseline = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8'));
+    expect(baseline.files).not.toHaveProperty(deletedPath);
+    const nextDetection = await updateCommand(testDir, { dryRun: true });
+    expect(nextDetection.changedFiles).toEqual([]);
   });
 
   test('hash mode accepts legacy string-hash last-scan format', async () => {

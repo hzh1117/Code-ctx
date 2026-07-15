@@ -725,6 +725,9 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
 }
 
 async function updateCommand(rootDir, options = {}) {
+  if (options.dryRun && options.prepareApply) {
+    throw new Error('dry-run 与 apply 不能同时使用');
+  }
   initPlugins(rootDir);
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 

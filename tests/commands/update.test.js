@@ -81,6 +81,17 @@ describe('updateCommand', () => {
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
   });
 
+  test('business layer rejects dry-run combined with apply preparation', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+
+    await expect(updateCommand(testDir, { dryRun: true, prepareApply: true }))
+      .rejects.toThrow('dry-run 与 apply 不能同时使用');
+
+    expect(generateWithAI).not.toHaveBeenCalled();
+    expect(fs.readdirSync(path.join(testDir, 'ai-docs'))).toEqual([]);
+  });
+
   test('should handle first run when .last-scan does not exist', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');

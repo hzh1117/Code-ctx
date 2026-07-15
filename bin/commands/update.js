@@ -1,12 +1,12 @@
-const { Command } = require('commander');
+const { Command, Option } = require('commander');
 const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 const { getAIConfig } = require('../../src/utils/config');
 const { outputPrompt } = require('../../src/utils/prompt-output');
 
 const update = new Command('update')
   .description('检测变化，更新相关文档')
-  .option('--dry-run', '只检测变化，不更新')
-  .option('--apply', '自动调用 AI 更新文档（执行 section 替换写回）')
+  .addOption(new Option('--dry-run', '只检测变化，不更新').conflicts('apply'))
+  .addOption(new Option('--apply', '自动调用 AI 更新文档（执行 section 替换写回）').conflicts('dryRun'))
   .option('--stdout', '输出 prompt 到 stdout')
   .action(async (options) => {
     try {

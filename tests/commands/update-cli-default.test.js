@@ -41,4 +41,21 @@ describe('update CLI default mode', () => {
     expect(fs.existsSync(path.join(rootDir, 'ai-docs/.last-scan.json'))).toBe(false);
     expect(fs.existsSync(path.join(rootDir, 'ai-docs/.update-state.json'))).toBe(false);
   });
+
+  test('rejects --dry-run with --apply without side effects', () => {
+    const cliPath = path.join(__dirname, '../../bin/cli.js');
+    const docPath = path.join(rootDir, 'ai-docs/src.md');
+    const originalDoc = fs.readFileSync(docPath, 'utf8');
+    const result = spawnSync(process.execPath, [cliPath, 'update', '--dry-run', '--apply'], {
+      cwd: rootDir,
+      encoding: 'utf8'
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/cannot be used with option|不能同时使用/i);
+    expect(fs.readFileSync(docPath, 'utf8')).toBe(originalDoc);
+    expect(fs.existsSync(path.join(rootDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    expect(fs.existsSync(path.join(rootDir, 'ai-docs/.update-state.json'))).toBe(false);
+    expect(fs.existsSync(path.join(rootDir, 'ai-docs/.task-history.jsonl'))).toBe(false);
+  });
 });

@@ -11,7 +11,10 @@ const update = new Command('update')
   .action(async (options) => {
     try {
       const rootDir = process.cwd();
-      const result = await updateCommand(rootDir, { dryRun: options.dryRun });
+      const result = await updateCommand(rootDir, {
+        dryRun: !!options.dryRun,
+        prepareApply: !!options.apply && !options.dryRun
+      });
 
       if (result.changedFiles.length === 0) {
         console.log('✓ 没有检测到文件变化');

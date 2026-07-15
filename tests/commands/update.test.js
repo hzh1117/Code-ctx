@@ -63,7 +63,7 @@ describe('updateCommand', () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
     
-    await updateCommand(testDir, { dryRun: false });
+    await updateCommand(testDir, { dryRun: false, prepareApply: true });
     
     const lastScanPath = path.join(testDir, 'ai-docs/.last-scan.json');
     const updateStatePath = path.join(testDir, 'ai-docs/.update-state.json');
@@ -113,6 +113,30 @@ describe('updateCommand', () => {
     expect(Array.isArray(result.changedFiles)).toBe(true);
 
     fs.rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('default mode returns one executable merged prompt without state commits', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/app.js'), 'export const feature = true;');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '# src project',
+      '<!-- section:overview -->',
+      'old overview',
+      '<!-- /section:overview -->',
+      '<!-- section:modules -->',
+      'old modules',
+      '<!-- /section:modules -->'
+    ].join('\n'));
+
+    const result = await updateCommand(testDir);
+
+    expect(typeof result.prompt).toBe('string');
+    expect(result.prompt).toContain('## 文档: src.md');
+    expect(result.prompt).toContain('<!-- section:overview -->');
+    expect(result.prompt).toContain('<!-- section:modules -->');
+    expect(result.prompt).toContain('export const feature = true;');
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
   });
 
   test('hash mode includes redacted current source in section prompts', async () => {
@@ -194,7 +218,7 @@ describe('updateCommand', () => {
     ].join('\n'));
     generateWithAI.mockResolvedValueOnce('new overview');
 
-    const detection = await updateCommand(testDir, { dryRun: false });
+    const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
     const transaction = await executeUpdateTransaction(testDir, detection, {});
     expect(transaction.committed).toBe(true);
@@ -276,7 +300,7 @@ describe('updateCommand', () => {
       .mockResolvedValueOnce('new a')
       .mockRejectedValueOnce(new Error('temporary failure'));
 
-    const firstDetection = await updateCommand(testDir, { dryRun: false });
+    const firstDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     const firstExecution = await executeUpdateTransaction(testDir, firstDetection, {});
 
     expect(firstExecution.committed).toBe(false);
@@ -287,7 +311,7 @@ describe('updateCommand', () => {
 
     generateWithAI.mockClear();
     generateWithAI.mockResolvedValueOnce('new b');
-    const retryDetection = await updateCommand(testDir, { dryRun: false });
+    const retryDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     expect(retryDetection.sectionUpdates.find(update => update.sectionName === 'a').status).toBe('success');
     const retryExecution = await executeUpdateTransaction(testDir, retryDetection, {});
 
@@ -310,7 +334,7 @@ describe('updateCommand', () => {
     fs.writeFileSync(docPath, original);
     generateWithAI.mockResolvedValueOnce('new overview');
 
-    const detection = await updateCommand(testDir, { dryRun: false });
+    const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
       throw new Error('rename failed');
     });
@@ -342,7 +366,7 @@ describe('updateCommand', () => {
       return 'new overview';
     });
 
-    const detection = await updateCommand(testDir, { dryRun: false });
+    const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     const execution = await executeUpdateTransaction(testDir, detection, {});
 
     expect(execution.committed).toBe(false);

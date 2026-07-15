@@ -31,7 +31,10 @@ async function watchCommand(rootDir, options = {}) {
 
     try {
       clearCache(); // Refresh templates and scenarios
-      const result = await updateCommand(rootDir, { dryRun: false });
+      const result = await updateCommand(rootDir, {
+        dryRun: false,
+        prepareApply: autoApply
+      });
 
       if (result.changedFiles.length === 0) {
         isProcessing = false;

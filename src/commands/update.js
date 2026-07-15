@@ -430,7 +430,17 @@ function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptio
         sectionContent
       });
 
-      sectionUpdates.push({ docName: relatedDoc.name, sectionName, prompt });
+      const update = { docName: relatedDoc.name, sectionName, prompt };
+      Object.defineProperty(update, '_manualContext', {
+        value: {
+          project,
+          changedFiles: projFiles,
+          changeEvidence: renderEvidenceChunks(projectEvidence),
+          sectionContent
+        },
+        enumerable: false
+      });
+      sectionUpdates.push(update);
     }
   }
 
@@ -484,6 +494,37 @@ function applySectionUpdates(docPath, updates) {
     }
     throw err;
   }
+}
+
+function buildCombinedSectionPrompt(sectionUpdates) {
+  const updatesByDoc = groupSectionUpdates(sectionUpdates);
+  const parts = [
+    '请根据以下变化证据，一次性更新所有列出的文档 section。',
+    '只陈述变化证据支持的事实；未受影响内容保持不变。',
+    '输出时按文档分组，每个 section 必须使用原 section 名称的 HTML 注释标记包裹。'
+  ];
+
+  for (const [docName, updates] of Object.entries(updatesByDoc)) {
+    const context = updates[0]._manualContext || {};
+    parts.push('', `## 文档: ${docName}`);
+    if (context.project) parts.push(`子项目: ${context.project}`);
+    parts.push('变化文件：');
+    for (const file of context.changedFiles || []) parts.push(`- ${file}`);
+    parts.push('', '变化证据：', context.changeEvidence || '（无可用源码证据）');
+    parts.push('', '待更新 section：');
+    for (const update of updates) {
+      const updateContext = update._manualContext || {};
+      parts.push(
+        '',
+        `### ${update.sectionName}`,
+        `<!-- section:${update.sectionName} -->`,
+        updateContext.sectionContent || '',
+        `<!-- /section:${update.sectionName} -->`
+      );
+    }
+  }
+
+  return parts.join('\n');
 }
 
 function groupSectionUpdates(sectionUpdates) {
@@ -697,9 +738,11 @@ async function updateCommand(rootDir, options = {}) {
     evidenceOptions
   );
 
-  const prompt = sectionUpdates.length === 0 && changedFiles.length > 0
-    ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
-    : null;
+  const prompt = sectionUpdates.length > 0
+    ? buildCombinedSectionPrompt(sectionUpdates)
+    : changedFiles.length > 0
+      ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
+      : null;
 
   const changeSetId = buildChangeSetId(changesWithEvidence);
   const pendingState = prepareUpdateState(
@@ -714,7 +757,7 @@ async function updateCommand(rootDir, options = {}) {
     status: pendingState.sections[getSectionKey(update.docName, update.sectionName)]?.status || 'pending'
   }));
 
-  if (!options.dryRun) {
+  if (options.prepareApply === true && !options.dryRun) {
     if (changedFiles.length > 0) {
       saveUpdateState(rootDir, pendingState);
     } else {

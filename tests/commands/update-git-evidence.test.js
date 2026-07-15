@@ -71,7 +71,7 @@ describe('updateCommand git evidence', () => {
     const sourcePath = path.join(rootDir, 'src/app.js');
     fs.writeFileSync(sourcePath, 'const route = "/new";\n');
 
-    const detection = await updateCommand(rootDir, { dryRun: false });
+    const detection = await updateCommand(rootDir, { dryRun: false, prepareApply: true });
     const execution = await executeUpdateTransaction(rootDir, detection, {});
 
     expect(execution.committed).toBe(true);

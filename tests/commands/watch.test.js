@@ -91,7 +91,10 @@ describe('commands/watch', () => {
 
     jest.advanceTimersByTime(150);
     await Promise.resolve();
-    expect(updateCommand).toHaveBeenCalledWith('/project', { dryRun: false });
+    expect(updateCommand).toHaveBeenCalledWith('/project', {
+      dryRun: false,
+      prepareApply: false
+    });
   });
 
   test('防抖合并多次快速变化为一次调用', async () => {

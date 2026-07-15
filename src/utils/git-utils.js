@@ -39,6 +39,20 @@ function getChangedFilesWorkingTree(rootDir) {
   return output.split('\n').filter(Boolean);
 }
 
+function getChangedFilesAgainst(rootDir, baseRef) {
+  if (baseRef !== 'HEAD' && !isValidCommitHash(baseRef)) return null;
+  const output = runGit(['diff', '--name-only', baseRef], rootDir);
+  if (output === null) return null;
+  if (!output) return [];
+  return output.split('\n').filter(Boolean);
+}
+
+function getFileDiff(rootDir, baseRef, filePath) {
+  if (baseRef !== 'HEAD' && !isValidCommitHash(baseRef)) return null;
+  if (typeof filePath !== 'string' || filePath.includes('\0')) return null;
+  return runGit(['diff', '--no-ext-diff', '--unified=3', baseRef, '--', filePath], rootDir);
+}
+
 function getUntrackedFiles(rootDir) {
   const output = runGit(['ls-files', '--others', '--exclude-standard'], rootDir);
   if (output === null) return [];
@@ -62,6 +76,8 @@ module.exports = {
   getCurrentCommitHash,
   getChangedFilesSince,
   getChangedFilesWorkingTree,
+  getChangedFilesAgainst,
+  getFileDiff,
   getUntrackedFiles,
   getLastScanCommit,
   isValidCommitHash

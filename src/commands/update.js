@@ -4,10 +4,17 @@ const crypto = require('crypto');
 const { extractSection, replaceSection, listSections } = require('../core/section');
 const { readFileUTF8, isWithinDir } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
-const { STATE_FILES } = require('../utils/constants');
+const { STATE_FILES, UPDATE_LIMITS } = require('../utils/constants');
 const { generateWithAI } = require('../ai/client');
 const { filterSensitive } = require('../utils/sensitive-filter');
-const { hasGitRepo, getCurrentCommitHash, getChangedFilesSince, getChangedFilesWorkingTree, getUntrackedFiles, getLastScanCommit } = require('../utils/git-utils');
+const {
+  hasGitRepo,
+  getCurrentCommitHash,
+  getChangedFilesAgainst,
+  getFileDiff,
+  getUntrackedFiles,
+  getLastScanCommit
+} = require('../utils/git-utils');
 const { findRelatedDoc, groupChangesByProject } = require('../core/doc-resolver');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
@@ -71,26 +78,25 @@ function filterIgnored(files) {
 
 function detectFromGit(rootDir) {
   const lastCommit = getLastScanCommit(rootDir);
-
-  if (lastCommit) {
-    const diffFiles = getChangedFilesSince(rootDir, lastCommit);
-    if (diffFiles === null) {
-      return { changedFiles: [], detectionMethod: null, gitFailed: true };
-    }
-    const untracked = filterIgnored(getUntrackedFiles(rootDir));
-    return {
-      changedFiles: [...new Set([...diffFiles, ...untracked])],
-      detectionMethod: 'git-diff',
-      gitFailed: false
-    };
+  const baseRef = lastCommit || 'HEAD';
+  const diffFiles = getChangedFilesAgainst(rootDir, baseRef);
+  if (diffFiles === null) {
+    return { changedFiles: [], changes: [], detectionMethod: null, gitFailed: true };
   }
 
-  // First run with git: collect all untracked + modified tracked files
-  const untracked = getUntrackedFiles(rootDir);
-  const modified = getChangedFilesWorkingTree(rootDir) || [];
+  const untracked = filterIgnored(getUntrackedFiles(rootDir));
+  const untrackedSet = new Set(untracked);
+  const changedFiles = filterIgnored([...new Set([...diffFiles, ...untracked])]);
+  const changes = changedFiles.map(file => ({
+    path: file,
+    status: untrackedSet.has(file) ? 'added' : (fs.existsSync(path.join(rootDir, file)) ? 'modified' : 'deleted')
+  }));
+
   return {
-    changedFiles: filterIgnored([...new Set([...untracked, ...modified])]),
-    detectionMethod: 'git-first-run',
+    changedFiles,
+    changes,
+    detectionMethod: lastCommit ? 'git-diff' : 'git-first-run',
+    gitBaseRef: baseRef,
     gitFailed: false
   };
 }
@@ -119,14 +125,36 @@ function detectFromHash(rootDir, lastScanPath) {
     }
   }
 
-  const changedFiles = [];
+  const changes = [];
   for (const [file, entry] of Object.entries(currentFiles)) {
     const prev = normalizeFileEntry(lastScan.files && lastScan.files[file]);
     if (prev.hash !== entry.hash) {
-      changedFiles.push(file);
+      changes.push({
+        path: file,
+        status: prev.hash ? 'modified' : 'added',
+        oldHash: prev.hash,
+        newHash: entry.hash
+      });
     }
   }
-  return { changedFiles, detectionMethod: 'hash', hashScanState: currentFiles };
+
+  for (const [file, oldEntry] of Object.entries(lastScan.files || {})) {
+    if (!Object.prototype.hasOwnProperty.call(currentFiles, file)) {
+      changes.push({
+        path: file,
+        status: 'deleted',
+        oldHash: normalizeFileEntry(oldEntry).hash,
+        newHash: null
+      });
+    }
+  }
+
+  return {
+    changedFiles: changes.map(change => change.path),
+    changes,
+    detectionMethod: 'hash',
+    hashScanState: currentFiles
+  };
 }
 
 function detectChangedFiles(rootDir, lastScanPath) {
@@ -147,9 +175,9 @@ function detectChangedFiles(rootDir, lastScanPath) {
 function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState) {
   // Start from previously-stored entries (normalized to new format) so
   // unchanged files keep their metadata; then layer in fresh entries.
-  const finalFiles = {};
+  let finalFiles = {};
   const oldScan = loadLastScan(lastScanPath);
-  if (oldScan && oldScan.files && typeof oldScan.files === 'object') {
+  if (!hashScanState && oldScan && oldScan.files && typeof oldScan.files === 'object') {
     for (const [file, entry] of Object.entries(oldScan.files)) {
       finalFiles[file] = normalizeFileEntry(entry);
     }
@@ -157,14 +185,15 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
 
   if (hashScanState) {
     // Hash mode already walked every file — use it as the authoritative state.
-    for (const [file, entry] of Object.entries(hashScanState)) {
-      finalFiles[file] = entry;
-    }
+    finalFiles = { ...hashScanState };
   } else {
     // Git mode: only refresh entries for files git reported as changed.
     for (const f of changedFiles) {
       const absPath = path.join(rootDir, f);
-      if (!fs.existsSync(absPath)) continue;
+      if (!fs.existsSync(absPath)) {
+        delete finalFiles[f];
+        continue;
+      }
       try {
         const stat = fs.statSync(absPath);
         finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
@@ -182,11 +211,116 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
   fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
 }
 
+function readCurrentSourceEvidence(rootDir, filePath) {
+  const absPath = path.join(rootDir, filePath);
+  if (!isWithinDir(absPath, rootDir) || !fs.existsSync(absPath)) return '';
+  try {
+    return readFileUTF8(absPath);
+  } catch {
+    return '';
+  }
+}
+
+function attachChangeEvidence(rootDir, changes, options = {}) {
+  const maxFileChars = Math.max(0, options.maxFileChars ?? UPDATE_LIMITS.MAX_FILE_EVIDENCE_CHARS);
+
+  return changes.map(change => {
+    let evidenceType = 'source';
+    let rawEvidence = '';
+
+    if (change.status === 'deleted') {
+      rawEvidence = options.gitBaseRef
+        ? (getFileDiff(rootDir, options.gitBaseRef, change.path) || '')
+        : '';
+      evidenceType = rawEvidence ? 'patch' : 'deletion';
+      if (!rawEvidence) rawEvidence = 'File deleted from the current project.';
+    } else if (options.gitBaseRef && change.status !== 'added') {
+      rawEvidence = getFileDiff(rootDir, options.gitBaseRef, change.path) || '';
+      evidenceType = rawEvidence ? 'patch' : 'source';
+    }
+
+    if (!rawEvidence && change.status !== 'deleted') {
+      rawEvidence = readCurrentSourceEvidence(rootDir, change.path);
+      evidenceType = 'source';
+    }
+
+    const safeEvidence = filterSensitive(rawEvidence).content;
+    const includedChars = Math.min(safeEvidence.length, maxFileChars);
+    const status = change.status === 'modified' && rawEvidence.includes('new file mode')
+      ? 'added'
+      : change.status;
+    return {
+      ...change,
+      status,
+      evidenceType,
+      evidence: safeEvidence.slice(0, includedChars),
+      truncation: {
+        truncated: includedChars < safeEvidence.length,
+        originalChars: safeEvidence.length,
+        includedChars,
+        reason: includedChars < safeEvidence.length ? 'file-limit' : null
+      }
+    };
+  });
+}
+
+function formatChangeEvidence(change) {
+  const metadata = [
+    `path=${JSON.stringify(change.path)}`,
+    `status=${JSON.stringify(change.status)}`,
+    `evidence=${JSON.stringify(change.evidenceType)}`,
+    `truncated=${change.truncation?.truncated === true}`
+  ];
+  if (change.oldHash) metadata.push(`oldHash=${JSON.stringify(change.oldHash)}`);
+  if (change.newHash) metadata.push(`newHash=${JSON.stringify(change.newHash)}`);
+  return `<change ${metadata.join(' ')}>\n${change.evidence || ''}\n</change>`;
+}
+
+function buildEvidenceChunks(changes, options = {}) {
+  const maxTotalChars = options.maxTotalChars ?? UPDATE_LIMITS.MAX_EVIDENCE_CHARS;
+  const maxChunkChars = Math.max(1, options.maxChunkChars ?? UPDATE_LIMITS.MAX_EVIDENCE_CHUNK_CHARS);
+  const orderedChanges = changes.slice().sort((a, b) => {
+    const pathOrder = String(a.path).replace(/\\/g, '/').localeCompare(String(b.path).replace(/\\/g, '/'));
+    return pathOrder || String(a.status).localeCompare(String(b.status));
+  });
+  const serialized = orderedChanges.map(formatChangeEvidence).join('\n\n');
+  const included = serialized.slice(0, Math.max(0, maxTotalChars));
+  const chunks = [];
+
+  for (let offset = 0; offset < included.length; offset += maxChunkChars) {
+    chunks.push(included.slice(offset, offset + maxChunkChars));
+  }
+
+  return {
+    chunks,
+    truncated: included.length < serialized.length,
+    originalChars: serialized.length,
+    includedChars: included.length
+  };
+}
+
+function renderEvidenceChunks(bundle) {
+  const total = bundle.chunks.length;
+  const rendered = bundle.chunks.map((chunk, index) => [
+    `--- change-evidence chunk ${index + 1}/${total} ---`,
+    chunk
+  ].join('\n'));
+  if (bundle.truncated) {
+    rendered.push(`[change evidence truncated: included ${bundle.includedChars}/${bundle.originalChars} chars]`);
+  }
+  return rendered.join('\n\n');
+}
+
+function selectChanges(changes, files) {
+  const fileSet = new Set(files);
+  return changes.filter(change => fileSet.has(change.path));
+}
+
 /**
  * Build per-section prompts for changed files.
  * Returns an array of { docName, sectionName, prompt } objects.
  */
-function buildSectionUpdatePrompts(rootDir, changedFiles) {
+function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptions) {
   const changesByProject = groupChangesByProject(changedFiles);
   const sectionUpdates = [];
 
@@ -196,6 +330,7 @@ function buildSectionUpdatePrompts(rootDir, changedFiles) {
 
     const sections = listSections(relatedDoc.content);
     if (sections.length === 0) continue;
+    const projectEvidence = buildEvidenceChunks(selectChanges(changes, projFiles), evidenceOptions);
 
     const tpl = loadTemplate('update-prompt.md');
     for (const sectionName of sections) {
@@ -206,6 +341,7 @@ function buildSectionUpdatePrompts(rootDir, changedFiles) {
         project,
         sectionName,
         changedFiles: projFiles.map(f => `- ${f}`).join('\n'),
+        changeEvidence: renderEvidenceChunks(projectEvidence),
         sectionContent
       });
 
@@ -216,13 +352,16 @@ function buildSectionUpdatePrompts(rootDir, changedFiles) {
   return sectionUpdates;
 }
 
-function buildFullDocPrompt(rootDir, changedFiles) {
+function buildFullDocPrompt(rootDir, changedFiles, changes, evidenceOptions) {
   const changesByProject = groupChangesByProject(changedFiles);
   const projectSections = [];
 
   for (const [project, projFiles] of Object.entries(changesByProject)) {
     const parts = [`### 子项目: ${project}`, '变化文件：'];
     projFiles.forEach(f => parts.push(`- ${f}`));
+    const projectEvidence = buildEvidenceChunks(selectChanges(changes, projFiles), evidenceOptions);
+    parts.push('\n变化证据：');
+    parts.push(renderEvidenceChunks(projectEvidence));
 
     const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
     if (relatedDoc) {
@@ -357,13 +496,28 @@ async function updateCommand(rootDir, options = {}) {
   initPlugins(rootDir);
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 
-  const { changedFiles, detectionMethod, useGit, hashScanState } =
+  const { changedFiles, changes, detectionMethod, useGit, hashScanState, gitBaseRef } =
     detectChangedFiles(rootDir, lastScanPath);
 
-  const sectionUpdates = buildSectionUpdatePrompts(rootDir, changedFiles);
+  const evidenceOptions = {
+    maxFileChars: options.maxEvidenceFileChars,
+    maxTotalChars: options.maxEvidenceChars,
+    maxChunkChars: options.maxEvidenceChunkChars
+  };
+  const changesWithEvidence = attachChangeEvidence(rootDir, changes, {
+    ...evidenceOptions,
+    gitBaseRef
+  });
+  const evidenceChunks = buildEvidenceChunks(changesWithEvidence, evidenceOptions);
+  const sectionUpdates = buildSectionUpdatePrompts(
+    rootDir,
+    changedFiles,
+    changesWithEvidence,
+    evidenceOptions
+  );
 
   const prompt = sectionUpdates.length === 0 && changedFiles.length > 0
-    ? buildFullDocPrompt(rootDir, changedFiles)
+    ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
     : null;
 
   if (!options.dryRun) {
@@ -385,7 +539,21 @@ async function updateCommand(rootDir, options = {}) {
     }
   }
 
-  return { changedFiles, prompt, sectionUpdates, detectionMethod };
+  return {
+    changedFiles,
+    changes: changesWithEvidence,
+    evidenceChunks,
+    prompt,
+    sectionUpdates,
+    detectionMethod
+  };
 }
 
-module.exports = { updateCommand, applySectionUpdates, executeUpdates, getFileHash, normalizeFileEntry };
+module.exports = {
+  updateCommand,
+  applySectionUpdates,
+  executeUpdates,
+  buildEvidenceChunks,
+  getFileHash,
+  normalizeFileEntry
+};

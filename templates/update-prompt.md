@@ -3,6 +3,9 @@
 变化文件：
 {{changedFiles}}
 
+变化证据（按确定性预算分块，可能包含 Git patch、当前源码或删除事件）：
+{{changeEvidence}}
+
 当前 "{{sectionName}}" 的内容：
 {{sectionContent}}
 

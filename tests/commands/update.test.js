@@ -1,4 +1,9 @@
-const { updateCommand, executeUpdates, applySectionUpdates } = require('../../src/commands/update');
+const {
+  updateCommand,
+  executeUpdates,
+  applySectionUpdates,
+  buildEvidenceChunks
+} = require('../../src/commands/update');
 // Mock at file level — safe because updateCommand tests use dryRun (skips AI) or only check prompt structure
 jest.mock('../../src/ai/client', () => ({ generateWithAI: jest.fn() }));
 const { generateWithAI } = require('../../src/ai/client');
@@ -97,6 +102,57 @@ describe('updateCommand', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
+  test('hash mode includes redacted current source in section prompts', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(
+      path.join(testDir, 'src/app.js'),
+      'const apiKey = "secret-value";\nrouter.get("/health", health);'
+    );
+    fs.writeFileSync(path.join(testDir, 'ai-docs', 'src.md'), [
+      '# src project',
+      '<!-- section:api -->',
+      'old api docs',
+      '<!-- /section:api -->'
+    ].join('\n'));
+
+    const result = await updateCommand(testDir, { dryRun: true });
+
+    expect(result.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: expect.stringMatching(/src[\\/]app\.js/), status: 'added', evidenceType: 'source' })
+    ]));
+    expect(result.sectionUpdates[0].prompt).toContain('router.get("/health", health);');
+    expect(result.sectionUpdates[0].prompt).toContain('[FILTERED]');
+    expect(result.sectionUpdates[0].prompt).not.toContain('secret-value');
+  });
+
+  test('hash mode emits explicit deletion evidence', async () => {
+    const deletedPath = path.join('src', 'removed.js');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      timestamp: new Date().toISOString(),
+      files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
+    }));
+    fs.writeFileSync(path.join(testDir, 'ai-docs', 'src.md'), [
+      '# src project',
+      '<!-- section:modules -->',
+      'removed.js module',
+      '<!-- /section:modules -->'
+    ].join('\n'));
+
+    const result = await updateCommand(testDir, { dryRun: true });
+
+    expect(result.changedFiles).toContain(deletedPath);
+    expect(result.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: deletedPath,
+        status: 'deleted',
+        oldHash: 'old-hash',
+        evidenceType: 'deletion'
+      })
+    ]));
+    expect(result.sectionUpdates[0].prompt).toContain('status="deleted"');
+    expect(result.sectionUpdates[0].prompt).toContain('File deleted from the current project.');
+  });
+
   test('hash mode accepts legacy string-hash last-scan format', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     const filePath = path.join(testDir, 'src/index.js');
@@ -152,6 +208,33 @@ describe('updateCommand', () => {
 
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles.length).toBe(0);
+  });
+});
+
+describe('buildEvidenceChunks', () => {
+  test('chunks evidence deterministically within total and chunk budgets', () => {
+    const changes = [{
+      path: 'src/large.js',
+      status: 'modified',
+      evidenceType: 'source',
+      evidence: 'x'.repeat(200),
+      truncation: { truncated: false }
+    }, {
+      path: 'src/first.js',
+      status: 'added',
+      evidenceType: 'source',
+      evidence: 'first',
+      truncation: { truncated: false }
+    }];
+
+    const first = buildEvidenceChunks(changes, { maxTotalChars: 90, maxChunkChars: 32 });
+    const second = buildEvidenceChunks(changes.slice().reverse(), { maxTotalChars: 90, maxChunkChars: 32 });
+
+    expect(first).toEqual(second);
+    expect(first.truncated).toBe(true);
+    expect(first.includedChars).toBe(90);
+    expect(first.chunks.length).toBe(3);
+    expect(first.chunks.every(chunk => chunk.length <= 32)).toBe(true);
   });
 });
 

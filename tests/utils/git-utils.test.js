@@ -11,6 +11,8 @@ const {
   getCurrentCommitHash,
   getChangedFilesSince,
   getChangedFilesWorkingTree,
+  getChangedFilesAgainst,
+  getFileDiff,
   getUntrackedFiles,
   isValidCommitHash,
   getLastScanCommit
@@ -133,6 +135,40 @@ describe('git-utils', () => {
     test('returns null when git command fails', () => {
       spawnSync.mockReturnValue({ stdout: '', status: 128, error: null });
       expect(getChangedFilesWorkingTree(testDir)).toBeNull();
+    });
+  });
+
+  describe('getChangedFilesAgainst', () => {
+    test('compares a valid baseline against the current worktree', () => {
+      spawnSync.mockReturnValue({ stdout: 'src/app.js\n', status: 0, error: null });
+      expect(getChangedFilesAgainst(testDir, 'abc1234')).toEqual(['src/app.js']);
+      expect(spawnSync).toHaveBeenCalledWith('git', ['diff', '--name-only', 'abc1234'], {
+        cwd: testDir,
+        stdio: 'pipe',
+        encoding: 'utf8'
+      });
+    });
+
+    test('rejects an invalid baseline', () => {
+      expect(getChangedFilesAgainst(testDir, 'HEAD;bad')).toBeNull();
+      expect(spawnSync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getFileDiff', () => {
+    test('returns a per-file patch using an argument-safe path', () => {
+      spawnSync.mockReturnValue({ stdout: 'diff --git a/src/app.js b/src/app.js\n', status: 0, error: null });
+      expect(getFileDiff(testDir, 'HEAD', 'src/app.js')).toContain('diff --git');
+      expect(spawnSync).toHaveBeenCalledWith(
+        'git',
+        ['diff', '--no-ext-diff', '--unified=3', 'HEAD', '--', 'src/app.js'],
+        { cwd: testDir, stdio: 'pipe', encoding: 'utf8' }
+      );
+    });
+
+    test('rejects paths containing a null byte', () => {
+      expect(getFileDiff(testDir, 'HEAD', 'src/bad\0.js')).toBeNull();
+      expect(spawnSync).not.toHaveBeenCalled();
     });
   });
 

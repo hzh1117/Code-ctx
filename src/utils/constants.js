@@ -29,6 +29,7 @@ const STATE_FILES = {
   LAST_SCAN: '.last-scan.json',
   UPDATE_STATE: '.update-state.json',
   INIT_STATE: '.init-state.json',
+  PROJECT_MANIFEST: 'project-manifest.json',
   TASK_HISTORY: '.task-history.jsonl'
 };
 

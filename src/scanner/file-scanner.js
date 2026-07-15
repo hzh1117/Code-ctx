@@ -39,6 +39,11 @@ const LANGUAGE_BY_EXTENSION = {
   '.yml': 'yaml'
 };
 
+const PROJECT_MANIFEST_PATTERNS = [
+  'package.json', 'pom.xml', 'build.gradle', 'settings.gradle',
+  'go.mod', 'Cargo.toml', 'pyproject.toml', 'requirements*.txt'
+];
+
 function scanProject(projectDir, projectType, options = {}) {
   if (!fs.existsSync(projectDir) || !fs.statSync(projectDir).isDirectory()) {
     throw new Error(`Directory does not exist: ${projectDir}`);
@@ -49,7 +54,10 @@ function scanProject(projectDir, projectType, options = {}) {
   const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   
-  const patterns = defaultRegistry.getScanPatterns(projectType);
+  const adapterPatterns = defaultRegistry.getScanPatterns(projectType);
+  const patterns = adapterPatterns.length > 0
+    ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
+    : [];
   const keyFiles = [];
   const tree = buildTree(projectDir);
 
@@ -185,7 +193,13 @@ function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
   }
 
   // Filter hidden dirs/files and node_modules, preserving entry objects
-  const visible = entries.filter(e => !e.name.startsWith('.') && e.name !== 'node_modules');
+  const visible = entries.filter(e =>
+    !e.name.startsWith('.') &&
+    e.name !== 'node_modules' &&
+    e.name !== 'ai-docs' &&
+    e.name !== 'code-ctx.config.json' &&
+    e.name !== 'code-ctx.config.js'
+  );
   let tree = '';
 
   for (let i = 0; i < visible.length; i++) {

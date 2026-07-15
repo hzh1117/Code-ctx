@@ -7,6 +7,7 @@ const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
+const { generateDeterministicDocs } = require('../generator/deterministic-docs');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
 const { listSections } = require('../core/section');
@@ -195,7 +196,7 @@ function scanAllProjects(projects, projectLimits, state, options) {
   logStep('4/7', '扫描项目文件');
   const scanResults = {};
   for (const project of projects) {
-    if (state.projects[project.alias]?.status === 'completed' && !options.force) {
+    if (state.projects[project.alias]?.status === 'completed' && !options.force && !options.skipAi) {
       log(`跳过 ${project.alias}（已完成）`);
       continue;
     }
@@ -511,8 +512,25 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
     !(state.projects[p.alias]?.status === 'completed' && !options.force)
   );
 
-  if (options.generateDocs === false || options.skipAi) {
+  if (options.generateDocs === false) {
     return { generatedDocs, failedDocs, status: 'scanned', success: true };
+  }
+
+  if (options.skipAi) {
+    const deterministic = generateDeterministicDocs(
+      rootDir, projects, scanResults, outputDir
+    );
+    for (const project of projects) {
+      state.projects[project.alias] = { status: 'completed', mode: 'deterministic' };
+    }
+    saveInitState(outputDir, state);
+    return {
+      generatedDocs: deterministic.generatedDocs,
+      failedDocs,
+      manifest: deterministic.manifest,
+      status: 'offline-completed',
+      success: true
+    };
   }
 
   if (!hasPendingProjects) {
@@ -648,7 +666,9 @@ function finalizeInit(rootDir, outputDir, projects, state, generation) {
     return;
   }
 
-  if (generation.status === 'scanned') {
+  if (generation.status === 'offline-completed') {
+    console.log('\n✓ 离线文档生成完成（已跳过 AI）');
+  } else if (generation.status === 'scanned') {
     console.log('\n✓ 项目扫描完成（已跳过 AI 文档生成）');
   } else if (generation.status === 'unchanged') {
     console.log('\n✓ 初始化检查完成（文档无需重新生成）');

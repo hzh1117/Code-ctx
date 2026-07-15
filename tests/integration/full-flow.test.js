@@ -25,6 +25,9 @@ describe('Full Flow Integration', () => {
     expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
     expect(initResult).toBeDefined();
     expect(initResult.projects).toBeDefined();
+    expect(initResult.status).toBe('offline-completed');
+    expect(fs.existsSync(path.join(testDir, 'ai-docs', 'OVERVIEW.md'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs', 'project-manifest.json'))).toBe(true);
     
     // 2. Use
     const result = await useCommand({
@@ -33,6 +36,7 @@ describe('Full Flow Integration', () => {
       rootDir: testDir
     });
     expect(result.prompt).toContain('用户管理');
+    expect(result.prompt).toContain('deterministic repository scanning');
     expect(typeof result.prompt).toBe('string');
     
     // 3. Doctor

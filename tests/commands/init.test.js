@@ -108,6 +108,38 @@ describe('initCommand', () => {
     expect(result.projects[0].type).toBe('unknown');
   });
 
+  test('skip-ai writes deterministic documents and a consumable manifest', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
+      dependencies: { express: '^5.0.0' }
+    }));
+    fs.writeFileSync(path.join(testDir, 'app.js'), 'module.exports = {};');
+
+    const first = await initCommand(testDir, { skipPrompt: true, skipAi: true });
+    const alias = first.projects[0].alias;
+    const docPath = path.join(testDir, 'ai-docs', `${alias}.md`);
+    const overviewPath = path.join(testDir, 'ai-docs', 'OVERVIEW.md');
+    const manifestPath = path.join(testDir, 'ai-docs', 'project-manifest.json');
+    const firstDoc = fs.readFileSync(docPath, 'utf8');
+
+    expect(first.status).toBe('offline-completed');
+    expect(firstDoc).toContain('<!-- code-ctx-project:');
+    expect(firstDoc).toContain('`package.json`');
+    expect(firstDoc).toContain('`app.js`');
+    expect(firstDoc).toContain('sha256:');
+    expect(fs.readFileSync(overviewPath, 'utf8')).toContain(`\`${alias}\``);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    expect(manifest.projects[0]).toEqual(expect.objectContaining({
+      id: alias,
+      sourcePath: '.',
+      document: `${alias}.md`,
+      keyFiles: expect.any(Array)
+    }));
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
+    expect(fs.readFileSync(docPath, 'utf8')).toBe(firstDoc);
+  });
+
   test('should persist detected project paths relative to the repository', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });

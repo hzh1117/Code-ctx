@@ -658,6 +658,9 @@ function removeUpdateState(rootDir) {
 }
 
 async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
+  if (!aiConfig || !aiConfig.apiKey) {
+    throw new Error('未配置 API Key，无法执行 update 事务');
+  }
   const transaction = updateResult && updateResult._stateTransaction;
   if (!transaction) {
     throw new Error('缺少 update 事务上下文，请先调用 updateCommand');
@@ -756,6 +759,9 @@ async function updateCommand(rootDir, options = {}) {
     : changedFiles.length > 0
       ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
       : null;
+  if (changedFiles.length > 0 && (typeof prompt !== 'string' || prompt.trim() === '')) {
+    throw new Error('update 生成了空 Prompt');
+  }
 
   const changeSetId = buildChangeSetId(changesWithEvidence);
   const pendingState = prepareUpdateState(

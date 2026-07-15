@@ -11,9 +11,11 @@ const update = new Command('update')
   .action(async (options) => {
     try {
       const rootDir = process.cwd();
+      const aiConfig = options.apply ? getAIConfig(rootDir) : null;
+      const canApply = !!options.apply && !!aiConfig?.apiKey && !options.dryRun;
       const result = await updateCommand(rootDir, {
         dryRun: !!options.dryRun,
-        prepareApply: !!options.apply && !options.dryRun
+        prepareApply: canApply
       });
 
       if (result.changedFiles.length === 0) {
@@ -59,11 +61,10 @@ const update = new Command('update')
           return;
         }
 
-        const aiConfig = getAIConfig(rootDir);
         if (!aiConfig.apiKey) {
           console.log('\n⚠ 未配置 API Key，请先在 .env 文件中配置');
           console.log('  已生成 prompt，可手动粘贴给 AI：');
-          await outputPrompt(result.prompt || '', options, {
+          await outputPrompt(result.prompt, options, {
             successMessage: '✓ prompt 已复制到剪贴板'
           });
           return;

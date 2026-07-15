@@ -218,7 +218,7 @@ describe('updateCommand', () => {
     generateWithAI.mockResolvedValueOnce('module removed');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
-    const execution = await executeUpdateTransaction(testDir, detection, {});
+    const execution = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
 
     expect(execution.committed).toBe(true);
     const baseline = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8'));
@@ -257,7 +257,7 @@ describe('updateCommand', () => {
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
-    const transaction = await executeUpdateTransaction(testDir, detection, {});
+    const transaction = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
     expect(transaction.committed).toBe(true);
 
     const lastScan = JSON.parse(
@@ -338,7 +338,7 @@ describe('updateCommand', () => {
       .mockRejectedValueOnce(new Error('temporary failure'));
 
     const firstDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
-    const firstExecution = await executeUpdateTransaction(testDir, firstDetection, {});
+    const firstExecution = await executeUpdateTransaction(testDir, firstDetection, { apiKey: 'test-key' });
 
     expect(firstExecution.committed).toBe(false);
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
@@ -350,7 +350,7 @@ describe('updateCommand', () => {
     generateWithAI.mockResolvedValueOnce('new b');
     const retryDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     expect(retryDetection.sectionUpdates.find(update => update.sectionName === 'a').status).toBe('success');
-    const retryExecution = await executeUpdateTransaction(testDir, retryDetection, {});
+    const retryExecution = await executeUpdateTransaction(testDir, retryDetection, { apiKey: 'test-key' });
 
     expect(generateWithAI).toHaveBeenCalledTimes(1);
     expect(retryExecution.committed).toBe(true);
@@ -377,7 +377,7 @@ describe('updateCommand', () => {
     });
     let execution;
     try {
-      execution = await executeUpdateTransaction(testDir, detection, {});
+      execution = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
     } finally {
       renameSpy.mockRestore();
     }
@@ -404,7 +404,7 @@ describe('updateCommand', () => {
     });
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
-    const execution = await executeUpdateTransaction(testDir, detection, {});
+    const execution = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
 
     expect(execution.committed).toBe(false);
     expect(execution.reason).toContain('源码在文档生成期间发生变化');

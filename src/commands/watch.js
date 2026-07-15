@@ -24,6 +24,7 @@ async function watchCommand(rootDir, options = {}) {
   console.log('   按 Ctrl+C 停止\n');
 
   const aiConfig = autoApply ? getAIConfig(rootDir) : null;
+  const canAutoApply = !!autoApply && !!aiConfig?.apiKey;
 
   async function processChanges() {
     if (isProcessing) return;
@@ -33,7 +34,7 @@ async function watchCommand(rootDir, options = {}) {
       clearCache(); // Refresh templates and scenarios
       const result = await updateCommand(rootDir, {
         dryRun: false,
-        prepareApply: autoApply
+        prepareApply: canAutoApply
       });
 
       if (result.changedFiles.length === 0) {
@@ -48,7 +49,7 @@ async function watchCommand(rootDir, options = {}) {
         console.log(`  ... 还有 ${result.changedFiles.length - 5} 个文件`);
       }
 
-      if (autoApply && aiConfig && aiConfig.apiKey && result.sectionUpdates.length > 0) {
+      if (canAutoApply && result.sectionUpdates.length > 0) {
         console.log('\n自动更新文档...');
         const updateResult = await executeUpdateTransaction(rootDir, result, aiConfig);
         console.log(`更新完成：✓ ${updateResult.success} / ✗ ${updateResult.failed} / ⊘ ${updateResult.skipped}`);

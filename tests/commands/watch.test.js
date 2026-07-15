@@ -158,6 +158,27 @@ describe('commands/watch', () => {
     expect(executeUpdateTransaction).not.toHaveBeenCalled();
   });
 
+  test('autoApply without API key detects in prompt-only mode', async () => {
+    getAIConfig.mockReturnValue({ apiKey: '' });
+    updateCommand.mockResolvedValue({
+      changedFiles: ['src/App.js'],
+      sectionUpdates: [{ section: 'overview' }]
+    });
+
+    watchCommand('/project', { debounce: 100, autoApply: true });
+    const watchCb = fs.watch.mock.calls.find(c => c[0].endsWith('src'))[2];
+    watchCb('change', 'App.js');
+    jest.advanceTimersByTime(150);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(updateCommand).toHaveBeenCalledWith('/project', {
+      dryRun: false,
+      prepareApply: false
+    });
+    expect(executeUpdateTransaction).not.toHaveBeenCalled();
+  });
+
   test('fs.watch 抛错时不中断整体监听', () => {
     fs.watch.mockImplementationOnce(() => {
       throw new Error('EACCES');

@@ -58,4 +58,25 @@ describe('update CLI default mode', () => {
     expect(fs.existsSync(path.join(rootDir, 'ai-docs/.update-state.json'))).toBe(false);
     expect(fs.existsSync(path.join(rootDir, 'ai-docs/.task-history.jsonl'))).toBe(false);
   });
+
+  test('apply without an API key emits a non-empty manual prompt without state loss', () => {
+    const cliPath = path.join(__dirname, '../../bin/cli.js');
+    const result = spawnSync(process.execPath, [cliPath, 'update', '--apply', '--stdout'], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        OPENAI_API_KEY: '',
+        ANTHROPIC_API_KEY: '',
+        ANTHROPIC_AUTH_TOKEN: ''
+      }
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('未配置 API Key');
+    expect(result.stdout).toContain('## 文档: src.md');
+    expect(result.stdout).toContain('export const cliEvidence = true;');
+    expect(fs.existsSync(path.join(rootDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    expect(fs.existsSync(path.join(rootDir, 'ai-docs/.update-state.json'))).toBe(false);
+  });
 });

@@ -365,6 +365,46 @@ describe('config', () => {
       expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json.bak'))).toBe(true);
     });
 
+    test('saveProjectConfig: converts absolute project paths to portable relative paths', () => {
+      const childDir = path.join(testDir, 'packages', 'app');
+      fs.mkdirSync(childDir, { recursive: true });
+
+      saveProjectConfig(testDir, {
+        projectName: 'portable',
+        projects: [{ alias: 'app', path: childDir, type: 'react' }]
+      });
+
+      const persisted = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
+      expect(persisted.projects[0].path).toBe('./packages/app');
+    });
+
+    test('loadProjectConfig: migrates legacy absolute paths within the repository', () => {
+      const childDir = path.join(testDir, 'app');
+      fs.mkdirSync(childDir, { recursive: true });
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+        projects: [{ alias: 'app', path: childDir, type: 'react' }]
+      }));
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const config = loadProjectConfig(testDir);
+        expect(config.projects[0].path).toBe('./app');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('绝对项目路径迁移'));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test.each([
+      ['legacy absolute path', path.resolve(testDir, '..', 'outside')],
+      ['relative traversal', '../outside']
+    ])('loadProjectConfig: rejects out-of-root %s', (_label, projectPath) => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+        projects: [{ alias: 'outside', path: projectPath, type: 'unknown' }]
+      }));
+
+      expect(() => loadProjectConfig(testDir)).toThrow(/越界/);
+    });
+
     test('saveAIConfig: writes back to JSON when JSON is the active format', () => {
       fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
         projectName: 'json-app',

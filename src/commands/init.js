@@ -229,7 +229,9 @@ function generateProjectConfig(rootDir, projects, options) {
     aiMode: 'clipboard',
     projects: projects.map(p => ({
       alias: p.alias,
-      path: p.path,
+      path: path.relative(rootDir, p.path)
+        ? `./${path.relative(rootDir, p.path).split(path.sep).join('/')}`
+        : '.',
       type: p.type,
       label: p.name
     })),

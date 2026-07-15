@@ -13,6 +13,7 @@ const projectConfigCache = new Map();
 // One-shot warnings per rootDir, so repeated loads don't spam.
 const warnedDualConfig = new Set();
 const warnedSchema = new Set();
+const warnedPathMigration = new Set();
 
 const CONFIG_FILE_JSON = 'code-ctx.config.json';
 const CONFIG_FILE_JS = 'code-ctx.config.js';
@@ -30,6 +31,45 @@ function _clearCache() {
   projectConfigCache.clear();
   warnedDualConfig.clear();
   warnedSchema.clear();
+  warnedPathMigration.clear();
+}
+
+function isWithinRoot(rootDir, targetPath) {
+  const relative = path.relative(path.resolve(rootDir), path.resolve(targetPath));
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+}
+
+function toPortableProjectPath(rootDir, projectPath, label = 'project.path') {
+  if (typeof projectPath !== 'string' || projectPath.trim() === '') {
+    throw new Error(`${label} 必须是非空字符串`);
+  }
+  const resolved = path.resolve(rootDir, projectPath);
+  if (!isWithinRoot(rootDir, resolved)) {
+    throw new Error(`${label} 越界，必须位于项目根目录内: ${projectPath}`);
+  }
+  const relative = path.relative(path.resolve(rootDir), resolved).split(path.sep).join('/');
+  return relative ? `./${relative}` : '.';
+}
+
+function normalizeProjectPaths(rootDir, config, configPath) {
+  if (!Array.isArray(config.projects)) return config;
+  let migratedAbsolutePath = false;
+  const normalized = {
+    ...config,
+    projects: config.projects.map((project, index) => {
+      if (!project || typeof project !== 'object' || project.path === undefined) return project;
+      if (path.isAbsolute(project.path)) migratedAbsolutePath = true;
+      return {
+        ...project,
+        path: toPortableProjectPath(rootDir, project.path, `projects[${index}].path`)
+      };
+    })
+  };
+  if (migratedAbsolutePath && configPath && !warnedPathMigration.has(configPath)) {
+    console.warn('[code-ctx] 已将旧配置中的绝对项目路径迁移为相对路径；下次保存配置时会写入新格式。');
+    warnedPathMigration.add(configPath);
+  }
+  return normalized;
 }
 
 function loadEnvConfig(rootDir) {
@@ -113,9 +153,10 @@ function loadProjectConfig(rootDir) {
     return cached.value;
   }
 
-  const value = info.format === 'json'
+  const parsedValue = info.format === 'json'
     ? loadJsonConfig(info.path)
     : loadConfigWithVM(info.path);
+  const value = normalizeProjectPaths(rootDir, parsedValue, info.path);
 
   const errors = validateProjectConfig(value);
   if (errors.length > 0 && !warnedSchema.has(info.path)) {
@@ -233,9 +274,10 @@ function saveProjectConfig(rootDir, config, options = {}) {
     }
   }
 
+  const portableConfig = normalizeProjectPaths(rootDir, config);
   const content = targetFormat === 'js'
-    ? `module.exports = ${JSON.stringify(config, null, 2)};\n`
-    : `${JSON.stringify(config, null, 2)}\n`;
+    ? `module.exports = ${JSON.stringify(portableConfig, null, 2)};\n`
+    : `${JSON.stringify(portableConfig, null, 2)}\n`;
   fs.writeFileSync(targetPath, content);
 
   projectConfigCache.delete(targetPath);
@@ -508,6 +550,8 @@ module.exports = {
   saveProjectConfig,
   getConfigFile,
   validateProjectConfig,
+  normalizeProjectPaths,
+  toPortableProjectPath,
   getAIProviders,
   getProjectLimits,
   CONFIG_FILE_JSON,

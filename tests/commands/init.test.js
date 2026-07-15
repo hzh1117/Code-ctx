@@ -108,7 +108,7 @@ describe('initCommand', () => {
     expect(result.projects[0].type).toBe('unknown');
   });
 
-  test('should preserve detected project path in generated config', async () => {
+  test('should persist detected project paths relative to the repository', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });
     fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
@@ -119,7 +119,10 @@ describe('initCommand', () => {
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     const config = loadProjectConfig(testDir);
-    expect(config.projects[0].path).toBe(subDir);
+    expect(config.projects[0].path).toBe('./my-app');
+    const persisted = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
+    expect(persisted.projects[0].path).toBe('./my-app');
+    expect(persisted.projects[0].path).not.toContain(path.resolve(testDir));
   });
 
   test('should return config with project info', async () => {

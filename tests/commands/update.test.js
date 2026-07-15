@@ -1,6 +1,7 @@
 const {
   updateCommand,
   executeUpdates,
+  executeUpdateTransaction,
   applySectionUpdates,
   buildEvidenceChunks
 } = require('../../src/commands/update');
@@ -58,14 +59,26 @@ describe('updateCommand', () => {
     expect(result.changedFiles.length).toBe(0);
   });
 
-  test('should update scan state when not dryRun', async () => {
+  test('should record pending detection without advancing scan baseline', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
     
     await updateCommand(testDir, { dryRun: false });
     
     const lastScanPath = path.join(testDir, 'ai-docs/.last-scan.json');
-    expect(fs.existsSync(lastScanPath)).toBe(true);
+    const updateStatePath = path.join(testDir, 'ai-docs/.update-state.json');
+    expect(fs.existsSync(lastScanPath)).toBe(false);
+    expect(fs.existsSync(updateStatePath)).toBe(true);
+  });
+
+  test('dry-run does not create pending or committed scan state', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+
+    await updateCommand(testDir, { dryRun: true });
+
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
   });
 
   test('should handle first run when .last-scan does not exist', async () => {
@@ -170,11 +183,21 @@ describe('updateCommand', () => {
     expect(result.changedFiles.length).toBe(0);
   });
 
-  test('hash mode persists new {mtimeMs, hash} format on write', async () => {
+  test('hash mode persists new {mtimeMs, hash} format only after successful docs', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '# src project',
+      '<!-- section:overview -->',
+      'old',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+    generateWithAI.mockResolvedValueOnce('new overview');
 
-    await updateCommand(testDir, { dryRun: false });
+    const detection = await updateCommand(testDir, { dryRun: false });
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    const transaction = await executeUpdateTransaction(testDir, detection, {});
+    expect(transaction.committed).toBe(true);
 
     const lastScan = JSON.parse(
       fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8')
@@ -209,9 +232,8 @@ describe('updateCommand', () => {
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles.length).toBe(0);
   });
-});
 
-describe('buildEvidenceChunks', () => {
+  describe('buildEvidenceChunks', () => {
   test('chunks evidence deterministically within total and chunk budgets', () => {
     const changes = [{
       path: 'src/large.js',
@@ -235,6 +257,99 @@ describe('buildEvidenceChunks', () => {
     expect(first.includedChars).toBe(90);
     expect(first.chunks.length).toBe(3);
     expect(first.chunks.every(chunk => chunk.length <= 32)).toBe(true);
+  });
+  });
+
+  test('partial failure preserves per-section retry state and commits after retry', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '# src project',
+      '<!-- section:a -->',
+      'old a',
+      '<!-- /section:a -->',
+      '<!-- section:b -->',
+      'old b',
+      '<!-- /section:b -->'
+    ].join('\n'));
+    generateWithAI
+      .mockResolvedValueOnce('new a')
+      .mockRejectedValueOnce(new Error('temporary failure'));
+
+    const firstDetection = await updateCommand(testDir, { dryRun: false });
+    const firstExecution = await executeUpdateTransaction(testDir, firstDetection, {});
+
+    expect(firstExecution.committed).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    const pending = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.update-state.json'), 'utf8'));
+    expect(pending.sections['src.md#a'].status).toBe('success');
+    expect(pending.sections['src.md#b'].status).toBe('failed');
+
+    generateWithAI.mockClear();
+    generateWithAI.mockResolvedValueOnce('new b');
+    const retryDetection = await updateCommand(testDir, { dryRun: false });
+    expect(retryDetection.sectionUpdates.find(update => update.sectionName === 'a').status).toBe('success');
+    const retryExecution = await executeUpdateTransaction(testDir, retryDetection, {});
+
+    expect(generateWithAI).toHaveBeenCalledTimes(1);
+    expect(retryExecution.committed).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(true);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
+  });
+
+  test('atomic write failure keeps the original doc and scan baseline pending', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    const docPath = path.join(testDir, 'ai-docs/src.md');
+    const original = [
+      '# src project',
+      '<!-- section:overview -->',
+      'old overview',
+      '<!-- /section:overview -->'
+    ].join('\n');
+    fs.writeFileSync(docPath, original);
+    generateWithAI.mockResolvedValueOnce('new overview');
+
+    const detection = await updateCommand(testDir, { dryRun: false });
+    const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
+      throw new Error('rename failed');
+    });
+    let execution;
+    try {
+      execution = await executeUpdateTransaction(testDir, detection, {});
+    } finally {
+      renameSpy.mockRestore();
+    }
+
+    expect(execution.committed).toBe(false);
+    expect(execution.writeFailed).toBe(1);
+    expect(fs.readFileSync(docPath, 'utf8')).toBe(original);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
+  });
+
+  test('source changes during generation prevent baseline commit', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    const sourcePath = path.join(testDir, 'src/index.js');
+    fs.writeFileSync(sourcePath, 'version one');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '# src project',
+      '<!-- section:overview -->',
+      'old overview',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+    generateWithAI.mockImplementationOnce(async () => {
+      fs.writeFileSync(sourcePath, 'version two');
+      return 'new overview';
+    });
+
+    const detection = await updateCommand(testDir, { dryRun: false });
+    const execution = await executeUpdateTransaction(testDir, detection, {});
+
+    expect(execution.committed).toBe(false);
+    expect(execution.reason).toContain('源码在文档生成期间发生变化');
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    const pending = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.update-state.json'), 'utf8'));
+    expect(pending.transactionError).toContain('扫描基线未提交');
   });
 });
 

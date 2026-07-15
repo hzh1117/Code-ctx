@@ -27,6 +27,7 @@ const UPDATE_LIMITS = {
 
 const STATE_FILES = {
   LAST_SCAN: '.last-scan.json',
+  UPDATE_STATE: '.update-state.json',
   INIT_STATE: '.init-state.json',
   TASK_HISTORY: '.task-history.jsonl'
 };

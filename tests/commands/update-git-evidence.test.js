@@ -2,7 +2,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { updateCommand } = require('../../src/commands/update');
+
+jest.mock('../../src/ai/client', () => ({ generateWithAI: jest.fn() }));
+
+const { generateWithAI } = require('../../src/ai/client');
+const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 
 function git(rootDir, ...args) {
   const result = spawnSync('git', args, { cwd: rootDir, encoding: 'utf8' });
@@ -14,6 +18,8 @@ describe('updateCommand git evidence', () => {
   let rootDir;
 
   beforeEach(() => {
+    generateWithAI.mockReset();
+    generateWithAI.mockResolvedValue('updated api docs');
     rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'update-git-evidence-'));
     fs.mkdirSync(path.join(rootDir, 'src'), { recursive: true });
     fs.mkdirSync(path.join(rootDir, 'ai-docs'), { recursive: true });
@@ -59,5 +65,24 @@ describe('updateCommand git evidence', () => {
     expect(appChange.evidence).toContain('+const route = "/new";');
     expect(result.sectionUpdates[0].prompt).toContain('change-evidence chunk');
     expect(result.sectionUpdates[0].prompt).toContain('+const route = "/new";');
+  });
+
+  test('committed worktree fingerprints suppress repeats and detect reverts', async () => {
+    const sourcePath = path.join(rootDir, 'src/app.js');
+    fs.writeFileSync(sourcePath, 'const route = "/new";\n');
+
+    const detection = await updateCommand(rootDir, { dryRun: false });
+    const execution = await executeUpdateTransaction(rootDir, detection, {});
+
+    expect(execution.committed).toBe(true);
+    const unchanged = await updateCommand(rootDir, { dryRun: true });
+    expect(unchanged.changedFiles).toEqual([]);
+
+    fs.writeFileSync(sourcePath, 'const route = "/old";\n');
+    const reverted = await updateCommand(rootDir, { dryRun: true });
+    expect(reverted.changedFiles).toContain('src/app.js');
+    expect(reverted.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'src/app.js', status: 'modified', evidenceType: 'source' })
+    ]));
   });
 });

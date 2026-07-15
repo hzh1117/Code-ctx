@@ -84,9 +84,24 @@ function detectFromGit(rootDir) {
     return { changedFiles: [], changes: [], detectionMethod: null, gitFailed: true };
   }
 
+  const lastScan = loadLastScan(path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN));
+  const processedChanges = lastScan.processedChanges || {};
   const untracked = filterIgnored(getUntrackedFiles(rootDir));
   const untrackedSet = new Set(untracked);
-  const changedFiles = filterIgnored([...new Set([...diffFiles, ...untracked])]);
+  const candidates = filterIgnored([
+    ...new Set([...diffFiles, ...untracked, ...Object.keys(processedChanges)])
+  ]);
+  const changedFiles = candidates.filter(file => {
+    const processed = processedChanges[file];
+    if (!processed) return true;
+    const absPath = path.join(rootDir, file);
+    if (!fs.existsSync(absPath)) return processed.status !== 'deleted';
+    try {
+      return processed.status === 'deleted' || processed.hash !== getFileHash(absPath);
+    } catch {
+      return true;
+    }
+  });
   const changes = changedFiles.map(file => ({
     path: file,
     status: untrackedSet.has(file) ? 'added' : (fs.existsSync(path.join(rootDir, file)) ? 'modified' : 'deleted')
@@ -177,6 +192,7 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
   // unchanged files keep their metadata; then layer in fresh entries.
   let finalFiles = {};
   const oldScan = loadLastScan(lastScanPath);
+  const processedChanges = useGit ? { ...(oldScan.processedChanges || {}) } : {};
   if (!hashScanState && oldScan && oldScan.files && typeof oldScan.files === 'object') {
     for (const [file, entry] of Object.entries(oldScan.files)) {
       finalFiles[file] = normalizeFileEntry(entry);
@@ -192,11 +208,14 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
       const absPath = path.join(rootDir, f);
       if (!fs.existsSync(absPath)) {
         delete finalFiles[f];
+        processedChanges[f] = { status: 'deleted', hash: null };
         continue;
       }
       try {
         const stat = fs.statSync(absPath);
-        finalFiles[f] = { mtimeMs: stat.mtimeMs, hash: getFileHash(absPath) };
+        const hash = getFileHash(absPath);
+        finalFiles[f] = { mtimeMs: stat.mtimeMs, hash };
+        processedChanges[f] = { status: 'present', hash };
       } catch (err) {
         console.debug(`[update] stat/hash skipped for ${f}: ${err.message}`);
       }
@@ -206,9 +225,74 @@ function saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState
   const newScan = {
     timestamp: new Date().toISOString(),
     lastCommitHash: useGit ? getCurrentCommitHash(rootDir) : null,
-    files: finalFiles
+    files: finalFiles,
+    ...(useGit ? { processedChanges } : {})
   };
   fs.writeFileSync(lastScanPath, JSON.stringify(newScan, null, 2));
+}
+
+function getUpdateStatePath(rootDir) {
+  return path.join(rootDir, 'ai-docs', STATE_FILES.UPDATE_STATE);
+}
+
+function loadUpdateState(rootDir) {
+  const statePath = getUpdateStatePath(rootDir);
+  if (!fs.existsSync(statePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveUpdateState(rootDir, state) {
+  fs.writeFileSync(getUpdateStatePath(rootDir), JSON.stringify(state, null, 2));
+}
+
+function getSectionKey(docName, sectionName) {
+  return `${docName}#${sectionName}`;
+}
+
+function buildChangeSetId(changes) {
+  const normalized = changes.map(change => ({
+    path: change.path,
+    status: change.status,
+    oldHash: change.oldHash || null,
+    newHash: change.newHash || null,
+    evidenceHash: change.evidenceHash || crypto.createHash('sha256').update(change.evidence || '').digest('hex')
+  })).sort((a, b) => a.path.localeCompare(b.path) || a.status.localeCompare(b.status));
+  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+function prepareUpdateState(rootDir, changeSetId, changes, sectionUpdates, detectionMethod) {
+  const previous = loadUpdateState(rootDir);
+  const canResume = previous?.changeSetId === changeSetId;
+  const sections = {};
+
+  for (const update of sectionUpdates) {
+    const key = getSectionKey(update.docName, update.sectionName);
+    const oldSection = canResume ? previous.sections?.[key] : null;
+    sections[key] = oldSection || {
+      docName: update.docName,
+      sectionName: update.sectionName,
+      status: 'pending',
+      error: null
+    };
+  }
+
+  return {
+    changeSetId,
+    detectedAt: canResume ? previous.detectedAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    detectionMethod,
+    changes: changes.map(({ path: filePath, status, oldHash, newHash }) => ({
+      path: filePath,
+      status,
+      oldHash: oldHash || null,
+      newHash: newHash || null
+    })),
+    sections
+  };
 }
 
 function readCurrentSourceEvidence(rootDir, filePath) {
@@ -254,6 +338,7 @@ function attachChangeEvidence(rootDir, changes, options = {}) {
       status,
       evidenceType,
       evidence: safeEvidence.slice(0, includedChars),
+      evidenceHash: crypto.createHash('sha256').update(safeEvidence).digest('hex'),
       truncation: {
         truncated: includedChars < safeEvidence.length,
         originalChars: safeEvidence.length,
@@ -387,7 +472,18 @@ function applySectionUpdates(docPath, updates) {
   for (const { sectionName, newContent } of updates) {
     content = replaceSection(content, sectionName, newContent);
   }
-  fs.writeFileSync(docPath, content);
+  const tempPath = `${docPath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tempPath, content);
+    fs.renameSync(tempPath, docPath);
+  } catch (err) {
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch {
+      // Preserve the original write error.
+    }
+    throw err;
+  }
 }
 
 function groupSectionUpdates(sectionUpdates) {
@@ -416,6 +512,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
   let success = 0;
   let failed = 0;
   let skipped = 0;
+  let writeFailed = 0;
 
   const updatesByDoc = groupSectionUpdates(sectionUpdates);
 
@@ -462,8 +559,6 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
     for (const outcome of sectionOutcomes) {
       if (outcome.status === 'success') {
         sectionResults.push({ sectionName: outcome.sectionName, newContent: outcome.newContent });
-        results.push({ docName, sectionName: outcome.sectionName, status: 'success' });
-        success++;
       } else {
         results.push({ docName, sectionName: outcome.sectionName, status: 'failed', reason: outcome.reason });
         failed++;
@@ -474,8 +569,22 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
     if (sectionResults.length > 0) {
       try {
         applySectionUpdates(docPath, sectionResults);
+        for (const sectionResult of sectionResults) {
+          results.push({ docName, sectionName: sectionResult.sectionName, status: 'success' });
+          success++;
+        }
         console.log(`  ✓ ${docName} 已更新 ${sectionResults.length} 个 section`);
       } catch (err) {
+        writeFailed++;
+        for (const sectionResult of sectionResults) {
+          results.push({
+            docName,
+            sectionName: sectionResult.sectionName,
+            status: 'failed',
+            reason: `文档写入失败: ${err.message}`
+          });
+          failed++;
+        }
         console.error(`  ✗ 写入 ${docName} 失败: ${err.message}`);
         if (fs.existsSync(backupPath)) {
           try {
@@ -489,7 +598,79 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
     }
   }
 
-  return { success, failed, skipped, results };
+  return { success, failed, skipped, writeFailed, results };
+}
+
+function removeUpdateState(rootDir) {
+  const statePath = getUpdateStatePath(rootDir);
+  if (fs.existsSync(statePath)) fs.unlinkSync(statePath);
+}
+
+async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
+  const transaction = updateResult && updateResult._stateTransaction;
+  if (!transaction) {
+    throw new Error('缺少 update 事务上下文，请先调用 updateCommand');
+  }
+
+  const storedState = loadUpdateState(rootDir);
+  const state = storedState?.changeSetId === transaction.changeSetId
+    ? storedState
+    : transaction.pendingState;
+  const pendingUpdates = updateResult.sectionUpdates.filter(update => {
+    const key = getSectionKey(update.docName, update.sectionName);
+    return state.sections[key]?.status !== 'success';
+  });
+  const execution = await executeUpdates(rootDir, pendingUpdates, aiConfig);
+
+  for (const result of execution.results) {
+    const key = getSectionKey(result.docName, result.sectionName);
+    if (!state.sections[key]) continue;
+    state.sections[key] = {
+      ...state.sections[key],
+      status: result.status === 'success' ? 'success' : 'failed',
+      error: result.status === 'success' ? null : (result.reason || result.status)
+    };
+  }
+  state.updatedAt = new Date().toISOString();
+
+  const sectionStates = Object.values(state.sections);
+  const allSectionsSucceeded = sectionStates.length > 0 &&
+    sectionStates.every(section => section.status === 'success');
+  saveUpdateState(rootDir, state);
+
+  if (!allSectionsSucceeded) {
+    return { ...execution, committed: false, pendingState: state };
+  }
+
+  const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
+  const freshDetection = detectChangedFiles(rootDir, lastScanPath);
+  const freshChanges = attachChangeEvidence(rootDir, freshDetection.changes, {
+    ...transaction.evidenceOptions,
+    gitBaseRef: freshDetection.gitBaseRef
+  });
+  const freshChangeSetId = buildChangeSetId(freshChanges);
+
+  if (freshChangeSetId !== transaction.changeSetId) {
+    state.transactionError = '源码在文档生成期间发生变化，扫描基线未提交';
+    state.updatedAt = new Date().toISOString();
+    saveUpdateState(rootDir, state);
+    return {
+      ...execution,
+      committed: false,
+      pendingState: state,
+      reason: state.transactionError
+    };
+  }
+
+  saveLastScan(
+    rootDir,
+    lastScanPath,
+    freshDetection.changedFiles,
+    freshDetection.useGit,
+    freshDetection.hashScanState
+  );
+  removeUpdateState(rootDir);
+  return { ...execution, committed: true, pendingState: null };
 }
 
 async function updateCommand(rootDir, options = {}) {
@@ -509,7 +690,7 @@ async function updateCommand(rootDir, options = {}) {
     gitBaseRef
   });
   const evidenceChunks = buildEvidenceChunks(changesWithEvidence, evidenceOptions);
-  const sectionUpdates = buildSectionUpdatePrompts(
+  let sectionUpdates = buildSectionUpdatePrompts(
     rootDir,
     changedFiles,
     changesWithEvidence,
@@ -520,8 +701,25 @@ async function updateCommand(rootDir, options = {}) {
     ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
     : null;
 
+  const changeSetId = buildChangeSetId(changesWithEvidence);
+  const pendingState = prepareUpdateState(
+    rootDir,
+    changeSetId,
+    changesWithEvidence,
+    sectionUpdates,
+    detectionMethod
+  );
+  sectionUpdates = sectionUpdates.map(update => ({
+    ...update,
+    status: pendingState.sections[getSectionKey(update.docName, update.sectionName)]?.status || 'pending'
+  }));
+
   if (!options.dryRun) {
-    saveLastScan(rootDir, lastScanPath, changedFiles, useGit, hashScanState);
+    if (changedFiles.length > 0) {
+      saveUpdateState(rootDir, pendingState);
+    } else {
+      removeUpdateState(rootDir);
+    }
   }
 
   try {
@@ -539,20 +737,33 @@ async function updateCommand(rootDir, options = {}) {
     }
   }
 
-  return {
+  const result = {
     changedFiles,
     changes: changesWithEvidence,
     evidenceChunks,
     prompt,
     sectionUpdates,
-    detectionMethod
+    detectionMethod,
+    changeSetId
   };
+  Object.defineProperty(result, '_stateTransaction', {
+    value: {
+      changeSetId,
+      evidenceOptions,
+      pendingState,
+      useGit,
+      hashScanState
+    },
+    enumerable: false
+  });
+  return result;
 }
 
 module.exports = {
   updateCommand,
   applySectionUpdates,
   executeUpdates,
+  executeUpdateTransaction,
   buildEvidenceChunks,
   getFileHash,
   normalizeFileEntry

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { updateCommand, executeUpdates } = require('./update');
+const { updateCommand, executeUpdateTransaction } = require('./update');
 const { getAIConfig } = require('../utils/config');
 const { clearCache } = require('../template/engine');
 
@@ -47,7 +47,7 @@ async function watchCommand(rootDir, options = {}) {
 
       if (autoApply && aiConfig && aiConfig.apiKey && result.sectionUpdates.length > 0) {
         console.log('\n自动更新文档...');
-        const updateResult = await executeUpdates(rootDir, result.sectionUpdates, aiConfig);
+        const updateResult = await executeUpdateTransaction(rootDir, result, aiConfig);
         console.log(`更新完成：✓ ${updateResult.success} / ✗ ${updateResult.failed} / ⊘ ${updateResult.skipped}`);
       } else if (result.sectionUpdates.length > 0) {
         console.log(`  涉及 ${result.sectionUpdates.length} 个 section，运行 code-ctx update --apply 更新文档`);

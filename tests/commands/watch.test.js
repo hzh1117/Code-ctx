@@ -4,7 +4,7 @@ const path = require('path');
 jest.mock('fs');
 jest.mock('../../src/commands/update', () => ({
   updateCommand: jest.fn(),
-  executeUpdates: jest.fn()
+  executeUpdateTransaction: jest.fn()
 }));
 jest.mock('../../src/utils/config', () => ({
   getAIConfig: jest.fn()
@@ -15,7 +15,7 @@ jest.mock('../../src/template/engine', () => ({
 
 const fs = require('fs');
 const { watchCommand } = require('../../src/commands/watch');
-const { updateCommand, executeUpdates } = require('../../src/commands/update');
+const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 const { getAIConfig } = require('../../src/utils/config');
 
 describe('commands/watch', () => {
@@ -50,7 +50,7 @@ describe('commands/watch', () => {
     });
 
     updateCommand.mockResolvedValue({ changedFiles: [], sectionUpdates: [] });
-    executeUpdates.mockResolvedValue({ success: 0, failed: 0, skipped: 0 });
+    executeUpdateTransaction.mockResolvedValue({ success: 0, failed: 0, skipped: 0, committed: true });
     getAIConfig.mockReturnValue({ apiKey: 'test-key' });
 
     exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
@@ -120,7 +120,7 @@ describe('commands/watch', () => {
     expect(updateCommand).not.toHaveBeenCalled();
   });
 
-  test('autoApply=true 时自动执行 executeUpdates', async () => {
+  test('autoApply=true 时自动执行 update transaction', async () => {
     updateCommand.mockResolvedValue({
       changedFiles: ['src/App.js'],
       sectionUpdates: [{ section: 'overview' }]
@@ -135,10 +135,10 @@ describe('commands/watch', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(executeUpdates).toHaveBeenCalled();
+    expect(executeUpdateTransaction).toHaveBeenCalledWith('/project', expect.any(Object), { apiKey: 'test-key' });
   });
 
-  test('autoApply=false 时不调用 executeUpdates', async () => {
+  test('autoApply=false 时不执行 update transaction', async () => {
     updateCommand.mockResolvedValue({
       changedFiles: ['src/App.js'],
       sectionUpdates: [{ section: 'overview' }]
@@ -152,7 +152,7 @@ describe('commands/watch', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(executeUpdates).not.toHaveBeenCalled();
+    expect(executeUpdateTransaction).not.toHaveBeenCalled();
   });
 
   test('fs.watch 抛错时不中断整体监听', () => {

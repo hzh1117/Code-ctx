@@ -1,5 +1,5 @@
 const { Command } = require('commander');
-const { updateCommand, executeUpdates } = require('../../src/commands/update');
+const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 const { getAIConfig } = require('../../src/utils/config');
 const { outputPrompt } = require('../../src/utils/prompt-output');
 
@@ -67,9 +67,12 @@ const update = new Command('update')
         }
 
         console.log('\n开始自动更新文档...');
-        const updateResult = await executeUpdates(rootDir, result.sectionUpdates, aiConfig);
+        const updateResult = await executeUpdateTransaction(rootDir, result, aiConfig);
 
         console.log(`\n更新完成：✓ ${updateResult.success} 成功 / ✗ ${updateResult.failed} 失败 / ⊘ ${updateResult.skipped} 跳过`);
+        if (!updateResult.committed) {
+          console.log('扫描基线未提交，失败或待处理 section 将在下次 update 时重试');
+        }
         if (updateResult.failed > 0) {
           console.log('\n失败的 section：');
           updateResult.results

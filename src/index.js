@@ -3,7 +3,12 @@
 // programmatic callers (e.g. the Web Dashboard, downstream tools).
 
 const { initCommand } = require('./commands/init');
-const { updateCommand, executeUpdates, applySectionUpdates } = require('./commands/update');
+const {
+  updateCommand,
+  executeUpdates,
+  executeUpdateTransaction,
+  applySectionUpdates
+} = require('./commands/update');
 const { useCommand, buildContext } = require('./commands/use');
 const { doctorCommand, doctorFix, runDoctor } = require('./commands/doctor');
 const { fixCommand } = require('./commands/fix');
@@ -16,6 +21,7 @@ module.exports = {
   initCommand,
   updateCommand,
   executeUpdates,
+  executeUpdateTransaction,
   applySectionUpdates,
   useCommand,
   buildContext,

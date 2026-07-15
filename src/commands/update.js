@@ -564,6 +564,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
   let failed = 0;
   let skipped = 0;
   let writeFailed = 0;
+  let restoreFailed = 0;
 
   const updatesByDoc = groupSectionUpdates(sectionUpdates);
 
@@ -586,8 +587,10 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
 
     // Backup before modifying so we can restore on write failure
     const backupPath = docPath + '.bak';
+    let backupCreated = false;
     try {
       fs.copyFileSync(docPath, backupPath);
+      backupCreated = true;
     } catch (err) {
       console.warn(`  ⚠ 备份 ${docName} 失败: ${err.message}`);
     }
@@ -627,29 +630,32 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
         console.log(`  ✓ ${docName} 已更新 ${sectionResults.length} 个 section`);
       } catch (err) {
         writeFailed++;
+        let failureReason = `文档写入失败: ${err.message}`;
+        console.error(`  ✗ 写入 ${docName} 失败: ${err.message}`);
+        if (backupCreated) {
+          try {
+            fs.copyFileSync(backupPath, docPath);
+            console.log(`  ↩ 已从备份恢复 ${docName}`);
+          } catch (restoreErr) {
+            restoreFailed++;
+            failureReason += `; 备份恢复失败: ${restoreErr.message}`;
+            console.error(`  ✗ 从备份恢复 ${docName} 失败: ${restoreErr.message}`);
+          }
+        }
         for (const sectionResult of sectionResults) {
           results.push({
             docName,
             sectionName: sectionResult.sectionName,
             status: 'failed',
-            reason: `文档写入失败: ${err.message}`
+            reason: failureReason
           });
           failed++;
-        }
-        console.error(`  ✗ 写入 ${docName} 失败: ${err.message}`);
-        if (fs.existsSync(backupPath)) {
-          try {
-            fs.copyFileSync(backupPath, docPath);
-            console.log(`  ↩ 已从备份恢复 ${docName}`);
-          } catch (restoreErr) {
-            console.error(`  ✗ 从备份恢复 ${docName} 失败: ${restoreErr.message}`);
-          }
         }
       }
     }
   }
 
-  return { success, failed, skipped, writeFailed, results };
+  return { success, failed, skipped, writeFailed, restoreFailed, results };
 }
 
 function removeUpdateState(rootDir) {

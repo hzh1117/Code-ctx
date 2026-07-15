@@ -578,4 +578,75 @@ describe('executeUpdates', () => {
     expect(fs.existsSync(backupPath)).toBe(true);
     expect(fs.readFileSync(backupPath, 'utf8')).toBe(original);
   });
+
+  test('write failure overrides generated sections to failed', async () => {
+    const docPath = path.join(testDir, 'ai-docs', 'web.md');
+    const original = '# Web\n<!-- section:s -->\n旧\n<!-- /section:s -->';
+    fs.writeFileSync(docPath, original);
+    generateWithAI.mockResolvedValue('新');
+    const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
+      throw new Error('rename failed');
+    });
+
+    let result;
+    try {
+      result = await executeUpdates(testDir, [
+        { docName: 'web.md', sectionName: 's', prompt: 'update' }
+      ], {});
+    } finally {
+      renameSpy.mockRestore();
+    }
+
+    expect(result).toEqual(expect.objectContaining({
+      success: 0,
+      failed: 1,
+      writeFailed: 1,
+      restoreFailed: 0
+    }));
+    expect(result.results[0]).toEqual(expect.objectContaining({
+      sectionName: 's',
+      status: 'failed',
+      reason: expect.stringContaining('rename failed')
+    }));
+    expect(fs.readFileSync(docPath, 'utf8')).toBe(original);
+  });
+
+  test('restore failure is reflected in every affected section result', async () => {
+    const docPath = path.join(testDir, 'ai-docs', 'web.md');
+    fs.writeFileSync(docPath, [
+      '<!-- section:a -->', '旧A', '<!-- /section:a -->',
+      '<!-- section:b -->', '旧B', '<!-- /section:b -->'
+    ].join('\n'));
+    generateWithAI.mockResolvedValue('新');
+    const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
+      throw new Error('rename failed');
+    });
+    const realCopy = fs.copyFileSync;
+    let copyCount = 0;
+    const copySpy = jest.spyOn(fs, 'copyFileSync').mockImplementation((source, destination) => {
+      copyCount++;
+      if (copyCount === 2) throw new Error('restore failed');
+      return realCopy(source, destination);
+    });
+
+    let result;
+    try {
+      result = await executeUpdates(testDir, [
+        { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
+        { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
+      ], {});
+    } finally {
+      copySpy.mockRestore();
+      renameSpy.mockRestore();
+    }
+
+    expect(result.success).toBe(0);
+    expect(result.failed).toBe(2);
+    expect(result.restoreFailed).toBe(1);
+    expect(result.results).toHaveLength(2);
+    for (const sectionResult of result.results) {
+      expect(sectionResult.status).toBe('failed');
+      expect(sectionResult.reason).toContain('备份恢复失败: restore failed');
+    }
+  });
 });

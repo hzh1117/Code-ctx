@@ -95,7 +95,7 @@ describe('initCommand AI continuation', () => {
       return allSections;
     });
 
-    await initCommand(testDir, { skipPrompt: true, force: true });
+    const result = await initCommand(testDir, { skipPrompt: true, force: true });
 
     const state = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs', '.init-state.json'), 'utf8'));
     // app-a should have failed, app-b should be completed
@@ -103,6 +103,25 @@ describe('initCommand AI continuation', () => {
     expect(state.projects['app-b']?.status).toBe('completed');
     // Both docs should still be attempted (failure doesn't crash the process)
     expect(fs.existsSync(path.join(testDir, 'ai-docs', 'app-b.md'))).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('partial');
+    expect(result.generation.failedDocs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ alias: 'app-a', error: 'AI service unavailable' })
+    ]));
+    expect(fs.existsSync(path.join(testDir, 'ai-docs', '.last-scan.json'))).toBe(false);
+  });
+
+  test('reports a structured failure when all AI generation fails', async () => {
+    generateWithContinuation.mockRejectedValue(new Error('authentication failed'));
+
+    const result = await initCommand(testDir, { skipPrompt: true, force: true });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe('failed');
+    expect(result.generation.generatedDocs).toEqual({});
+    expect(result.generation.failedDocs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ error: 'authentication failed' })
+    ]));
   });
 
   test('uses continuation generation and appends missing template sections', async () => {

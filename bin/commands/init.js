@@ -16,7 +16,7 @@ const init = new Command('init')
         console.error('初始化失败: --config-format 必须是 json 或 js');
         process.exit(1);
       }
-      await initCommand(process.cwd(), {
+      const result = await initCommand(process.cwd(), {
         skipAi: options.skipAi,
         force: options.force,
         project: options.project,
@@ -25,6 +25,9 @@ const init = new Command('init')
         configFormat: options.configFormat,
         verbose: options.verbose
       });
+      if (!result.success) {
+        process.exitCode = 1;
+      }
     } catch (err) {
       console.error('初始化失败:', err.message);
       process.exit(1);

@@ -284,7 +284,7 @@ function pickStrategy(projects, scanResults) {
 }
 
 async function generateTypeSpecificDocs(ctx) {
-  const { projects, scanResults, aiConfig, outputDir, options, state, failedDocs } = ctx;
+  const { projects, scanResults, aiConfig, outputDir, options, state, generatedDocs, failedDocs } = ctx;
   log(`生成 ${options.docType.toUpperCase()} 文档...`);
 
   const pendingProjects = projects.filter(p => {
@@ -318,19 +318,23 @@ async function generateTypeSpecificDocs(ctx) {
         ...state.projects[result.alias],
         [`${result.docType}Doc`]: 'completed'
       };
+      generatedDocs[`${result.alias}-${result.docType}`] = result.fileName;
       saveInitState(outputDir, state);
     } catch (err) {
       console.error(`  ${project.alias}-${options.docType}.md 生成失败:`, err.message);
       if (_verboseMode) {
         console.error('  错误详情:', err.stack);
       }
-      failedDocs.push({ error: err.message });
+      failedDocs.push({ alias: project.alias, docType: options.docType, error: err.message });
     }
   }
 }
 
 async function generateOneShotDocs(ctx) {
-  const { projects, scanResults, aiConfig, outputDir, options, state, generatedDocs, projectExpectedSections } = ctx;
+  const {
+    projects, scanResults, aiConfig, outputDir, options, state,
+    generatedDocs, failedDocs, projectExpectedSections
+  } = ctx;
   log('\nONE_SHOT 模式：所有子项目合并生成...');
   logVerbose('构建 prompt...');
   const allPrompt = buildInitPrompt({
@@ -353,13 +357,14 @@ async function generateOneShotDocs(ctx) {
     const match = safeDocs.match(strictRegex) || safeDocs.match(fuzzyRegex);
     if (!match) {
       console.warn(`  ${project.alias}: 文档拆分失败，标记为待重新生成`);
+      failedDocs.push({ alias: project.alias, error: 'AI 响应中未找到项目文档' });
     }
     let doc = match ? match[0].trim() : `# ${project.alias}\n\n文档生成中，请稍后重试。`;
     if (match) {
       doc = await completeMissingSections(doc, projectExpectedSections, aiConfig, project.alias);
     }
     fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
-    generatedDocs[project.alias] = doc;
+    if (match) generatedDocs[project.alias] = doc;
     state.projects[project.alias] = { status: match ? 'completed' : 'needs-regen' };
   }
   saveInitState(outputDir, state);
@@ -492,6 +497,7 @@ async function generateOverviewDoc(ctx) {
     'OVERVIEW'
   );
   fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), safeOverview);
+  generatedDocs.OVERVIEW = safeOverview;
   log(`成功生成 ${successCount} 个子项目文档 + OVERVIEW.md`);
 }
 
@@ -504,7 +510,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
   );
 
   if (options.generateDocs === false || options.skipAi) {
-    return { generatedDocs, failedDocs };
+    return { generatedDocs, failedDocs, status: 'scanned', success: true };
   }
 
   if (!hasPendingProjects) {
@@ -512,7 +518,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
     log('所有子项目都已生成过文档（记录在 ai-docs/.init-state.json）');
     log('如需重新生成，请使用：code-ctx init --force');
     log('或删除 ai-docs/.init-state.json 后重新运行');
-    return { generatedDocs, failedDocs };
+    return { generatedDocs, failedDocs, status: 'unchanged', success: true };
   }
 
   logStep('6/7', '生成项目文档');
@@ -528,14 +534,27 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
 
     if (!aiConfig.apiKey) {
       console.log('\n未配置 API Key，请先在 .env 文件中配置');
-      return { generatedDocs, failedDocs };
+      for (const project of projects.filter(p =>
+        !(state.projects[p.alias]?.status === 'completed' && !options.force)
+      )) {
+        failedDocs.push({ alias: project.alias, error: '未配置 API Key' });
+        state.projects[project.alias] = { status: 'failed', error: '未配置 API Key' };
+      }
+      saveInitState(outputDir, state);
+      return { generatedDocs, failedDocs, status: 'failed', success: false };
     }
 
     if (options.docType && ['api', 'database'].includes(options.docType)) {
       await generateTypeSpecificDocs({
         projects, scanResults, aiConfig, outputDir, options, state, failedDocs
       });
-      return { generatedDocs, failedDocs };
+      const success = failedDocs.length === 0 && Object.keys(generatedDocs).length > 0;
+      return {
+        generatedDocs,
+        failedDocs,
+        status: success ? 'completed' : (Object.keys(generatedDocs).length > 0 ? 'partial' : 'failed'),
+        success
+      };
     }
 
     const projectExpectedSections = getExpectedSectionsFromTemplate('scan-prompt.md');
@@ -555,15 +574,33 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
       await generateBatchWithContextDocs(ctx);
     }
 
-    await generateOverviewDoc({ ...ctx, overviewExpectedSections });
+    try {
+      await generateOverviewDoc({ ...ctx, overviewExpectedSections });
+    } catch (err) {
+      failedDocs.push({ alias: 'OVERVIEW', error: err.message });
+      console.error('  OVERVIEW.md 生成失败:', err.message);
+    }
   } catch (err) {
     console.error('\n文档生成失败:', err.message);
     if (_verboseMode) {
       console.error('错误详情:', err.stack);
     }
+    if (failedDocs.length === 0) {
+      failedDocs.push({ alias: 'generation', error: err.message });
+    }
   }
 
-  return { generatedDocs, failedDocs };
+  const generatedCount = Object.keys(generatedDocs).length;
+  if (failedDocs.length === 0 && generatedCount === 0) {
+    failedDocs.push({ alias: 'generation', error: '未生成任何文档' });
+  }
+  const success = failedDocs.length === 0;
+  return {
+    generatedDocs,
+    failedDocs,
+    status: success ? 'completed' : (generatedCount > 0 ? 'partial' : 'failed'),
+    success
+  };
 }
 
 function runSensitiveInfoCheck(outputDir) {
@@ -582,21 +619,40 @@ function runSensitiveInfoCheck(outputDir) {
   return sensitiveWarnings;
 }
 
-function finalizeInit(rootDir, outputDir, projects, state) {
+function finalizeInit(rootDir, outputDir, projects, state, generation) {
   logVerbose('保存最终状态...');
   state.lastRun = new Date().toISOString();
   saveInitState(outputDir, state);
 
-  const lastScanPath = path.join(outputDir, STATE_FILES.LAST_SCAN);
-  const commitHash = hasGitRepo(rootDir) ? getCurrentCommitHash(rootDir) : null;
-  fs.writeFileSync(lastScanPath, JSON.stringify({
-    timestamp: Date.now(),
-    lastCommitHash: commitHash,
-    projects: projects.map(p => p.alias)
-  }, null, 2));
+  if (generation.success) {
+    const lastScanPath = path.join(outputDir, STATE_FILES.LAST_SCAN);
+    const commitHash = hasGitRepo(rootDir) ? getCurrentCommitHash(rootDir) : null;
+    fs.writeFileSync(lastScanPath, JSON.stringify({
+      timestamp: Date.now(),
+      lastCommitHash: commitHash,
+      projects: projects.map(p => p.alias)
+    }, null, 2));
+  }
   logVerbose('状态文件已更新');
 
-  console.log('\n✓ 初始化完成！');
+  if (!generation.success) {
+    const generatedCount = Object.keys(generation.generatedDocs).length;
+    const label = generation.status === 'partial' ? '初始化部分完成' : '初始化失败';
+    console.error(`\n${label}：生成 ${generatedCount} 个，失败 ${generation.failedDocs.length} 个`);
+    for (const failure of generation.failedDocs) {
+      console.error(`  - ${failure.alias || 'unknown'}: ${failure.error}`);
+    }
+    console.error('请修复配置或网络问题后重新运行 code-ctx init');
+    return;
+  }
+
+  if (generation.status === 'scanned') {
+    console.log('\n✓ 项目扫描完成（已跳过 AI 文档生成）');
+  } else if (generation.status === 'unchanged') {
+    console.log('\n✓ 初始化检查完成（文档无需重新生成）');
+  } else {
+    console.log('\n✓ 初始化完成！');
+  }
   console.log('ai-docs/ 已创建');
   console.log('\n下一步：');
   console.log('  开始开发前：  code-ctx use "你的任务描述"');
@@ -625,12 +681,21 @@ async function initCommand(rootDir, options = {}) {
 
   const config = generateProjectConfig(rootDir, projects, options);
 
-  await generateDocuments(rootDir, projects, scanResults, config, outputDir, state, options);
+  const generation = await generateDocuments(
+    rootDir, projects, scanResults, config, outputDir, state, options
+  );
 
   const warnings = runSensitiveInfoCheck(outputDir);
-  finalizeInit(rootDir, outputDir, projects, state);
+  finalizeInit(rootDir, outputDir, projects, state, generation);
 
-  return { projects, config, warnings };
+  return {
+    projects,
+    config,
+    warnings,
+    generation,
+    success: generation.success,
+    status: generation.status
+  };
 }
 
 module.exports = { initCommand, setVerbose };

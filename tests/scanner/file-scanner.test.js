@@ -274,6 +274,41 @@ describe('scanProject', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('supports explicit scan pattern overrides', () => {
+    const dir = createTmpDir();
+    try {
+      fs.mkdirSync(path.join(dir, 'custom'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'custom', 'entry.foo'), 'custom source');
+      fs.writeFileSync(path.join(dir, 'src.js'), 'ignored source');
+
+      const result = scanProject(dir, 'generic-js-ts', {
+        scanPatterns: ['custom/**/*.foo']
+      });
+      const relativeFiles = result.keyFiles.map(file => path.relative(dir, file).replace(/\\/g, '/'));
+
+      expect(relativeFiles).toContain('custom/entry.foo');
+      expect(relativeFiles).not.toContain('src.js');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('Next.js scans JavaScript and JSX app router files', () => {
+    const dir = createTmpDir();
+    try {
+      fs.mkdirSync(path.join(dir, 'app', 'api', 'users'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'app', 'page.jsx'), 'export default function Page() {}');
+      fs.writeFileSync(path.join(dir, 'app', 'api', 'users', 'route.js'), 'export function GET() {}');
+
+      const result = scanProject(dir, 'nextjs');
+      const relativeFiles = result.keyFiles.map(file => path.relative(dir, file).replace(/\\/g, '/'));
+
+      expect(relativeFiles).toEqual(expect.arrayContaining(['app/page.jsx', 'app/api/users/route.js']));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('adapter priorityKeywords', () => {

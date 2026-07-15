@@ -243,6 +243,11 @@ function validateProjectConfig(config) {
         if (p.type !== undefined && typeof p.type !== 'string') {
           errors.push(`projects[${i}].type 必须是字符串`);
         }
+        if (p.scanPatterns !== undefined && (
+          !Array.isArray(p.scanPatterns) || p.scanPatterns.some(pattern => typeof pattern !== 'string')
+        )) {
+          errors.push(`projects[${i}].scanPatterns 必须是字符串数组`);
+        }
       });
     }
   }

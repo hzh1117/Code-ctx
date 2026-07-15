@@ -53,6 +53,17 @@ describe('detectProjects', () => {
     expect(projects.some(p => p.type === 'vue3-admin')).toBe(true);
   });
 
+  test('should detect Vue3 without requiring a UI component library', () => {
+    const projectDir = path.join(testDir, 'plain-vue3');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
+      dependencies: { vue: '^3.5.0' }
+    }));
+
+    const projects = detectProjects(testDir);
+    expect(projects.find(p => p.name === 'plain-vue3')?.type).toBe('vue3-admin');
+  });
+
   test('should detect React project', () => {
     const projectDir = path.join(testDir, 'react-app');
     fs.mkdirSync(projectDir, { recursive: true });
@@ -82,6 +93,41 @@ describe('detectProjects', () => {
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'node-backend')).toBe(true);
+  });
+
+  test('should detect Fastify TypeScript backend', () => {
+    const projectDir = path.join(testDir, 'fastify-api');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
+      dependencies: { fastify: '^5.0.0' },
+      devDependencies: { typescript: '^5.0.0' }
+    }));
+    fs.writeFileSync(path.join(projectDir, 'server.ts'), 'export {}');
+
+    const projects = detectProjects(testDir);
+    expect(projects.find(p => p.name === 'fastify-api')?.type).toBe('node-backend');
+  });
+
+  test('uses generic JS/TS detection for an otherwise unknown package', () => {
+    const projectDir = path.join(testDir, 'custom-tool');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({ name: 'custom-tool' }));
+    fs.writeFileSync(path.join(projectDir, 'index.ts'), 'export {}');
+
+    const projects = detectProjects(testDir);
+    expect(projects.find(p => p.name === 'custom-tool')?.type).toBe('generic-js-ts');
+  });
+
+  test('uses generic backend detection for non-framework server packages', () => {
+    const projectDir = path.join(testDir, 'realtime-service');
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
+      dependencies: { 'socket.io': '^4.0.0' }
+    }));
+    fs.writeFileSync(path.join(projectDir, 'server.js'), 'module.exports = {};');
+
+    const projects = detectProjects(testDir);
+    expect(projects.find(p => p.name === 'realtime-service')?.type).toBe('generic-backend');
   });
 
   test('should detect Go backend', () => {

@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
 const { scanProject, estimateTokens } = require('../scanner/file-scanner');
-const { getAIConfig, getProjectLimits, getConfigFile, saveProjectConfig } = require('../utils/config');
+const {
+  getAIConfig, getProjectLimits, getConfigFile, loadProjectConfig, saveProjectConfig
+} = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
@@ -180,6 +182,26 @@ function detectSubProjects(rootDir, options) {
   return projects;
 }
 
+function applyConfiguredProjectOverrides(rootDir, projects) {
+  const config = loadProjectConfig(rootDir);
+  if (!Array.isArray(config.projects)) return projects;
+
+  const configuredByPath = new Map(config.projects
+    .filter(project => project.path)
+    .map(project => [path.resolve(rootDir, project.path), project]));
+  return projects.map(project => {
+    const configured = configuredByPath.get(path.resolve(project.path));
+    if (!configured) return project;
+    return {
+      ...project,
+      type: configured.type || project.type,
+      scanPatterns: Array.isArray(configured.scanPatterns)
+        ? configured.scanPatterns.slice()
+        : undefined
+    };
+  });
+}
+
 function prepareOutputDir(rootDir) {
   logStep('3/7', '创建输出目录');
   const outputDir = path.join(rootDir, 'ai-docs');
@@ -203,7 +225,10 @@ function scanAllProjects(projects, projectLimits, state, options) {
 
     logVerbose(`\n开始扫描: ${project.alias}`);
     const scanStartTime = Date.now();
-    const scanResult = scanProject(project.path, project.type, projectLimits);
+    const scanResult = scanProject(project.path, project.type, {
+      ...projectLimits,
+      scanPatterns: project.scanPatterns
+    });
     const scanTime = Date.now() - scanStartTime;
     scanResults[project.alias] = scanResult;
 
@@ -688,7 +713,10 @@ async function initCommand(rootDir, options = {}) {
 
   validateRootDir(rootDir);
   initPlugins(rootDir);
-  const projects = detectSubProjects(rootDir, options);
+  const projects = applyConfiguredProjectOverrides(
+    rootDir,
+    detectSubProjects(rootDir, options)
+  );
   const outputDir = prepareOutputDir(rootDir);
 
   const projectLimits = options.unlimited

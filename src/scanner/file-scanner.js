@@ -54,7 +54,8 @@ function scanProject(projectDir, projectType, options = {}) {
   const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   
-  const adapterPatterns = defaultRegistry.getScanPatterns(projectType);
+  const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
+  const adapterPatterns = configuredPatterns || defaultRegistry.getScanPatterns(projectType);
   const patterns = adapterPatterns.length > 0
     ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
     : [];

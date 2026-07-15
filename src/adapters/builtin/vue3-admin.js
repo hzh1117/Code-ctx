@@ -5,11 +5,16 @@ class Vue3AdminAdapter extends BaseAdapter {
   get type() { return 'vue3-admin'; }
 
   detect(pkg) {
-    return !!(pkg.dependencies?.vue && pkg.dependencies?.['element-plus']);
+    const version = pkg.dependencies?.vue || pkg.devDependencies?.vue;
+    return !!version && !/^\s*[~^]?2(?:\.|$)/.test(version);
   }
 
   get scanPatterns() {
-    return ['src/api/*.js', 'src/router/*.js', 'src/stores/*.js', '.env.*'];
+    return [
+      'src/**/*.{vue,js,jsx,ts,tsx}',
+      '*.{js,ts,mjs,cjs}',
+      '.env.*'
+    ];
   }
 
   get priorityKeywords() {

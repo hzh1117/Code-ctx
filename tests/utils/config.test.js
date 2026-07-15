@@ -337,6 +337,15 @@ describe('config', () => {
       expect(errors.some(e => e.includes('projects[2].path'))).toBe(true);
     });
 
+    test('validateProjectConfig: accepts string scan pattern overrides', () => {
+      expect(validateProjectConfig({
+        projects: [{ alias: 'custom', path: '.', scanPatterns: ['custom/**/*.foo'] }]
+      })).toEqual([]);
+      expect(validateProjectConfig({
+        projects: [{ alias: 'custom', path: '.', scanPatterns: [123] }]
+      })).toEqual(expect.arrayContaining([expect.stringContaining('scanPatterns')]));
+    });
+
     test('saveProjectConfig: defaults to JSON when nothing exists', () => {
       saveProjectConfig(testDir, { projectName: 'fresh' });
       expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);

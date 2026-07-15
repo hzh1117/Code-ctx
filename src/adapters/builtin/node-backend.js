@@ -5,11 +5,18 @@ class NodeBackendAdapter extends BaseAdapter {
   get type() { return 'node-backend'; }
 
   detect(pkg) {
-    return !!(pkg.dependencies?.express || pkg.dependencies?.koa || pkg.dependencies?.['@nestjs/core']);
+    const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+    return !!(
+      deps.express || deps.koa || deps.fastify || deps.restify ||
+      deps['@hapi/hapi'] || deps['@nestjs/core']
+    );
   }
 
   get scanPatterns() {
-    return ['routes/*.js', 'controllers/*.js', 'app.js'];
+    return [
+      '{src,server,app,routes,controllers,middleware,services,models}/**/*.{js,cjs,mjs,ts,tsx}',
+      '*.{js,cjs,mjs,ts}'
+    ];
   }
 
   get priorityKeywords() {

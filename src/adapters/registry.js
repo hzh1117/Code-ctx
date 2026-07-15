@@ -15,7 +15,9 @@ class AdapterRegistry {
   }
 
   detect(pkg, files) {
-    for (const [type, adapter] of this.adapters) {
+    const ordered = [...this.adapters.entries()]
+      .sort(([, a], [, b]) => a.detectionPriority - b.detectionPriority);
+    for (const [type, adapter] of ordered) {
       if (adapter.detect(pkg, files)) {
         return type;
       }

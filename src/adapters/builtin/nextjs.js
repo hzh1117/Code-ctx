@@ -11,9 +11,10 @@ class NextjsAdapter extends BaseAdapter {
 
   get scanPatterns() {
     return [
-      'app/api/**/*.ts',
-      'pages/api/**/*.ts',
-      'lib/**/*.ts'
+      '{app,pages,src/app,src/pages}/**/*.{js,jsx,ts,tsx}',
+      '{lib,src/lib}/**/*.{js,jsx,ts,tsx}',
+      'middleware.{js,ts}',
+      'next.config.{js,mjs,cjs,ts}'
     ];
   }
 

@@ -140,6 +140,32 @@ describe('initCommand', () => {
     expect(fs.readFileSync(docPath, 'utf8')).toBe(firstDoc);
   });
 
+  test('applies configured scan pattern overrides by project path', async () => {
+    fs.mkdirSync(path.join(testDir, 'custom'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({ name: 'custom' }));
+    fs.writeFileSync(path.join(testDir, 'custom', 'entry.foo'), 'domain source');
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+      projectName: 'custom',
+      projects: [{
+        alias: 'init-test',
+        path: '.',
+        type: 'generic-js-ts',
+        scanPatterns: ['custom/**/*.foo']
+      }]
+    }));
+    _clearCache();
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    const manifest = JSON.parse(fs.readFileSync(
+      path.join(testDir, 'ai-docs', 'project-manifest.json'),
+      'utf8'
+    ));
+    expect(manifest.projects[0].keyFiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: 'custom/entry.foo' })
+    ]));
+  });
+
   test('should persist detected project paths relative to the repository', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });

@@ -7,6 +7,10 @@ class BaseAdapter {
     throw new Error('Adapter must implement detect()');
   }
 
+  get detectionPriority() {
+    return 100;
+  }
+
   get scanPatterns() {
     return [];
   }

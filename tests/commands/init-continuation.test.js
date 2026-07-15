@@ -130,13 +130,34 @@ describe('initCommand AI continuation', () => {
     ]));
   });
 
+  test('does not write or complete a project when one-shot boundaries are invalid', async () => {
+    generateWithContinuation.mockResolvedValue([
+      '## my-app',
+      '<!-- section:overview -->',
+      'unstructured response',
+      '<!-- /section:overview -->'
+    ].join('\n'));
+
+    const result = await initCommand(testDir, { skipPrompt: true, force: true });
+    const state = JSON.parse(fs.readFileSync(
+      path.join(testDir, 'ai-docs', '.init-state.json'),
+      'utf8'
+    ));
+
+    expect(result.success).toBe(false);
+    expect(state.projects['my-app']).toEqual(expect.objectContaining({ status: 'failed' }));
+    expect(fs.existsSync(path.join(testDir, 'ai-docs', 'my-app.md'))).toBe(false);
+  });
+
   test('uses continuation generation and appends missing template sections', async () => {
     generateWithContinuation
       .mockResolvedValueOnce([
-        '## my-app',
+        '<<<CODE_CTX_DOC my-app>>>',
+        '# my-app',
         '<!-- section:overview -->',
         '项目概述',
-        '<!-- /section:overview -->'
+        '<!-- /section:overview -->',
+        '<<<END_CODE_CTX_DOC my-app>>>'
       ].join('\n'))
       .mockResolvedValueOnce([
         '<!-- section:structure -->',

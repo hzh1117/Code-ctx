@@ -10,6 +10,7 @@ const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
 const { generateDeterministicDocs } = require('../generator/deterministic-docs');
+const { parseOneShotDocuments } = require('../generator/one-shot-parser');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 const { evaluateContextBudget } = require('../utils/token-estimator');
 const { hasGitRepo, getCurrentCommitHash } = require('../utils/git-utils');
@@ -67,7 +68,7 @@ function getExpectedSectionsFromTemplate(templateName) {
   const templatePath = path.join(__dirname, '../../templates', templateName);
   if (!fs.existsSync(templatePath)) return [];
   const content = fs.readFileSync(templatePath, 'utf8');
-  return listSections(content);
+  return listSections(content).filter(section => /^[a-z][a-z0-9-]*$/.test(section));
 }
 
 async function generateDocument(prompt, aiConfig, alias) {
@@ -382,23 +383,37 @@ async function generateOneShotDocs(ctx) {
   const aiTime = Date.now() - aiStartTime;
   logVerbose('AI 调用完成 (耗时', aiTime, 'ms)');
   const safeDocs = filterSensitive(allDocs).content;
+  const pendingProjects = projects.filter(project =>
+    !(state.projects[project.alias]?.status === 'completed' && !options.force)
+  );
+  const parsed = parseOneShotDocuments(
+    safeDocs,
+    pendingProjects.map(project => project.alias)
+  );
 
-  for (const project of projects) {
-    if (state.projects[project.alias]?.status === 'completed' && !options.force) continue;
-    const strictRegex = new RegExp(`(?:^|\\n)## ${project.alias}[\\s\\S]*?(?=\\n## |$)`, 'i');
-    const fuzzyRegex = new RegExp(`(?:^|\\n)##[^\\n]*${project.alias}[\\s\\S]*?(?=\\n## |$)`, 'i');
-    const match = safeDocs.match(strictRegex) || safeDocs.match(fuzzyRegex);
-    if (!match) {
-      console.warn(`  ${project.alias}: 文档拆分失败，标记为待重新生成`);
-      failedDocs.push({ alias: project.alias, error: 'AI 响应中未找到项目文档' });
+  for (const project of pendingProjects) {
+    const parseError = parsed.errors.get(project.alias);
+    if (parseError) {
+      console.warn(`  ${project.alias}: ${parseError}`);
+      failedDocs.push({ alias: project.alias, error: parseError });
+      state.projects[project.alias] = { status: 'failed', error: parseError };
+      continue;
     }
-    let doc = match ? match[0].trim() : `# ${project.alias}\n\n文档生成中，请稍后重试。`;
-    if (match) {
+    try {
+      let doc = parsed.documents.get(project.alias);
       doc = await completeMissingSections(doc, projectExpectedSections, aiConfig, project.alias);
+      const missing = projectExpectedSections.filter(section => !listSections(doc).includes(section));
+      if (missing.length > 0) {
+        throw new Error(`文档缺少 section: ${missing.join(', ')}`);
+      }
+      fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
+      generatedDocs[project.alias] = doc;
+      state.projects[project.alias] = { status: 'completed' };
+    } catch (err) {
+      failedDocs.push({ alias: project.alias, error: err.message });
+      state.projects[project.alias] = { status: 'failed', error: err.message };
+      console.error(`  ${project.alias}.md 校验失败: ${err.message}`);
     }
-    fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), doc);
-    if (match) generatedDocs[project.alias] = doc;
-    state.projects[project.alias] = { status: match ? 'completed' : 'needs-regen' };
   }
   saveInitState(outputDir, state);
 }

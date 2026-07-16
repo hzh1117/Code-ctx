@@ -1,0 +1,13 @@
+{
+  "redacted": true,
+  "openai": {
+    "requestKeys": ["model", "max_tokens", "messages"],
+    "responsePath": "choices[0].message.content",
+    "responseType": "string"
+  },
+  "anthropic": {
+    "requestKeys": ["model", "max_tokens", "messages"],
+    "responsePath": "content[].text",
+    "responseType": "string"
+  }
+}

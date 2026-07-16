@@ -20,6 +20,12 @@ describe('update CLI default mode', () => {
       'old modules',
       '<!-- /section:modules -->'
     ].join('\n'));
+    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
+    }));
+    fs.writeFileSync(path.join(rootDir, 'ai-docs/project-manifest.json'), JSON.stringify({
+      projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
+    }));
   });
 
   afterEach(() => {

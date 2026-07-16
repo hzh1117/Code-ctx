@@ -114,6 +114,46 @@ function buildOverview(projectEntries) {
   ].join('\n');
 }
 
+function writeProjectManifest(rootDir, projects, scanResults, outputDir, mode = 'ai') {
+  const manifestPath = path.join(outputDir, 'project-manifest.json');
+  let previousProjects = [];
+  if (fs.existsSync(manifestPath)) {
+    try {
+      previousProjects = JSON.parse(fs.readFileSync(manifestPath, 'utf8')).projects || [];
+    } catch {
+      previousProjects = [];
+    }
+  }
+  const previousById = new Map(previousProjects.map(project => [project.id, project]));
+  const manifestProjects = projects
+    .filter(project => fs.existsSync(path.join(outputDir, `${project.alias}.md`)))
+    .map(project => {
+      const scanResult = scanResults[project.alias];
+      const previous = previousById.get(project.alias) || {};
+      const keyFiles = scanResult
+        ? (scanResult.sourceFiles || []).map(source => ({
+          path: source.path,
+          language: source.language,
+          hash: source.hash,
+          truncated: !!source.truncation?.truncated
+        }))
+        : (previous.keyFiles || []);
+      return {
+        id: project.alias,
+        label: project.name,
+        type: project.type,
+        sourcePath: portableRelative(rootDir, project.path),
+        document: `${project.alias}.md`,
+        techEvidence: scanResult ? dependencyEvidence(scanResult) : (previous.techEvidence || []),
+        tree: scanResult?.tree || previous.tree || '',
+        keyFiles
+      };
+    });
+  const manifest = { version: 1, mode, projects: manifestProjects };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return manifest;
+}
+
 function generateDeterministicDocs(rootDir, projects, scanResults, outputDir) {
   const generatedDocs = {};
   const manifestProjects = [];
@@ -148,10 +188,12 @@ function generateDeterministicDocs(rootDir, projects, scanResults, outputDir) {
   fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), overview);
   generatedDocs.OVERVIEW = overview;
 
-  const manifest = { version: 1, mode: 'deterministic', projects: manifestProjects };
-  fs.writeFileSync(
-    path.join(outputDir, 'project-manifest.json'),
-    `${JSON.stringify(manifest, null, 2)}\n`
+  const manifest = writeProjectManifest(
+    rootDir,
+    projects,
+    scanResults,
+    outputDir,
+    'deterministic'
   );
 
   return { generatedDocs, manifest };
@@ -161,5 +203,6 @@ module.exports = {
   buildProjectDoc,
   buildOverview,
   dependencyEvidence,
+  writeProjectManifest,
   generateDeterministicDocs
 };

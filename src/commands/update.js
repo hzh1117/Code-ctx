@@ -20,6 +20,7 @@ const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
 
 const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
+const IGNORE_FILES = ['code-ctx.config.json', 'code-ctx.config.js'];
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
@@ -48,6 +49,7 @@ function getAllFiles(dir, ignoreDirs = IGNORE_DIRS) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     if (entry.isDirectory() && ignoreDirs.includes(entry.name)) continue;
+    if (!entry.isDirectory() && IGNORE_FILES.includes(entry.name)) continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       files.push(...getAllFiles(fullPath, ignoreDirs));
@@ -416,7 +418,7 @@ function selectChanges(changes, files) {
  * Returns an array of { docName, sectionName, prompt } objects.
  */
 function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptions) {
-  const changesByProject = groupChangesByProject(changedFiles);
+  const changesByProject = groupChangesByProject(rootDir, changedFiles);
   const sectionUpdates = [];
 
   for (const [project, projFiles] of Object.entries(changesByProject)) {
@@ -458,7 +460,7 @@ function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptio
 }
 
 function buildFullDocPrompt(rootDir, changedFiles, changes, evidenceOptions) {
-  const changesByProject = groupChangesByProject(changedFiles);
+  const changesByProject = groupChangesByProject(rootDir, changedFiles);
   const projectSections = [];
 
   for (const [project, projFiles] of Object.entries(changesByProject)) {

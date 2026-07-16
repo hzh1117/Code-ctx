@@ -9,7 +9,9 @@ const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
-const { generateDeterministicDocs } = require('../generator/deterministic-docs');
+const {
+  generateDeterministicDocs, writeProjectManifest
+} = require('../generator/deterministic-docs');
 const { parseOneShotDocuments } = require('../generator/one-shot-parser');
 const { TOKEN_THRESHOLDS, STATE_FILES } = require('../utils/constants');
 const { evaluateContextBudget } = require('../utils/token-estimator');
@@ -644,6 +646,9 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
     } catch (err) {
       failedDocs.push({ alias: 'OVERVIEW', error: err.message });
       console.error('  OVERVIEW.md 生成失败:', err.message);
+    }
+    if (Object.keys(generatedDocs).length > 0) {
+      writeProjectManifest(rootDir, projects, scanResults, outputDir, 'ai');
     }
   } catch (err) {
     console.error('\n文档生成失败:', err.message);

@@ -7,6 +7,7 @@ jest.mock('../../src/ai/client', () => ({ generateWithAI: jest.fn() }));
 
 const { generateWithAI } = require('../../src/ai/client');
 const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
+const { _clearCache } = require('../../src/utils/config');
 
 function git(rootDir, ...args) {
   const result = spawnSync('git', args, { cwd: rootDir, encoding: 'utf8' });
@@ -30,6 +31,13 @@ describe('updateCommand git evidence', () => {
       'old route docs',
       '<!-- /section:api -->'
     ].join('\n'));
+    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'web', path: './src', type: 'generic-js-ts' }]
+    }));
+    fs.writeFileSync(path.join(rootDir, 'ai-docs/project-manifest.json'), JSON.stringify({
+      projects: [{ id: 'web', sourcePath: './src', document: 'web.md' }]
+    }));
+    _clearCache();
     fs.writeFileSync(path.join(rootDir, '.gitignore'), 'ai-docs/.last-scan.json\n');
 
     git(rootDir, 'init');
@@ -46,6 +54,7 @@ describe('updateCommand git evidence', () => {
   });
 
   afterEach(() => {
+    _clearCache();
     fs.rmSync(rootDir, { recursive: true, force: true });
   });
 

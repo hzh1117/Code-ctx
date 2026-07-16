@@ -206,6 +206,10 @@ describe('initCommand AI continuation', () => {
 
     const doc = fs.readFileSync(path.join(testDir, 'ai-docs/my-app.md'), 'utf8');
     const overview = fs.readFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'), 'utf8');
+    const manifest = JSON.parse(fs.readFileSync(
+      path.join(testDir, 'ai-docs/project-manifest.json'),
+      'utf8'
+    ));
     expect(doc).toContain('<!-- section:overview -->');
     expect(doc).toContain('<!-- section:structure -->');
     expect(doc).toContain('<!-- section:modules -->');
@@ -215,6 +219,11 @@ describe('initCommand AI continuation', () => {
     expect(doc).toContain('<!-- section:notes -->');
     expect(overview).toContain('<!-- section:overview -->');
     expect(overview).toContain('<!-- section:quickstart -->');
+    expect(manifest.projects[0]).toEqual(expect.objectContaining({
+      id: 'my-app',
+      sourcePath: './my-app',
+      document: 'my-app.md'
+    }));
     expect(generateWithContinuation).toHaveBeenCalledWith(
       expect.stringContaining('请为以下所有子项目生成结构文档'),
       expect.objectContaining({

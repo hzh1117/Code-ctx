@@ -1,143 +1,123 @@
-const { findRelatedDoc, findRelatedDocs, groupChangesByProject } = require('../../src/core/doc-resolver');
+const {
+  findRelatedDoc,
+  findRelatedDocs,
+  groupChangesByProject,
+  resolveProjectForFile
+} = require('../../src/core/doc-resolver');
+const { _clearCache } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-describe('groupChangesByProject', () => {
-  test('groups files by top-level directory', () => {
-    const files = [
-      'web/src/App.vue',
-      'web/src/main.js',
-      'api/routes/user.js',
-      'api/models/user.js'
-    ];
-    const groups = groupChangesByProject(files);
-    expect(groups).toEqual({
-      'web': ['web/src/App.vue', 'web/src/main.js'],
-      'api': ['api/routes/user.js', 'api/models/user.js']
-    });
-  });
+describe('manifest-backed doc resolver', () => {
+  let root;
+  let aiDocs;
 
-  test('excludes ai-docs from groups', () => {
-    const files = ['web/app.js', 'ai-docs/web.md'];
-    const groups = groupChangesByProject(files);
-    expect(groups).not.toHaveProperty('ai-docs');
-    expect(groups).toHaveProperty('web');
-  });
-
-  test('returns empty object for empty file list', () => {
-    expect(groupChangesByProject([])).toEqual({});
-  });
-
-  test('handles single-level files (no subdirectory)', () => {
-    const files = ['README.md', 'package.json'];
-    const groups = groupChangesByProject(files);
-    expect(groups).toEqual({
-      'README.md': ['README.md'],
-      'package.json': ['package.json']
-    });
-  });
-
-  test('handles Windows-style backslash paths', () => {
-    const files = ['web\\src\\App.vue', 'web\\src\\main.js'];
-    const groups = groupChangesByProject(files);
-    expect(groups).toHaveProperty('web');
-    expect(groups['web']).toEqual(['web\\src\\App.vue', 'web\\src\\main.js']);
-  });
-
-  test('normalizes mixed path separators', () => {
-    const files = ['web/src/App.vue', 'web\\main.js'];
-    const groups = groupChangesByProject(files);
-    expect(groups).toHaveProperty('web');
-    expect(groups['web']).toHaveLength(2);
-  });
-
-  test('excludes ai-docs even with trailing separator', () => {
-    const files = ['ai-docs/web.md', 'web/app.js'];
-    const groups = groupChangesByProject(files);
-    expect(Object.keys(groups)).not.toContain('ai-docs');
-  });
-});
-
-describe('findRelatedDoc', () => {
-  const testDir = path.join(__dirname, '../fixtures/doc-resolver-test');
+  function configure(projects) {
+    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({ projects }));
+    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
+      version: 1,
+      projects: projects.map(project => ({
+        id: project.alias,
+        sourcePath: project.path,
+        document: `${project.alias}.md`
+      }))
+    }));
+    for (const project of projects) {
+      fs.writeFileSync(path.join(aiDocs, `${project.alias}.md`), `# ${project.alias}\n正文不参与归属判断`);
+    }
+    _clearCache();
+  }
 
   beforeEach(() => {
-    fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'doc-resolver-'));
+    aiDocs = path.join(root, 'ai-docs');
+    fs.mkdirSync(aiDocs);
+    _clearCache();
   });
 
   afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
+    _clearCache();
+    fs.rmSync(root, { recursive: true, force: true });
   });
 
-  test('finds doc that mentions the directory name', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), '# web 前端\nsrc/ 目录结构说明');
-    const result = findRelatedDoc(testDir, 'web/src/App.vue');
-    expect(result).not.toBeNull();
-    expect(result.name).toBe('web.md');
-    expect(result.content).toContain('web 前端');
+  test('uses longest normalized project-root prefix for nested projects', () => {
+    fs.mkdirSync(path.join(root, 'packages', 'web', 'src'), { recursive: true });
+    configure([
+      { alias: 'root', path: '.', type: 'generic-js-ts' },
+      { alias: 'web', path: './packages/web', type: 'react' }
+    ]);
+
+    expect(findRelatedDoc(root, 'packages/web/src/App.jsx')).toEqual(expect.objectContaining({
+      name: 'web.md',
+      projectId: 'web'
+    }));
+    expect(findRelatedDoc(root, 'package.json')).toEqual(expect.objectContaining({
+      name: 'root.md',
+      projectId: 'root'
+    }));
   });
 
-  test('returns null when no matching doc exists', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/api.md'), '# API 文档');
-    const result = findRelatedDoc(testDir, 'web/src/App.vue');
-    expect(result).toBeNull();
+  test('resolves same-named nested directories by full project path', () => {
+    fs.mkdirSync(path.join(root, 'apps', 'admin', 'src'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'packages', 'admin', 'src'), { recursive: true });
+    configure([
+      { alias: 'apps-admin', path: './apps/admin', type: 'react' },
+      { alias: 'packages-admin', path: './packages/admin', type: 'react' }
+    ]);
+
+    expect(resolveProjectForFile(root, 'packages/admin/src/App.jsx').id).toBe('packages-admin');
+    expect(resolveProjectForFile(root, 'apps/admin/src/App.jsx').id).toBe('apps-admin');
   });
 
-  test('returns null when ai-docs directory does not exist', () => {
-    const emptyDir = path.join(testDir, 'empty');
-    fs.mkdirSync(emptyDir, { recursive: true });
-    const result = findRelatedDoc(emptyDir, 'web/src/App.vue');
-    expect(result).toBeNull();
+  test('does not infer ownership from document body when manifest is missing', () => {
+    fs.writeFileSync(path.join(aiDocs, 'web.md'), '# web\npackages/web src App');
+    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'web', path: './packages/web', type: 'react' }]
+    }));
+    _clearCache();
+
+    expect(findRelatedDoc(root, 'packages/web/src/App.jsx')).toBeNull();
   });
 
-  test('skips OVERVIEW.md', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'), '# 项目概述\nweb 前端说明');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/api.md'), '# API');
-    const result = findRelatedDoc(testDir, 'web/src/App.vue');
-    // OVERVIEW.md contains "web" but should be skipped; api.md does not contain "web"
-    expect(result).toBeNull();
+  test('rejects manifest source paths that disagree with config', () => {
+    fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'web', path: './apps/web', type: 'react' }]
+    }));
+    fs.writeFileSync(path.join(aiDocs, 'web.md'), '# Web');
+    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
+      projects: [{ id: 'web', sourcePath: './other/web', document: 'web.md' }]
+    }));
+    _clearCache();
+
+    expect(findRelatedDoc(root, 'apps/web/App.jsx')).toBeNull();
   });
 
-  test('matches first doc that mentions the directory', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/a.md'), '# A\n没有匹配内容');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/b.md'), '# B\nweb 前端相关');
-    const result = findRelatedDoc(testDir, 'web/src/App.vue');
-    expect(result).not.toBeNull();
-    expect(result.name).toBe('b.md');
-  });
-});
+  test('groups root and nested changes by canonical project id', () => {
+    fs.mkdirSync(path.join(root, 'packages', 'api'), { recursive: true });
+    configure([
+      { alias: 'root', path: '.', type: 'generic-js-ts' },
+      { alias: 'api', path: './packages/api', type: 'node-backend' }
+    ]);
 
-describe('findRelatedDocs', () => {
-  const testDir = path.join(__dirname, '../fixtures/doc-resolver-multi-test');
-
-  beforeEach(() => {
-    fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
-  });
-
-  afterEach(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
+    expect(groupChangesByProject(root, [
+      'README.md',
+      'packages/api/routes.js',
+      'ai-docs/root.md'
+    ])).toEqual({
+      root: ['README.md'],
+      api: ['packages/api/routes.js']
+    });
   });
 
-  test('finds docs for multiple changed files', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), '# Web\nweb 前端');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/api.md'), '# API\napi 后端');
-    const result = findRelatedDocs(testDir, ['web/app.js', 'api/routes/user.js']);
-    expect(result).toHaveLength(2);
-    const names = result.map(r => r.name);
-    expect(names).toContain('web.md');
-    expect(names).toContain('api.md');
-  });
+  test('findRelatedDocs deduplicates manifest documents', () => {
+    fs.mkdirSync(path.join(root, 'web'), { recursive: true });
+    configure([{ alias: 'web', path: './web', type: 'react' }]);
 
-  test('deduplicates docs when multiple files match same doc', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), '# Web\nweb 前端');
-    const result = findRelatedDocs(testDir, ['web/app.js', 'web/main.js']);
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('web.md');
-  });
+    const docs = findRelatedDocs(root, ['web/App.jsx', 'web/main.jsx']);
 
-  test('returns empty array when no matches', () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/api.md'), '# API');
-    const result = findRelatedDocs(testDir, ['web/app.js']);
-    expect(result).toEqual([]);
+    expect(docs).toHaveLength(1);
+    expect(docs[0].name).toBe('web.md');
   });
 });

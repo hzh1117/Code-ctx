@@ -15,6 +15,7 @@ jest.mock('../../src/utils/git-utils', () => {
 });
 const fs = require('fs');
 const path = require('path');
+const { _clearCache } = require('../../src/utils/config');
 
 describe('updateCommand', () => {
   const testDir = path.join(__dirname, '../fixtures/update-test');
@@ -22,9 +23,17 @@ describe('updateCommand', () => {
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });
     fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
+    }));
+    fs.writeFileSync(path.join(testDir, 'ai-docs/project-manifest.json'), JSON.stringify({
+      projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
+    }));
+    _clearCache();
   });
 
   afterEach(() => {
+    _clearCache();
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
@@ -89,7 +98,7 @@ describe('updateCommand', () => {
       .rejects.toThrow('dry-run 与 apply 不能同时使用');
 
     expect(generateWithAI).not.toHaveBeenCalled();
-    expect(fs.readdirSync(path.join(testDir, 'ai-docs'))).toEqual([]);
+    expect(fs.readdirSync(path.join(testDir, 'ai-docs'))).toEqual(['project-manifest.json']);
   });
 
   test('should handle first run when .last-scan does not exist', async () => {

@@ -17,6 +17,7 @@ describe('config validate CLI', () => {
     process.exitCode = originalExitCode;
     jest.restoreAllMocks();
     jest.resetModules();
+    delete process.env.CODE_CTX_SETUP_API_KEY;
   });
 
   test('reports a valid configuration', async () => {
@@ -83,5 +84,24 @@ describe('config validate CLI', () => {
     expect(process.exitCode).toBe(1);
     expect(fs.existsSync(marker)).toBe(false);
     expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.json'))).toBe(false);
+  });
+
+  test('setup supports a non-interactive configuration path', async () => {
+    process.env.CODE_CTX_SETUP_API_KEY = 'test-secret-key';
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    const command = require('../../bin/commands/config');
+
+    await command.parseAsync([
+      'node', 'config', 'setup', rootDir,
+      '--provider', 'openai',
+      '--base-url', 'https://api.openai.com/v1',
+      '--model', 'gpt-5.5',
+      '--no-test'
+    ]);
+
+    expect(process.exitCode).toBeUndefined();
+    expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.json'))).toBe(true);
+    expect(fs.readFileSync(path.join(rootDir, '.env'), 'utf8'))
+      .toContain('OPENAI_API_KEY=test-secret-key');
   });
 });

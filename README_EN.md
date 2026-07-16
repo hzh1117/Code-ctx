@@ -62,11 +62,14 @@ npx code-ctx --version
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) when developing from source; those steps are not required for normal installation.
 
-### Initialize Your Project
+### Configure and Initialize Your Project
 
 ```bash
 cd /path/to/your-project
+code-ctx config setup
+code-ctx config validate
 code-ctx init
+test -f ai-docs/OVERVIEW.md
 code-ctx use "Add user login feature"
 ```
 

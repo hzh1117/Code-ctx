@@ -62,11 +62,14 @@ npm install -g code-ctx
 npx code-ctx --version
 ```
 
-### 初始化你的项目
+### 配置并初始化你的项目
 
 ```bash
 cd /path/to/your-project
+code-ctx config setup
+code-ctx config validate
 code-ctx init
+test -f ai-docs/OVERVIEW.md
 code-ctx use "新增用户登录功能"
 ```
 

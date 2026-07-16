@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { createServer } = require('../../src/web/server');
-const { buildContext } = require('../../src/commands/use');
+const { useCommand } = require('../../src/commands/use');
 const { requestJson } = require('../helpers/http');
 
 describe('web generate-prompt api', () => {
@@ -28,9 +28,11 @@ describe('web generate-prompt api', () => {
     }
   });
 
-  test('POST /api/generate-prompt reuses buildContext prompt assembly', async () => {
+  test('POST /api/generate-prompt returns the application-service result', async () => {
     const task = '商户后台新增功能';
-    const expectedPrompt = await buildContext(task, 'B', {
+    const expected = await useCommand({
+      taskDescription: task,
+      scenario: 'B',
       rootDir: testDir,
       noAiMatch: true,
       language: 'zh'
@@ -44,6 +46,11 @@ describe('web generate-prompt api', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.scenario).toBe('B');
-    expect(res.body.prompt).toBe(expectedPrompt);
+    expect(res.body.prompt).toBe(expected.prompt);
+    expect(res.body.tokenBudget).toEqual(expect.objectContaining({
+      estimate: expect.any(Number),
+      input: expect.any(Object)
+    }));
+    expect(res.body.loadedDocs).toEqual(expect.arrayContaining(['OVERVIEW.md', 'mer.md']));
   });
 });

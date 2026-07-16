@@ -1,6 +1,5 @@
 const { filterSensitive } = require('../../../utils/sensitive-filter');
-const { buildContext, useCommand } = require('../../../commands/use');
-const { evaluateContextBudget } = require('../../../utils/token-estimator');
+const { useCommand } = require('../../../commands/use');
 const { getAIConfig } = require('../../../utils/config');
 
 module.exports = function register(router, rootDir) {
@@ -8,11 +7,18 @@ module.exports = function register(router, rootDir) {
     try {
       const { task, scenario } = req.body;
       const safeTask = filterSensitive(task || '').content;
+      let aiConfig = null;
+      try {
+        aiConfig = getAIConfig(rootDir);
+      } catch {
+        // Prompt generation can continue with default token limits.
+      }
 
       const result = await useCommand({
         taskDescription: safeTask,
         scenario,
         rootDir,
+        aiConfig,
         noAiMatch: true,
         language: 'zh'
       });
@@ -21,29 +27,14 @@ module.exports = function register(router, rootDir) {
         return res.json({ success: false, ...result });
       }
 
-      const prompt = await buildContext(safeTask, result.matchedScenario, {
-        rootDir,
-        noAiMatch: true,
-        language: 'zh'
-      });
-
-      let tokenBudget = null;
-      try {
-        const aiConfig = getAIConfig(rootDir);
-        tokenBudget = evaluateContextBudget(prompt, {
-          maxInputTokens: aiConfig?.maxInputTokens,
-          maxOutputTokens: aiConfig?.maxTokens
-        });
-      } catch {
-        // tokenBudget is optional — never block the prompt response on it
-      }
-
       res.json({
         success: true,
         scenario: result.matchedScenario,
         scenarioName: result.scenarioName,
-        prompt,
-        tokenBudget
+        prompt: result.prompt,
+        tokenBudget: result.tokenBudget,
+        compactInfo: result.compactInfo,
+        loadedDocs: result.loadedDocs
       });
     } catch (err) {
       console.error('Generate prompt error:', err.message);

@@ -336,6 +336,25 @@ describe('detectProjects — monorepo deep scan', () => {
     );
   });
 
+  test('performs only one bounded traversal from the root', () => {
+    const childDir = path.join(testDir, 'packages', 'web');
+    fs.mkdirSync(childDir, { recursive: true });
+    fs.writeFileSync(path.join(childDir, 'package.json'), JSON.stringify({ dependencies: { react: '^18.0.0' } }));
+    const readdir = jest.spyOn(fs, 'readdirSync');
+    let rootTraversalCalls;
+
+    try {
+      detectProjects(testDir);
+      rootTraversalCalls = readdir.mock.calls.filter(([dirPath, options]) => {
+        return path.resolve(dirPath) === path.resolve(testDir) && options?.withFileTypes === true;
+      }).length;
+    } finally {
+      readdir.mockRestore();
+    }
+
+    expect(rootTraversalCalls).toBe(1);
+  });
+
   test('falls back to a scannable unknown root instead of returning no projects', () => {
     fs.writeFileSync(path.join(testDir, 'main.xyz'), 'custom source');
 

@@ -87,10 +87,10 @@ function detectProjectInDir(dirPath, registry = defaultRegistry) {
 }
 
 /**
- * Detect projects in rootDir. Supports both flat and monorepo layouts:
- *   - Flat: scan rootDir's direct children (original behavior)
- *   - Monorepo: if few/no projects found at top level, recurse up to
- *     MAX_SCAN_DEPTH into common monorepo directories (packages/, apps/, etc.)
+ * Detect projects with one bounded depth-first traversal:
+ *   - Detect the root independently so root projects and children can coexist.
+ *   - Visit each directory once and recurse through non-project directories up
+ *     to MAX_SCAN_DEPTH.
  *
  * @param {string} rootDir
  * @param {object} [options]
@@ -142,7 +142,7 @@ function detectProjects(rootDir, options = {}) {
     }
   }
 
-  // Root projects and monorepo children can coexist.
+  // This is the only traversal pass. The unknown fallback below must not rescan.
   scanDir(rootDir, 0, '');
 
   if (projects.length === 0) {

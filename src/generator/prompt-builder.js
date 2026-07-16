@@ -16,7 +16,8 @@ const LABELS = {
     projectPath: '项目路径',
     dirStructure: '目录结构',
     keyFiles: '关键文件',
-    sourceEvidence: '源码证据'
+    sourceEvidence: '源码证据',
+    adapterHints: '技术栈分析提示'
   },
   en: {
     part1: '[Part 1: Project Context]',
@@ -31,7 +32,8 @@ const LABELS = {
     projectPath: 'Project Path',
     dirStructure: 'Directory Structure',
     keyFiles: 'Key Files',
-    sourceEvidence: 'Source Evidence'
+    sourceEvidence: 'Source Evidence',
+    adapterHints: 'Stack Analysis Hints'
   }
 };
 
@@ -159,7 +161,10 @@ ${labels.keyFiles}：
 ${(result.sourceFiles || []).map(file => file.path).join('\n') || (result.keyFiles || []).join('\n')}
 
 ${labels.sourceEvidence}：
-${formatSourceFiles(result.sourceFiles)}`;
+${formatSourceFiles(result.sourceFiles)}
+
+${labels.adapterHints}：
+${result.promptHints || ''}`;
   }).join('\n\n---\n\n');
 
   const tpl = loadTemplate('scan-prompt-one-shot.md', language);
@@ -193,7 +198,10 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
     tree: limitText(scanObj.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree'),
     keyFiles: (scanObj.sourceFiles || []).map(file => file.path).join('\n') || (scanObj.keyFiles || []).join('\n'),
     sourceEvidence: formatSourceFiles(scanObj.sourceFiles),
-    otherDocsSection
+    otherDocsSection: [
+      scanObj.promptHints ? `${labels.adapterHints}：\n${scanObj.promptHints}` : '',
+      otherDocsSection
+    ].filter(Boolean).join('\n\n')
   });
 }
 

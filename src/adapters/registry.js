@@ -37,6 +37,19 @@ class AdapterRegistry {
     return adapter.getFilePriority(normalizedPath);
   }
 
+  getPromptHints(type) {
+    const adapter = this.adapters.get(type);
+    if (!adapter || typeof adapter.getPromptHints !== 'function') return '';
+    return adapter.getPromptHints();
+  }
+
+  extractKeyFiles(type, projectDir) {
+    const adapter = this.adapters.get(type);
+    if (!adapter || typeof adapter.extractKeyFiles !== 'function') return [];
+    const files = adapter.extractKeyFiles(projectDir);
+    return Array.isArray(files) ? files : [];
+  }
+
   get types() {
     return [...this.adapters.keys()];
   }

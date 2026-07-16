@@ -71,6 +71,9 @@ function scanProject(projectDir, projectType, options = {}) {
     keyFiles.push(...matches);
   }
 
+  keyFiles.push(...defaultRegistry.extractKeyFiles(projectType, projectDir)
+    .filter(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile()));
+
   const uniqueFiles = [...new Set(keyFiles)];
 
   // 限制文件数量
@@ -92,6 +95,7 @@ function scanProject(projectDir, projectType, options = {}) {
     tree,
     keyFiles: result.files,
     sourceFiles,
+    promptHints: defaultRegistry.getPromptHints(projectType),
     totalFiles: uniqueFiles.length,
     limitedTo: result.files.length,
     estimatedTokens: result.tokens

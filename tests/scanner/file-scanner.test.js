@@ -105,6 +105,19 @@ describe('scanProject', () => {
     }
   });
 
+  test('uses adapter key-file extraction and prompt hints', () => {
+    const dir = createTmpDir();
+    setupBaseFixtures(dir);
+    fs.writeFileSync(path.join(dir, 'vite.config.js'), 'export default {};');
+    try {
+      const result = scanProject(dir, 'react');
+      expect(result.keyFiles).toContain(path.join(dir, 'vite.config.js'));
+      expect(result.promptHints).toContain('React 前端项目');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('should return redacted structured source snapshots', () => {
     const dir = createTmpDir();
     setupBaseFixtures(dir);

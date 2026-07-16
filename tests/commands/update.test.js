@@ -129,8 +129,19 @@ describe('updateCommand', () => {
     const result = await updateCommand(testDir);
 
     expect(result).toHaveProperty('changedFiles');
-    expect(result).toHaveProperty('prompt');
     expect(Array.isArray(result.changedFiles)).toBe(true);
+    expect(typeof result.prompt).toBe('string');
+    expect(result.prompt.trim().length).toBeGreaterThan(0);
+    expect(result.prompt).toContain('console.log("hello")');
+    expect(result.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: expect.stringMatching(/src[\\/]app\.js/),
+        status: 'added',
+        evidenceType: 'source'
+      })
+    ]));
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
 
     fs.rmSync(testDir, { recursive: true, force: true });
   });

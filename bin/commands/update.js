@@ -90,6 +90,9 @@ const update = new Command('update')
             .filter(r => r.status === 'failed')
             .forEach(r => console.log(`  ${r.docName} > ${r.sectionName}: ${r.reason}`));
         }
+        if (updateResult.failed > 0 || !updateResult.committed) {
+          process.exitCode = 1;
+        }
       } else {
         // Default: copy prompt to clipboard
         if (result.prompt) {

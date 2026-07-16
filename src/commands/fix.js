@@ -4,6 +4,7 @@ const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
+const { isAICancellationError } = require('../ai/errors');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
@@ -34,7 +35,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
     return { project: projectAlias, prompt };
   }
 
-  const aiConfig = getAIConfig(rootDir);
+  const aiConfig = { ...getAIConfig(rootDir), signal: options.signal };
   if (aiConfig.apiKey) {
     console.log(`正在重新生成 ${projectAlias}.md...`);
     try {
@@ -49,6 +50,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
       console.log(`✓ ${projectAlias}.md 已重新生成`);
       return { project: projectAlias, generated: true };
     } catch (err) {
+      if (isAICancellationError(err)) throw err;
       console.error(`⚠️ AI 生成失败: ${err.message}`);
       console.log('prompt 已生成，请手动粘贴给 AI：');
       console.log(prompt);

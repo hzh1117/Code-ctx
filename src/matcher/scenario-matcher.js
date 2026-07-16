@@ -1,4 +1,5 @@
 const { generateWithAI } = require('../ai/client');
+const { isAICancellationError } = require('../ai/errors');
 const { getScenarios } = require('../template/engine');
 
 // Fallback used only when the scenarios JSON is unavailable or no scenario
@@ -140,6 +141,7 @@ async function matchScenarioWithAI(taskDescription, aiConfig, options = {}) {
       }
     }
   } catch (err) {
+    if (isAICancellationError(err)) throw err;
     // AI fallback failed, fall through to keyword result
   }
 

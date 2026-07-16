@@ -7,6 +7,7 @@ const {
 } = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
+const { isAICancellationError } = require('../ai/errors');
 const { filterSensitive, scanDirectory } = require('../utils/sensitive-filter');
 const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
 const {
@@ -71,6 +72,13 @@ function getExpectedSectionsFromTemplate(templateName) {
   if (!fs.existsSync(templatePath)) return [];
   const content = fs.readFileSync(templatePath, 'utf8');
   return listSections(content).filter(section => /^[a-z][a-z0-9-]*$/.test(section));
+}
+
+function throwIfSettledCancelled(settled) {
+  const cancellation = settled.find(
+    result => result.status === 'rejected' && isAICancellationError(result.reason)
+  );
+  if (cancellation) throw cancellation.reason;
 }
 
 async function generateDocument(prompt, aiConfig, alias) {
@@ -357,6 +365,7 @@ async function generateTypeSpecificDocs(ctx) {
       generatedDocs[`${result.alias}-${result.docType}`] = result.fileName;
       saveInitState(outputDir, state);
     } catch (err) {
+      if (isAICancellationError(err)) throw err;
       console.error(`  ${project.alias}-${options.docType}.md 生成失败:`, err.message);
       if (_verboseMode) {
         console.error('  错误详情:', err.stack);
@@ -448,6 +457,7 @@ async function generateBatchMinimalDocs(ctx) {
     fs.writeFileSync(path.join(outputDir, `${alias}.md`), safeDoc);
     return { alias, doc: safeDoc };
   });
+  throwIfSettledCancelled(settled);
   for (let j = 0; j < settled.length; j++) {
     const result = settled[j];
     if (result.status === 'fulfilled') {
@@ -502,6 +512,7 @@ async function generateBatchWithContextDocs(ctx) {
       fs.writeFileSync(path.join(outputDir, `${project.alias}.md`), safeDoc);
       return { alias: project.alias, doc: safeDoc };
     });
+    throwIfSettledCancelled(settled);
 
     for (let j = 0; j < settled.length; j++) {
       const result = settled[j];
@@ -591,7 +602,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
   logStep('6/7', '生成项目文档');
   try {
     logVerbose('加载 AI 配置...');
-    const aiConfig = getAIConfig(rootDir);
+    const aiConfig = { ...getAIConfig(rootDir), signal: options.signal };
     logVerbose('协议:', aiConfig.protocol);
     logVerbose('Base URL:', aiConfig.baseUrl);
     logVerbose('模型:', aiConfig.model);
@@ -644,6 +655,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
     try {
       await generateOverviewDoc({ ...ctx, overviewExpectedSections });
     } catch (err) {
+      if (isAICancellationError(err)) throw err;
       failedDocs.push({ alias: 'OVERVIEW', error: err.message });
       console.error('  OVERVIEW.md 生成失败:', err.message);
     }
@@ -651,6 +663,7 @@ async function generateDocuments(rootDir, projects, scanResults, config, outputD
       writeProjectManifest(rootDir, projects, scanResults, outputDir, 'ai');
     }
   } catch (err) {
+    if (isAICancellationError(err)) throw err;
     console.error('\n文档生成失败:', err.message);
     if (_verboseMode) {
       console.error('错误详情:', err.stack);

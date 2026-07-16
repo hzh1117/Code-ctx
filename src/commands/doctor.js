@@ -5,6 +5,7 @@ const { detectProjects } = require('../scanner/project-detector');
 const { scanProject } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
 const { generateWithContinuation } = require('../ai/client');
+const { isAICancellationError } = require('../ai/errors');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { readFileUTF8 } = require('../utils/file-reader');
 const { buildInitPrompt } = require('../generator/prompt-builder');
@@ -412,7 +413,7 @@ async function doctorFix(rootDir, options = {}) {
     return;
   }
 
-  const aiConfig = getAIConfig(rootDir);
+  const aiConfig = { ...getAIConfig(rootDir), signal: options.signal };
   if (!aiConfig.apiKey) {
     console.log('❌ 未配置 API Key，请先在 .env 文件中配置');
     console.log('   然后运行 code-ctx doctor --fix');
@@ -484,6 +485,7 @@ async function doctorFix(rootDir, options = {}) {
       console.log(`    ✓ 已重新生成 ${project.alias}.md`);
       fixedCount++;
     } catch (err) {
+      if (isAICancellationError(err)) throw err;
       console.log(`    ❌ 生成失败: ${err.message}`);
     }
   }
@@ -506,6 +508,7 @@ async function doctorFix(rootDir, options = {}) {
       console.log('    ✓ 已生成 OVERVIEW.md');
       fixedCount++;
     } catch (err) {
+      if (isAICancellationError(err)) throw err;
       console.log(`    ❌ 生成失败: ${err.message}`);
     }
   }

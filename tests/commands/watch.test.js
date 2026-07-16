@@ -138,7 +138,11 @@ describe('commands/watch', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    expect(executeUpdateTransaction).toHaveBeenCalledWith('/project', expect.any(Object), { apiKey: 'test-key' });
+    expect(executeUpdateTransaction).toHaveBeenCalledWith(
+      '/project',
+      expect.any(Object),
+      expect.objectContaining({ apiKey: 'test-key', signal: expect.any(AbortSignal) })
+    );
   });
 
   test('autoApply=false 时不执行 update transaction', async () => {
@@ -205,16 +209,17 @@ describe('commands/watch', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('boom'));
   });
 
-  test('SIGINT 信号关闭所有 watcher', () => {
-    watchCommand('/project', { debounce: 100 });
+  test('SIGINT 信号关闭所有 watcher', async () => {
+    const watching = watchCommand('/project', { debounce: 100 });
     expect(watchers.length).toBeGreaterThan(0);
 
     process.emit('SIGINT');
+    await watching;
 
     for (const w of watchers) {
       expect(w.close).toHaveBeenCalled();
     }
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(exitSpy).not.toHaveBeenCalled();
   });
 
   test('未传 filename 时不触发处理', () => {

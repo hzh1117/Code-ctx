@@ -123,6 +123,17 @@ describe('matchScenarioWithAI', () => {
     expect(result.method).toBe('keyword');
   });
 
+  test('用户取消时直接向上传播，不降级到关键词', async () => {
+    const error = new Error('cancelled');
+    error.code = 'AI_REQUEST_ABORTED';
+    generateWithAI.mockRejectedValue(error);
+
+    await expect(matchScenarioWithAI(
+      '一个没有关键词的模糊任务 zzzqqqxxx',
+      { apiKey: 'k' }
+    )).rejects.toMatchObject({ code: 'AI_REQUEST_ABORTED' });
+  });
+
   test('AI 返回 JSON 含额外文本时仍能解析', async () => {
     const scenarios = getScenarios();
     const validId = scenarios[0].id;

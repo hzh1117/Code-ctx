@@ -3,6 +3,7 @@ const { input, confirm, select } = require('@inquirer/prompts');
 const { useCommand } = require('../../src/commands/use');
 const { getAIConfig } = require('../../src/utils/config');
 const { outputPrompt } = require('../../src/utils/prompt-output');
+const { runWithInterrupt, exitCodeForError } = require('../abortable-action');
 
 const PLACEHOLDER_RE = /【[^】]+】/g;
 
@@ -35,10 +36,10 @@ const use = new Command('use')
   .option('-l, --language <lang>', 'Prompt 语言 (zh/en)', 'zh')
   .option('--stdout', '输出到 stdout 而非剪贴板')
   .option('--out <file>', '输出到指定文件')
-  .action(async (task, options) => {
+  .action((task, options) => runWithInterrupt(async (signal) => {
     try {
       const rootDir = process.cwd();
-      const aiConfig = getAIConfig(rootDir);
+      const aiConfig = { ...getAIConfig(rootDir), signal };
       const language = options.language || 'zh';
 
       let result = await useCommand({
@@ -118,8 +119,8 @@ const use = new Command('use')
       }
     } catch (err) {
       console.error('生成失败:', err.message);
-      process.exit(1);
+      process.exitCode = exitCodeForError(err);
     }
-  });
+  }));
 
 module.exports = use;

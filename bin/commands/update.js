@@ -2,16 +2,17 @@ const { Command, Option } = require('commander');
 const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 const { getAIConfig } = require('../../src/utils/config');
 const { outputPrompt } = require('../../src/utils/prompt-output');
+const { runWithInterrupt, exitCodeForError } = require('../abortable-action');
 
 const update = new Command('update')
   .description('检测变化，更新相关文档')
   .addOption(new Option('--dry-run', '只检测变化，不更新').conflicts('apply'))
   .addOption(new Option('--apply', '自动调用 AI 更新文档（执行 section 替换写回）').conflicts('dryRun'))
   .option('--stdout', '输出 prompt 到 stdout')
-  .action(async (options) => {
+  .action((options) => runWithInterrupt(async (signal) => {
     try {
       const rootDir = process.cwd();
-      const aiConfig = options.apply ? getAIConfig(rootDir) : null;
+      const aiConfig = options.apply ? { ...getAIConfig(rootDir), signal } : null;
       const canApply = !!options.apply && !!aiConfig?.apiKey && !options.dryRun;
       const result = await updateCommand(rootDir, {
         dryRun: !!options.dryRun,
@@ -100,8 +101,8 @@ const update = new Command('update')
       }
     } catch (err) {
       console.error('更新失败:', err.message);
-      process.exit(1);
+      process.exitCode = exitCodeForError(err);
     }
-  });
+  }));
 
 module.exports = update;

@@ -5,8 +5,15 @@ const dns = require('dns').promises;
 const { AI_CLIENT } = require('../utils/constants');
 const { evaluateContextBudget } = require('../utils/token-estimator');
 const { redactOutboundMessages } = require('./privacy-gateway');
+const {
+  createAbortError,
+  createDeadlineError,
+  createRequestTimeoutError,
+  isAICancellationError
+} = require('./errors');
 
 const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
+const DEFAULT_DEADLINE = AI_CLIENT.DEFAULT_DEADLINE;
 const MAX_RETRIES = AI_CLIENT.MAX_RETRIES;
 const RETRYABLE_ERRORS = AI_CLIENT.RETRYABLE_ERRORS;
 const RETRYABLE_STATUS_CODES = AI_CLIENT.RETRYABLE_STATUS_CODES;
@@ -232,79 +239,42 @@ function getRetryDelay(retries, res) {
 // SSRF validation MUST be performed by the caller before invoking this
 // helper (validateBaseUrl + validateResolvedBaseUrl), so a recursive retry
 // doesn't re-resolve DNS each pass.
-function postJsonWithRetry({ url, headers, body, timeout, debugLabel, retries = 0 }) {
-  const protocol = url.protocol === 'https:' ? https : http;
-
-  return new Promise((resolve, reject) => {
-    let retried = false;
-
-    const scheduleRetry = (reason, delay) => {
-      retried = true;
-      console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${retries + 1}/${MAX_RETRIES})...`);
-      setTimeout(
-        () => postJsonWithRetry({ url, headers, body, timeout, debugLabel, retries: retries + 1 })
-          .then(resolve)
-          .catch(reject),
-        delay
-      );
-    };
-
-    const doRetry = (reason, res) => {
-      if (retried) return;
-      debugLog('准备重试', { reason, retry: retries + 1 });
-      if (retries < MAX_RETRIES) {
-        const delay = res ? getRetryDelay(retries, res) : BASE_RETRY_DELAY * Math.pow(2, retries);
-        scheduleRetry(reason, delay);
-      } else {
-        reject(new Error(reason));
+async function postJsonWithRetry({
+  url, headers, body, timeout, debugLabel, retries = 0,
+  maxRetries = MAX_RETRIES, signal, deadlineAt
+}) {
+  let attempt = retries;
+  while (true) {
+    throwIfCancelled(signal, deadlineAt);
+    try {
+      const result = await postJsonOnce({
+        url, headers, body, timeout, debugLabel, signal, deadlineAt
+      });
+      if (!RETRYABLE_STATUS_CODES.includes(result.statusCode) || attempt >= maxRetries) {
+        return { statusCode: result.statusCode, body: result.body };
       }
-    };
 
-    const req = protocol.request(
-      url,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        timeout
-      },
-      (res) => {
-        debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
-        let data = '';
-        res.on('data', chunk => data += chunk);
-        res.on('end', () => {
-          debugResponse(debugLabel, data);
-          if (RETRYABLE_STATUS_CODES.includes(res.statusCode) && retries < MAX_RETRIES) {
-            scheduleRetry(`服务器返回 ${res.statusCode}`, getRetryDelay(retries, res));
-            return;
-          }
-          resolve({ statusCode: res.statusCode, body: data });
-        });
-      }
-    );
+      const reason = `服务器返回 ${result.statusCode}`;
+      const delay = getRetryDelay(attempt, result.response);
+      console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${attempt + 1}/${maxRetries})...`);
+      await waitForRetry(delay, signal, deadlineAt);
+      attempt++;
+    } catch (err) {
+      if (err.code === 'AI_REQUEST_ABORTED' || err.code === 'AI_OPERATION_DEADLINE') throw err;
+      const retryable = err.code === 'AI_REQUEST_TIMEOUT' ||
+        RETRYABLE_ERRORS.includes(err.code) ||
+        err.message.includes('socket hang up');
+      if (!retryable || attempt >= maxRetries) throw err;
 
-    req.on('timeout', () => {
-      debugLog('请求超时', { timeout, retry: retries + 1 });
-      req.destroy();
-      if (retries < MAX_RETRIES) {
-        doRetry(`请求超时 (${timeout}ms)`);
-      } else {
-        reject(new Error(`请求超时 (${timeout}ms)`));
-      }
-    });
-
-    req.on('error', (err) => {
-      debugLog('请求错误', { code: err.code, message: err.message, stack: err.stack });
-      const isRetryable = RETRYABLE_ERRORS.includes(err.code) || err.message.includes('socket hang up');
-      if (retries < MAX_RETRIES && isRetryable) {
-        doRetry(`连接失败 (${err.code || err.message})`);
-      } else if (!retried) {
-        reject(err);
-      }
-    });
-
-    req.write(body);
-    req.end();
-  });
+      const reason = err.code === 'AI_REQUEST_TIMEOUT'
+        ? err.message
+        : `连接失败 (${err.code || err.message})`;
+      const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+      console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${attempt + 1}/${maxRetries})...`);
+      await waitForRetry(delay, signal, deadlineAt);
+      attempt++;
+    }
+  }
 }
 
 function parseJsonOrThrow(rawBody, statusCode, providerLabel) {
@@ -325,13 +295,21 @@ async function callOpenAIWithMessages(messages, options) {
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
-    dnsLookup
+    dnsLookup,
+    signal,
+    maxRetries
   } = options;
+  const deadlineAt = resolveDeadlineAt(options);
 
+  throwIfCancelled(signal, deadlineAt);
   const safeMessages = redactOutboundMessages(messages, options.onRedactionAudit).messages;
   assertMessagesWithinBudget(safeMessages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
-  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+  await awaitWithCancellation(
+    validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup }),
+    signal,
+    deadlineAt
+  );
   const url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
   const body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages });
 
@@ -349,7 +327,10 @@ async function callOpenAIWithMessages(messages, options) {
     headers: { 'Authorization': `Bearer ${apiKey}` },
     body,
     timeout,
-    debugLabel: 'OpenAI 响应'
+    debugLabel: 'OpenAI 响应',
+    signal,
+    deadlineAt,
+    maxRetries
   });
 
   const json = parseJsonOrThrow(rawBody, statusCode, 'OpenAI');
@@ -387,13 +368,21 @@ async function callAnthropicWithMessages(messages, options) {
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
-    dnsLookup
+    dnsLookup,
+    signal,
+    maxRetries
   } = options;
+  const deadlineAt = resolveDeadlineAt(options);
 
+  throwIfCancelled(signal, deadlineAt);
   const safeMessages = redactOutboundMessages(messages, options.onRedactionAudit).messages;
   assertMessagesWithinBudget(safeMessages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
-  await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+  await awaitWithCancellation(
+    validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup }),
+    signal,
+    deadlineAt
+  );
   const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
   const anthropicPayload = normalizeAnthropicMessages(safeMessages);
 
@@ -429,7 +418,10 @@ async function callAnthropicWithMessages(messages, options) {
     },
     body,
     timeout,
-    debugLabel: 'Anthropic 响应'
+    debugLabel: 'Anthropic 响应',
+    signal,
+    deadlineAt,
+    maxRetries
   });
 
   const json = parseJsonOrThrow(rawBody, statusCode, 'Anthropic');
@@ -473,7 +465,10 @@ async function generateWithAI(prompt, options = {}) {
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
     dnsLookup,
-    onRedactionAudit
+    onRedactionAudit,
+    signal,
+    deadlineMs,
+    maxRetries
   } = options;
 
   if (!apiKey) {
@@ -482,7 +477,8 @@ async function generateWithAI(prompt, options = {}) {
 
   const callOptions = {
     apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
-    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit
+    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit,
+    signal, deadlineMs, deadlineAt: resolveDeadlineAt(options), maxRetries
   };
 
   if (protocol === 'openai') {
@@ -506,7 +502,11 @@ async function generateFromMessages(messages, options = {}) {
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
     dnsLookup,
-    onRedactionAudit
+    onRedactionAudit,
+    signal,
+    deadlineMs,
+    deadlineAt,
+    maxRetries
   } = options;
 
   if (!apiKey) {
@@ -516,6 +516,7 @@ async function generateFromMessages(messages, options = {}) {
   const callOptions = {
     apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
     allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit,
+    signal, deadlineMs, deadlineAt, maxRetries,
     returnMetadata: true
   };
 
@@ -526,6 +527,153 @@ async function generateFromMessages(messages, options = {}) {
   } else {
     throw new Error(`不支持的协议: ${protocol}`);
   }
+}
+
+function resolveDeadlineAt(options = {}) {
+  if (Number.isFinite(options.deadlineAt)) return options.deadlineAt;
+  const deadlineMs = options.deadlineMs === undefined ? DEFAULT_DEADLINE : options.deadlineMs;
+  return Number.isFinite(deadlineMs) && deadlineMs > 0
+    ? Date.now() + deadlineMs
+    : Infinity;
+}
+
+function throwIfCancelled(signal, deadlineAt) {
+  if (signal?.aborted) throw createAbortError();
+  if (Number.isFinite(deadlineAt) && Date.now() >= deadlineAt) throw createDeadlineError();
+}
+
+function awaitWithCancellation(promise, signal, deadlineAt) {
+  throwIfCancelled(signal, deadlineAt);
+  if (!signal && !Number.isFinite(deadlineAt)) return promise;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let deadlineTimer;
+    const cleanup = () => {
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onAbort = () => finish(reject, createAbortError());
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (Number.isFinite(deadlineAt)) {
+      deadlineTimer = setTimeout(
+        () => finish(reject, createDeadlineError()),
+        Math.max(0, deadlineAt - Date.now())
+      );
+    }
+    Promise.resolve(promise).then(
+      value => finish(resolve, value),
+      error => finish(reject, error)
+    );
+  });
+}
+
+function waitForRetry(delay, signal, deadlineAt) {
+  throwIfCancelled(signal, deadlineAt);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const remaining = Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : Infinity;
+    const wait = Math.min(delay, remaining);
+    let timer;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onAbort = () => finish(reject, createAbortError());
+    timer = setTimeout(() => {
+      if (Number.isFinite(deadlineAt) && Date.now() >= deadlineAt) {
+        finish(reject, createDeadlineError());
+      } else {
+        finish(resolve);
+      }
+    }, Math.max(0, wait));
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function postJsonOnce({ url, headers, body, timeout, debugLabel, signal, deadlineAt }) {
+  const protocol = url.protocol === 'https:' ? https : http;
+  throwIfCancelled(signal, deadlineAt);
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let deadlineTimer;
+    let req;
+
+    const cleanup = () => {
+      if (deadlineTimer) clearTimeout(deadlineTimer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+    const onAbort = () => {
+      const error = createAbortError();
+      if (req) req.destroy(error);
+      finish(reject, error);
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (Number.isFinite(deadlineAt)) {
+      const remaining = deadlineAt - Date.now();
+      if (remaining <= 0) {
+        finish(reject, createDeadlineError());
+        return;
+      }
+      deadlineTimer = setTimeout(() => {
+        const error = createDeadlineError();
+        if (req) req.destroy(error);
+        finish(reject, error);
+      }, remaining);
+    }
+
+    req = protocol.request(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        timeout
+      },
+      (res) => {
+        debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          debugResponse(debugLabel, data);
+          finish(resolve, { statusCode: res.statusCode, body: data, response: res });
+        });
+        res.on('error', err => finish(reject, err));
+      }
+    );
+
+    req.on('timeout', () => {
+      const error = createRequestTimeoutError(timeout);
+      debugLog('请求超时', { timeout });
+      req.destroy(error);
+      finish(reject, error);
+    });
+    req.on('error', err => finish(reject, err));
+    req.write(body);
+    req.end();
+  });
 }
 
 function assertMessagesWithinBudget(messages, options) {
@@ -585,6 +733,7 @@ async function generateWithContinuation(prompt, options = {}) {
     maxContinuations = 5
   } = options;
 
+  const operationOptions = { ...options, deadlineAt: resolveDeadlineAt(options) };
   const continuationPrompt = `${prompt}\n\n若回答因长度限制被截断，请在截断位置输出 <<<CONTINUE>>> 标记`;
   const baseMessages = [];
   if (systemPrompt) {
@@ -593,7 +742,7 @@ async function generateWithContinuation(prompt, options = {}) {
   baseMessages.push({ role: 'user', content: continuationPrompt });
 
   let messages = [...baseMessages];
-  let response = await generateFromMessages(messages, options);
+  let response = await generateFromMessages(messages, operationOptions);
   let content = response.content;
   let combined = content.replace(/<<<CONTINUE>>>/g, '');
   let continuationCount = 0;
@@ -616,7 +765,7 @@ async function generateWithContinuation(prompt, options = {}) {
       { role: 'assistant', content },
       { role: 'user', content: `请从上次中断处继续，不要重复。待完成原因: ${reasons.join(', ')}` }
     ];
-    response = await generateFromMessages(messages, options);
+    response = await generateFromMessages(messages, operationOptions);
     content = response.content;
     combined += content.replace(/<<<CONTINUE>>>/g, '');
     reasons = continuationReasons(response, combined);
@@ -650,7 +799,9 @@ function generateWithAIStream(prompt, options = {}) {
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
     dnsLookup,
-    onRedactionAudit
+    onRedactionAudit,
+    signal,
+    deadlineMs
   } = options;
 
   if (!apiKey) {
@@ -661,6 +812,8 @@ function generateWithAIStream(prompt, options = {}) {
   const doStream = async () => {
     try {
       let parsedBaseUrl, url, headers, body;
+      const deadlineAt = resolveDeadlineAt({ ...options, deadlineMs });
+      throwIfCancelled(signal, deadlineAt);
       const safeMessages = redactOutboundMessages(
         [{ role: 'user', content: prompt }],
         onRedactionAudit
@@ -672,7 +825,11 @@ function generateWithAIStream(prompt, options = {}) {
 
       if (protocol === 'openai') {
         parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
-        await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+        await awaitWithCancellation(
+          validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup }),
+          signal,
+          deadlineAt
+        );
         url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
         headers = {
           'Content-Type': 'application/json',
@@ -681,7 +838,11 @@ function generateWithAIStream(prompt, options = {}) {
         body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages, stream: true });
       } else if (protocol === 'anthropic') {
         parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
-        await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
+        await awaitWithCancellation(
+          validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup }),
+          signal,
+          deadlineAt
+        );
         const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
         url = normalizedBaseUrl.includes('/v1')
           ? new URL(`${normalizedBaseUrl}/messages`)
@@ -699,8 +860,26 @@ function generateWithAIStream(prompt, options = {}) {
       const httpsModule = require('https');
       const httpModule = require('http');
       const protocolModule = url.protocol === 'https:' ? httpsModule : httpModule;
+      let settled = false;
+      let deadlineTimer;
+      let req;
+      const cleanup = () => {
+        if (deadlineTimer) clearTimeout(deadlineTimer);
+        signal?.removeEventListener('abort', onAbort);
+      };
+      const emitError = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        emitter.emit('error', error);
+      };
+      const onAbort = () => {
+        const error = createAbortError();
+        if (req) req.destroy(error);
+        emitError(error);
+      };
 
-      const req = protocolModule.request(url, {
+      req = protocolModule.request(url, {
         method: 'POST',
         headers,
         timeout
@@ -711,9 +890,9 @@ function generateWithAIStream(prompt, options = {}) {
           res.on('end', () => {
             try {
               const json = JSON.parse(errData);
-              emitter.emit('error', createApiError(res.statusCode, json, 'AI API 返回错误'));
+              emitError(createApiError(res.statusCode, json, 'AI API 返回错误'));
             } catch {
-              emitter.emit('error', new Error(`[${res.statusCode}] AI API 返回错误`));
+              emitError(new Error(`[${res.statusCode}] AI API 返回错误`));
             }
           });
           return;
@@ -776,20 +955,33 @@ function generateWithAIStream(prompt, options = {}) {
               }
             }
           }
-          emitter.emit('done', fullText);
+          if (!settled) {
+            settled = true;
+            cleanup();
+            emitter.emit('done', fullText);
+          }
         });
       });
 
-      req.on('error', (err) => emitter.emit('error', err));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (Number.isFinite(deadlineAt)) {
+        deadlineTimer = setTimeout(() => {
+          const error = createDeadlineError();
+          req.destroy(error);
+          emitError(error);
+        }, Math.max(0, deadlineAt - Date.now()));
+      }
+      req.on('error', emitError);
       req.on('timeout', () => {
-        req.destroy();
-        emitter.emit('error', new Error(`请求超时 (${timeout}ms)`));
+        const error = createRequestTimeoutError(timeout);
+        req.destroy(error);
+        emitError(error);
       });
 
       req.write(body);
       req.end();
     } catch (err) {
-      emitter.emit('error', err);
+      process.nextTick(() => emitter.emit('error', err));
     }
   };
 
@@ -807,5 +999,6 @@ module.exports = {
   validateResolvedBaseUrl,
   normalizeAnthropicMessages,
   inspectOutputStructure,
-  assertMessagesWithinBudget
+  assertMessagesWithinBudget,
+  isAICancellationError
 };

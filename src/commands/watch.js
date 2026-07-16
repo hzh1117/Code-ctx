@@ -15,6 +15,8 @@ function shouldIgnore(filePath) {
 async function watchCommand(rootDir, options = {}) {
   const debounceMs = options.debounce || DEFAULT_DEBOUNCE_MS;
   const autoApply = options.autoApply || false;
+  const interruptController = options.signal ? null : new AbortController();
+  const signal = options.signal || interruptController.signal;
   let debounceTimer = null;
   let isProcessing = false;
 
@@ -23,7 +25,7 @@ async function watchCommand(rootDir, options = {}) {
   console.log(`   自动更新: ${autoApply ? '是' : '否'}`);
   console.log('   按 Ctrl+C 停止\n');
 
-  const aiConfig = autoApply ? getAIConfig(rootDir) : null;
+  const aiConfig = autoApply ? { ...getAIConfig(rootDir), signal } : null;
   const canAutoApply = !!autoApply && !!aiConfig?.apiKey;
 
   async function processChanges() {
@@ -92,18 +94,24 @@ async function watchCommand(rootDir, options = {}) {
     }
   }
 
-  // Handle graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('\n\n停止监听');
-    for (const watcher of watchers) {
-      watcher.close();
-    }
-    if (debounceTimer) clearTimeout(debounceTimer);
-    process.exit(0);
-  });
+  return new Promise(resolve => {
+    const onSigint = () => interruptController.abort();
+    const cleanup = () => {
+      console.log('\n\n停止监听');
+      for (const watcher of watchers) watcher.close();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      process.removeListener('SIGINT', onSigint);
+      signal.removeEventListener('abort', cleanup);
+      resolve();
+    };
 
-  // Keep process alive
-  return new Promise(() => {});
+    if (signal.aborted) {
+      cleanup();
+      return;
+    }
+    signal.addEventListener('abort', cleanup, { once: true });
+    if (interruptController) process.once('SIGINT', onSigint);
+  });
 }
 
 module.exports = { watchCommand };

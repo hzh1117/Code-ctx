@@ -6,6 +6,7 @@ const { readFileUTF8, isWithinDir } = require('../utils/file-reader');
 const { renderTemplate, loadTemplate } = require('../template/engine');
 const { STATE_FILES, UPDATE_LIMITS } = require('../utils/constants');
 const { generateWithAI } = require('../ai/client');
+const { isAICancellationError } = require('../ai/errors');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const {
   hasGitRepo,
@@ -706,6 +707,7 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
         const safeContent = filterSensitive(newContent).content;
         return { sectionName: update.sectionName, status: 'success', newContent: safeContent };
       } catch (err) {
+        if (isAICancellationError(err)) throw err;
         console.error(`  ✗ ${docName} > ${update.sectionName} 更新失败: ${err.message}`);
         return { sectionName: update.sectionName, status: 'failed', reason: err.message };
       }

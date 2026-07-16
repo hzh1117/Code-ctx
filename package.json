@@ -25,7 +25,7 @@
     "test": "jest",
     "coverage": "jest --coverage --runInBand",
     "lint": "eslint src/ bin/",
-    "check": "npm test -- --runInBand && npm run build:web",
+    "check": "npm run lint && npm test -- --runInBand && npm run build:web",
     "build:web": "cd web && npm run build",
     "pack:smoke": "node scripts/package-smoke.js",
     "dashboard": "node bin/cli.js dashboard",

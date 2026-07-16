@@ -152,7 +152,7 @@ describe('updateCommand', () => {
 
     expect(typeof result.prompt).toBe('string');
     expect(result.prompt).toContain('## 文档: src.md');
-    expect(result.prompt).toContain('<!-- section:overview -->');
+    expect(result.prompt).not.toContain('<!-- section:overview -->');
     expect(result.prompt).toContain('<!-- section:modules -->');
     expect(result.prompt).toContain('export const feature = true;');
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
@@ -180,6 +180,57 @@ describe('updateCommand', () => {
     expect(result.sectionUpdates[0].prompt).toContain('router.get("/health", health);');
     expect(result.sectionUpdates[0].prompt).toContain('[FILTERED]');
     expect(result.sectionUpdates[0].prompt).not.toContain('secret-value');
+  });
+
+  test('updates only deterministically affected sections for a route change', async () => {
+    const sourcePath = path.join(testDir, 'src', 'routes', 'users.js');
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    const oldSource = 'router.get("/users", listUsers);';
+    fs.writeFileSync(sourcePath, oldSource);
+    const relativePath = path.relative(testDir, sourcePath);
+    const oldHash = require('crypto').createHash('md5').update(oldSource).digest('hex');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
+      files: { [relativePath]: oldHash }
+    }));
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '<!-- section:overview -->', 'overview', '<!-- /section:overview -->',
+      '<!-- section:structure -->', 'structure', '<!-- /section:structure -->',
+      '<!-- section:modules -->', 'modules', '<!-- /section:modules -->',
+      '<!-- section:api -->', 'api', '<!-- /section:api -->',
+      '<!-- section:data -->', 'data', '<!-- /section:data -->',
+      '<!-- section:dependencies -->', 'dependencies', '<!-- /section:dependencies -->',
+      '<!-- section:notes -->', 'notes', '<!-- /section:notes -->'
+    ].join('\n'));
+    fs.writeFileSync(sourcePath, 'router.post("/users", createUser);');
+
+    const result = await updateCommand(testDir, { dryRun: true });
+    const sections = result.sectionUpdates.map(update => update.sectionName).sort();
+
+    expect(sections).toEqual(['api', 'modules']);
+    expect(result.confirmationRequired).toEqual([]);
+    expect(result.prompt).not.toContain('<!-- section:overview -->');
+    expect(result.prompt).not.toContain('<!-- section:data -->');
+  });
+
+  test('unknown files require confirmation and prevent baseline commit', async () => {
+    fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'domain.foo'), 'opaque domain format');
+    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
+      '<!-- section:structure -->', 'old structure', '<!-- /section:structure -->',
+      '<!-- section:modules -->', 'old modules', '<!-- /section:modules -->'
+    ].join('\n'));
+    generateWithAI.mockResolvedValueOnce('new structure');
+
+    const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
+
+    expect(detection.sectionUpdates.map(update => update.sectionName)).toEqual(['structure']);
+    expect(detection.confirmationRequired).toEqual([
+      expect.objectContaining({ files: [expect.stringMatching(/domain\.foo/)] })
+    ]);
+    const execution = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
+    expect(execution.committed).toBe(false);
+    expect(execution.confirmationRequired).toHaveLength(1);
+    expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
   });
 
   test('hash mode emits explicit deletion evidence', async () => {
@@ -258,11 +309,11 @@ describe('updateCommand', () => {
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
     fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
       '# src project',
-      '<!-- section:overview -->',
+      '<!-- section:modules -->',
       'old',
-      '<!-- /section:overview -->'
+      '<!-- /section:modules -->'
     ].join('\n'));
-    generateWithAI.mockResolvedValueOnce('new overview');
+    generateWithAI.mockResolvedValueOnce('new modules');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
@@ -332,18 +383,18 @@ describe('updateCommand', () => {
 
   test('partial failure preserves per-section retry state and commits after retry', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
+    fs.writeFileSync(path.join(testDir, 'src/app.js'), 'content');
     fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
       '# src project',
-      '<!-- section:a -->',
-      'old a',
-      '<!-- /section:a -->',
-      '<!-- section:b -->',
-      'old b',
-      '<!-- /section:b -->'
+      '<!-- section:api -->',
+      'old api',
+      '<!-- /section:api -->',
+      '<!-- section:modules -->',
+      'old modules',
+      '<!-- /section:modules -->'
     ].join('\n'));
     generateWithAI
-      .mockResolvedValueOnce('new a')
+      .mockResolvedValueOnce('new api')
       .mockRejectedValueOnce(new Error('temporary failure'));
 
     const firstDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
@@ -352,13 +403,13 @@ describe('updateCommand', () => {
     expect(firstExecution.committed).toBe(false);
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
     const pending = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.update-state.json'), 'utf8'));
-    expect(pending.sections['src.md#a'].status).toBe('success');
-    expect(pending.sections['src.md#b'].status).toBe('failed');
+    expect(pending.sections['src.md#api'].status).toBe('success');
+    expect(pending.sections['src.md#modules'].status).toBe('failed');
 
     generateWithAI.mockClear();
-    generateWithAI.mockResolvedValueOnce('new b');
+    generateWithAI.mockResolvedValueOnce('new modules');
     const retryDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
-    expect(retryDetection.sectionUpdates.find(update => update.sectionName === 'a').status).toBe('success');
+    expect(retryDetection.sectionUpdates.find(update => update.sectionName === 'api').status).toBe('success');
     const retryExecution = await executeUpdateTransaction(testDir, retryDetection, { apiKey: 'test-key' });
 
     expect(generateWithAI).toHaveBeenCalledTimes(1);
@@ -373,12 +424,12 @@ describe('updateCommand', () => {
     const docPath = path.join(testDir, 'ai-docs/src.md');
     const original = [
       '# src project',
-      '<!-- section:overview -->',
-      'old overview',
-      '<!-- /section:overview -->'
+      '<!-- section:modules -->',
+      'old modules',
+      '<!-- /section:modules -->'
     ].join('\n');
     fs.writeFileSync(docPath, original);
-    generateWithAI.mockResolvedValueOnce('new overview');
+    generateWithAI.mockResolvedValueOnce('new modules');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
@@ -403,13 +454,13 @@ describe('updateCommand', () => {
     fs.writeFileSync(sourcePath, 'version one');
     fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
       '# src project',
-      '<!-- section:overview -->',
-      'old overview',
-      '<!-- /section:overview -->'
+      '<!-- section:modules -->',
+      'old modules',
+      '<!-- /section:modules -->'
     ].join('\n'));
     generateWithAI.mockImplementationOnce(async () => {
       fs.writeFileSync(sourcePath, 'version two');
-      return 'new overview';
+      return 'new modules';
     });
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });

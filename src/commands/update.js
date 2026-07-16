@@ -15,7 +15,9 @@ const {
   getUntrackedFiles,
   getLastScanCommit
 } = require('../utils/git-utils');
-const { findRelatedDoc, groupChangesByProject } = require('../core/doc-resolver');
+const {
+  findRelatedDoc, groupChangesByProject, resolveProjectForFile
+} = require('../core/doc-resolver');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
 
@@ -274,7 +276,9 @@ function buildChangeSetId(changes) {
   return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
-function prepareUpdateState(rootDir, changeSetId, changes, sectionUpdates, detectionMethod) {
+function prepareUpdateState(
+  rootDir, changeSetId, changes, sectionUpdates, detectionMethod, confirmations = []
+) {
   const previous = loadUpdateState(rootDir);
   const canResume = previous?.changeSetId === changeSetId;
   const sections = {};
@@ -302,7 +306,8 @@ function prepareUpdateState(rootDir, changeSetId, changes, sectionUpdates, detec
       oldHash: oldHash || null,
       newHash: newHash || null
     })),
-    sections
+    sections,
+    confirmations
   };
 }
 
@@ -413,6 +418,57 @@ function selectChanges(changes, files) {
   return changes.filter(change => fileSet.has(change.path));
 }
 
+function inferSectionsForChange(change) {
+  const normalized = change.path.replace(/\\/g, '/').toLowerCase();
+  const basename = path.posix.basename(normalized);
+  const evidence = String(change.evidence || '').toLowerCase();
+  const sections = new Set();
+  let recognized = false;
+
+  if (/^(package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pom\.xml|build\.gradle|go\.mod|cargo\.toml|pyproject\.toml|requirements.*\.txt)$/.test(basename)) {
+    sections.add('dependencies');
+    recognized = true;
+  }
+  if (/^(readme|changelog|contributing)(\.|$)/.test(basename)) {
+    sections.add('overview');
+    sections.add('notes');
+    recognized = true;
+  }
+  if (/(^|\/)(api|routes?|controllers?|handlers?|middleware)(\/|\.|$)/.test(normalized) ||
+      /(?:router|app|server)\.(get|post|put|patch|delete)\s*\(/.test(evidence) ||
+      /^(app|server|main)\.[cm]?[jt]s$/.test(basename)) {
+    sections.add('api');
+    sections.add('modules');
+    recognized = true;
+  }
+  if (/(^|\/)(models?|entities|schemas?|migrations?|repositories|store|state|reducers?)(\/|\.|$)/.test(normalized)) {
+    sections.add('data');
+    sections.add('modules');
+    recognized = true;
+  }
+  if (/(^|\/)(components?|pages?|views?|hooks?|services?|modules?|utils?|lib|src)(\/|\.|$)/.test(normalized) &&
+      /\.(js|jsx|ts|tsx|vue|svelte|py|java|kt|go|rs|php|rb|cs|c|cc|cpp)$/.test(normalized)) {
+    sections.add('modules');
+    recognized = true;
+  }
+  if (/(^|\/)(config|configs)(\/|\.|$)/.test(normalized) || /^\.env/.test(basename)) {
+    sections.add('dependencies');
+    sections.add('notes');
+    recognized = true;
+  }
+  if (/\.(test|spec)\.[cm]?[jt]sx?$/.test(normalized)) {
+    sections.add('notes');
+    recognized = true;
+  }
+  if (change.status === 'added' || change.status === 'deleted') sections.add('structure');
+
+  return {
+    sections: [...sections],
+    uncertain: !recognized,
+    reason: recognized ? null : '无法从文件类型、路径或符号证据确定受影响 section'
+  };
+}
+
 /**
  * Build per-section prompts for changed files.
  * Returns an array of { docName, sectionName, prompt } objects.
@@ -420,25 +476,75 @@ function selectChanges(changes, files) {
 function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptions) {
   const changesByProject = groupChangesByProject(rootDir, changedFiles);
   const sectionUpdates = [];
+  const confirmations = [];
+
+  for (const file of changedFiles) {
+    if (!resolveProjectForFile(rootDir, file)) {
+      confirmations.push({
+        projectId: null,
+        docName: null,
+        files: [file],
+        reason: '文件未映射到配置和 manifest 中的任何项目'
+      });
+    }
+  }
 
   for (const [project, projFiles] of Object.entries(changesByProject)) {
     const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
-    if (!relatedDoc) continue;
+    if (!relatedDoc) {
+      confirmations.push({ projectId: project, docName: null, files: projFiles, reason: '项目文档不存在' });
+      continue;
+    }
 
     const sections = listSections(relatedDoc.content);
-    if (sections.length === 0) continue;
-    const projectEvidence = buildEvidenceChunks(selectChanges(changes, projFiles), evidenceOptions);
+    if (sections.length === 0) {
+      confirmations.push({
+        projectId: project,
+        docName: relatedDoc.name,
+        files: projFiles,
+        reason: '项目文档没有可更新的 section 标记'
+      });
+      continue;
+    }
+    const sectionChanges = new Map();
+    for (const change of selectChanges(changes, projFiles)) {
+      const inference = inferSectionsForChange(change);
+      const available = inference.sections.filter(section => sections.includes(section));
+      for (const section of available) {
+        if (!sectionChanges.has(section)) sectionChanges.set(section, []);
+        sectionChanges.get(section).push(change);
+      }
+      if (inference.uncertain || available.length === 0) {
+        confirmations.push({
+          projectId: project,
+          docName: relatedDoc.name,
+          files: [change.path],
+          reason: inference.reason || `文档不包含推断出的 section: ${inference.sections.join(', ')}`
+        });
+      }
+    }
 
     const tpl = loadTemplate('update-prompt.md');
-    for (const sectionName of sections) {
+    for (const [sectionName, affectedChanges] of sectionChanges) {
       const sectionContent = extractSection(relatedDoc.content, sectionName);
-      if (sectionContent === null) continue;
+      if (sectionContent === null) {
+        confirmations.push({
+          projectId: project,
+          docName: relatedDoc.name,
+          files: affectedChanges.map(change => change.path),
+          reason: `section ${sectionName} 标记格式无效，无法安全替换`
+        });
+        continue;
+      }
+      const affectedFiles = affectedChanges.map(change => change.path);
+      const projectEvidence = buildEvidenceChunks(affectedChanges, evidenceOptions);
+      const renderedEvidence = renderEvidenceChunks(projectEvidence);
 
       const prompt = renderTemplate(tpl, {
         project,
         sectionName,
-        changedFiles: projFiles.map(f => `- ${f}`).join('\n'),
-        changeEvidence: renderEvidenceChunks(projectEvidence),
+        changedFiles: affectedFiles.map(f => `- ${f}`).join('\n'),
+        changeEvidence: renderedEvidence,
         sectionContent
       });
 
@@ -446,8 +552,8 @@ function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptio
       Object.defineProperty(update, '_manualContext', {
         value: {
           project,
-          changedFiles: projFiles,
-          changeEvidence: renderEvidenceChunks(projectEvidence),
+          changedFiles: affectedFiles,
+          changeEvidence: renderedEvidence,
           sectionContent
         },
         enumerable: false
@@ -456,32 +562,26 @@ function buildSectionUpdatePrompts(rootDir, changedFiles, changes, evidenceOptio
     }
   }
 
-  return sectionUpdates;
+  return { sectionUpdates, confirmations };
 }
 
-function buildFullDocPrompt(rootDir, changedFiles, changes, evidenceOptions) {
-  const changesByProject = groupChangesByProject(rootDir, changedFiles);
-  const projectSections = [];
-
-  for (const [project, projFiles] of Object.entries(changesByProject)) {
-    const parts = [`### 子项目: ${project}`, '变化文件：'];
-    projFiles.forEach(f => parts.push(`- ${f}`));
-    const projectEvidence = buildEvidenceChunks(selectChanges(changes, projFiles), evidenceOptions);
-    parts.push('\n变化证据：');
-    parts.push(renderEvidenceChunks(projectEvidence));
-
-    const relatedDoc = findRelatedDoc(rootDir, projFiles[0]);
-    if (relatedDoc) {
-      parts.push(`\n当前文档内容（${relatedDoc.name}）：`);
-      parts.push('```markdown');
-      parts.push(relatedDoc.content);
-      parts.push('```');
-    }
-    projectSections.push(parts.join('\n'));
+function buildConfirmationPrompt(confirmations, changes, evidenceOptions) {
+  const parts = [
+    '以下代码变化无法确定性映射到文档 section，需要先确认影响范围。',
+    '请只返回每个文件应影响的文档和 section，不要改写文档内容。'
+  ];
+  for (const confirmation of confirmations) {
+    parts.push('', `## 待确认: ${confirmation.files.join(', ')}`);
+    if (confirmation.projectId) parts.push(`项目: ${confirmation.projectId}`);
+    if (confirmation.docName) parts.push(`文档: ${confirmation.docName}`);
+    parts.push(`原因: ${confirmation.reason}`);
+    const evidence = buildEvidenceChunks(
+      selectChanges(changes, confirmation.files),
+      evidenceOptions
+    );
+    parts.push('变化证据：', renderEvidenceChunks(evidence));
   }
-
-  const tpl = loadTemplate('update-prompt-full.md');
-  return renderTemplate(tpl, { projectSections: projectSections.join('\n\n') });
+  return parts.join('\n');
 }
 
 /**
@@ -517,18 +617,18 @@ function buildCombinedSectionPrompt(sectionUpdates) {
   ];
 
   for (const [docName, updates] of Object.entries(updatesByDoc)) {
-    const context = updates[0]._manualContext || {};
-    parts.push('', `## 文档: ${docName}`);
-    if (context.project) parts.push(`子项目: ${context.project}`);
-    parts.push('变化文件：');
-    for (const file of context.changedFiles || []) parts.push(`- ${file}`);
-    parts.push('', '变化证据：', context.changeEvidence || '（无可用源码证据）');
-    parts.push('', '待更新 section：');
+    parts.push('', `## 文档: ${docName}`, '待更新 section：');
     for (const update of updates) {
       const updateContext = update._manualContext || {};
       parts.push(
         '',
         `### ${update.sectionName}`,
+        `子项目: ${updateContext.project || ''}`,
+        '变化文件：',
+        ...(updateContext.changedFiles || []).map(file => `- ${file}`),
+        '变化证据：',
+        updateContext.changeEvidence || '（无可用源码证据）',
+        '当前 section：',
         `<!-- section:${update.sectionName} -->`,
         updateContext.sectionContent || '',
         `<!-- /section:${update.sectionName} -->`
@@ -695,6 +795,18 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
   }
   state.updatedAt = new Date().toISOString();
 
+  if ((state.confirmations || []).length > 0) {
+    state.transactionError = '存在待确认的 section 影响范围，扫描基线未提交';
+    saveUpdateState(rootDir, state);
+    return {
+      ...execution,
+      committed: false,
+      pendingState: state,
+      confirmationRequired: state.confirmations,
+      reason: state.transactionError
+    };
+  }
+
   const sectionStates = Object.values(state.sections);
   const allSectionsSucceeded = sectionStates.length > 0 &&
     sectionStates.every(section => section.status === 'success');
@@ -755,18 +867,23 @@ async function updateCommand(rootDir, options = {}) {
     gitBaseRef
   });
   const evidenceChunks = buildEvidenceChunks(changesWithEvidence, evidenceOptions);
-  let sectionUpdates = buildSectionUpdatePrompts(
+  const impactPlan = buildSectionUpdatePrompts(
     rootDir,
     changedFiles,
     changesWithEvidence,
     evidenceOptions
   );
+  let sectionUpdates = impactPlan.sectionUpdates;
+  const confirmationRequired = impactPlan.confirmations;
 
-  const prompt = sectionUpdates.length > 0
+  const updatePrompt = sectionUpdates.length > 0
     ? buildCombinedSectionPrompt(sectionUpdates)
-    : changedFiles.length > 0
-      ? buildFullDocPrompt(rootDir, changedFiles, changesWithEvidence, evidenceOptions)
-      : null;
+    : null;
+  const confirmationPrompt = confirmationRequired.length > 0
+    ? buildConfirmationPrompt(confirmationRequired, changesWithEvidence, evidenceOptions)
+    : null;
+  const promptParts = [updatePrompt, confirmationPrompt].filter(Boolean);
+  const prompt = promptParts.length > 0 ? promptParts.join('\n\n') : null;
   if (changedFiles.length > 0 && (typeof prompt !== 'string' || prompt.trim() === '')) {
     throw new Error('update 生成了空 Prompt');
   }
@@ -777,7 +894,8 @@ async function updateCommand(rootDir, options = {}) {
     changeSetId,
     changesWithEvidence,
     sectionUpdates,
-    detectionMethod
+    detectionMethod,
+    confirmationRequired
   );
   sectionUpdates = sectionUpdates.map(update => ({
     ...update,
@@ -813,6 +931,7 @@ async function updateCommand(rootDir, options = {}) {
     evidenceChunks,
     prompt,
     sectionUpdates,
+    confirmationRequired,
     detectionMethod,
     changeSetId
   };

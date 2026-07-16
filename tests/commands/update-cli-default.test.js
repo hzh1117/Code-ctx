@@ -41,7 +41,7 @@ describe('update CLI default mode', () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('## 文档: src.md');
-    expect(result.stdout).toContain('<!-- section:overview -->');
+    expect(result.stdout).not.toContain('<!-- section:overview -->');
     expect(result.stdout).toContain('<!-- section:modules -->');
     expect(result.stdout).toContain('export const cliEvidence = true;');
     expect(fs.existsSync(path.join(rootDir, 'ai-docs/.last-scan.json'))).toBe(false);

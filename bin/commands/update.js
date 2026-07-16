@@ -47,11 +47,17 @@ const update = new Command('update')
           console.log(`  ${doc} > ${sections.join(', ')}`);
         }
       }
+      if (result.confirmationRequired.length > 0) {
+        console.log(`\n有 ${result.confirmationRequired.length} 项变化需要确认 section 影响范围：`);
+        for (const item of result.confirmationRequired) {
+          console.log(`  ${item.files.join(', ')}: ${item.reason}`);
+        }
+      }
 
       if (options.apply) {
         // --apply: call AI and write back
         if (result.sectionUpdates.length === 0) {
-          console.log('\n没有可更新的 section（文档可能缺少 section 标记）');
+          console.log('\n没有可自动更新的 section（存在未映射或待确认变化）');
           if (result.prompt) {
             console.log('已生成全量更新 prompt，可手动粘贴给 AI：');
             await outputPrompt(result.prompt, options, {

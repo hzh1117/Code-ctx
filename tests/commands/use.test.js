@@ -212,11 +212,14 @@ describe('useCommand', () => {
       expect(result.compactInfo).toBeDefined();
       expect(result.compactInfo.originalLength).toBeGreaterThan(8000);
       expect(result.compactInfo.compactLength).toBeLessThan(result.compactInfo.originalLength);
+      expect(result.compactInfo.compactTokens).toBeLessThan(result.compactInfo.originalTokens);
       expect(result.prompt).toContain('| 项目 | 说明 |');
       expect(result.prompt).toContain('核心功能描述');
       expect(result.prompt).toContain('注意事项');
       expect(result.prompt).not.toContain(longContent);
       expect(result.prompt).toContain('商户后台新增功能');
+      expect(result.prompt).toContain('Context compression report');
+      expect(result.compactInfo.removed.length).toBeGreaterThan(0);
     });
 
     test('should compact using generated template section ids', async () => {
@@ -265,6 +268,38 @@ describe('useCommand', () => {
       });
 
       expect(result.compactInfo).toBeNull();
+    });
+
+    test('selects data sections for a database scenario', async () => {
+      const aiDocsDir = path.join(fixturesDir, 'ai-docs');
+      const longContent = 'x'.repeat(9000);
+      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), [
+        '<!-- section:overview -->',
+        'System overview',
+        '<!-- /section:overview -->',
+        '<!-- section:architecture -->',
+        longContent,
+        '<!-- /section:architecture -->'
+      ].join('\n'));
+      fs.writeFileSync(path.join(aiDocsDir, 'api.md'), [
+        '<!-- section:data -->',
+        'User table migration evidence',
+        '<!-- /section:data -->',
+        '<!-- section:api -->',
+        longContent,
+        '<!-- /section:api -->'
+      ].join('\n'));
+
+      const result = await useCommand({
+        scenario: 'D',
+        taskDescription: '修改数据库表结构',
+        rootDir: fixturesDir
+      });
+
+      expect(result.compactInfo).not.toBeNull();
+      expect(result.prompt).toContain('User table migration evidence');
+      expect(result.prompt).toContain('api.md#api: not selected for scenario');
+      expect(result.prompt).not.toContain(longContent);
     });
   });
 });

@@ -4,17 +4,22 @@ const { getScenarios } = require('../template/engine');
 const { matchScenarioWithAI } = require('../matcher/scenario-matcher');
 const { buildUsePrompt } = require('../generator/prompt-builder');
 const { filterSensitive } = require('../utils/sensitive-filter');
-const { extractSection } = require('../core/section');
-const { PROMPT_MAX_CHARS } = require('../utils/constants');
+const { extractSection, listSections } = require('../core/section');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
-const { evaluateContextBudget } = require('../utils/token-estimator');
+const { evaluateContextBudget, estimateTokensForContent } = require('../utils/token-estimator');
 
-const COMPACT_THRESHOLD = PROMPT_MAX_CHARS;
+const COMPACT_THRESHOLD_TOKENS = 2000;
 const LOW_CONFIDENCE_THRESHOLD = 50;
-const COMPACT_SECTION_IDS = {
-  overview: ['overview'],
-  relatedDocs: ['modules', 'notes']
+const SCENARIO_SECTION_PROFILES = {
+  A: ['overview', 'modules', 'api', 'notes', 'dependencies'],
+  B: ['overview', 'modules', 'api', 'notes', 'data', 'dependencies'],
+  C: ['overview', 'api', 'modules', 'notes', 'data', 'dependencies'],
+  D: ['overview', 'data', 'modules', 'notes', 'dependencies'],
+  E: ['overview', 'api', 'modules', 'notes', 'dependencies'],
+  F: ['overview', 'modules', 'notes', 'dependencies'],
+  G: ['overview', 'api', 'modules', 'notes', 'data', 'dependencies'],
+  H: ['overview', 'api', 'dependencies', 'modules', 'notes', 'data']
 };
 
 async function resolveScenario(taskDescription, scenario, aiConfig, noAiMatch, language) {
@@ -83,45 +88,109 @@ function loadContextDocs(rootDir, selectedScenario) {
   return { overviewContent, relatedDocs, loadedDocs };
 }
 
-function extractFirstSection(content, sectionNames) {
-  for (const name of sectionNames) {
-    const section = extractSection(content, name);
-    if (section) return section;
-  }
-  return null;
+function sectionsForScenario(scenarioId, taskDescription) {
+  const sections = new Set(SCENARIO_SECTION_PROFILES[scenarioId] || [
+    'overview', 'modules', 'notes'
+  ]);
+  const task = String(taskDescription || '').toLowerCase();
+  if (/api|接口|路由|endpoint/.test(task)) sections.add('api');
+  if (/数据|数据库|表|schema|model|store|状态/.test(task)) sections.add('data');
+  if (/依赖|集成|调用|联调|dependency/.test(task)) sections.add('dependencies');
+  return [...sections];
 }
 
-function compactPrompt(prompt, taskDescription, template, overviewContent, relatedDocs) {
-  const originalLength = prompt.length;
+function summarizeRemoved(name, sectionName, content, reason) {
+  const summary = String(content || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  return `- ${name}#${sectionName}: ${reason}; summary=${summary || '(empty)'}`;
+}
 
-  let compactOverview = overviewContent;
-  if (overviewContent) {
-    compactOverview = extractFirstSection(overviewContent, COMPACT_SECTION_IDS.overview) || '';
+function compactDocument(name, content, preferredSections, budget, removals) {
+  const availableSections = listSections(content);
+  if (availableSections.length === 0 && String(content || '').trim()) {
+    removals.push(summarizeRemoved(name, 'unstructured', content, 'missing section markers'));
   }
+  const selected = [];
+  let usedTokens = 0;
+  for (const sectionName of preferredSections) {
+    const section = extractSection(content, sectionName);
+    if (!section) continue;
+    const tokens = estimateTokensForContent(section);
+    if (usedTokens + tokens <= budget) {
+      selected.push(`<!-- section:${sectionName} -->\n${section}\n<!-- /section:${sectionName} -->`);
+      usedTokens += tokens;
+    } else {
+      const remaining = Math.max(0, budget - usedTokens);
+      if (remaining > 30) {
+        const ratio = remaining / tokens;
+        const truncated = section.slice(0, Math.max(80, Math.floor(section.length * ratio)));
+        selected.push(`<!-- section:${sectionName} -->\n${truncated}\n[truncated: token budget]\n<!-- /section:${sectionName} -->`);
+        usedTokens = budget;
+      }
+      removals.push(summarizeRemoved(name, sectionName, section, 'token budget'));
+    }
+  }
+  for (const sectionName of availableSections) {
+    if (!preferredSections.includes(sectionName)) {
+      removals.push(summarizeRemoved(
+        name,
+        sectionName,
+        extractSection(content, sectionName),
+        'not selected for scenario'
+      ));
+    }
+  }
+  return selected.join('\n\n');
+}
+
+function compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs) {
+  const originalLength = prompt.length;
+  const originalTokens = estimateTokensForContent(prompt);
+  const preferredSections = sectionsForScenario(selectedScenario.id, taskDescription);
+  const basePrompt = buildUsePrompt({
+    taskDescription: taskDescription || '',
+    overviewContent: '',
+    relatedDocs: {},
+    template: selectedScenario.template || ''
+  });
+  const contentBudget = Math.max(
+    200,
+    COMPACT_THRESHOLD_TOKENS - estimateTokensForContent(basePrompt) - 250
+  );
+  const documentCount = Object.keys(relatedDocs).length + (overviewContent ? 1 : 0);
+  const perDocumentBudget = Math.max(100, Math.floor(contentBudget / Math.max(1, documentCount)));
+  const removals = [];
+  const compactOverview = overviewContent
+    ? compactDocument('OVERVIEW.md', overviewContent, preferredSections, perDocumentBudget, removals)
+    : '';
 
   const compactRelatedDocs = {};
   for (const [name, content] of Object.entries(relatedDocs)) {
-    const parts = [];
-    for (const sectionName of COMPACT_SECTION_IDS.relatedDocs) {
-      const section = extractSection(content, sectionName);
-      if (section) parts.push(section);
-    }
-    if (parts.length > 0) {
-      compactRelatedDocs[name] = parts.join('\n\n');
-    }
+    compactRelatedDocs[name] = compactDocument(
+      name, content, preferredSections, perDocumentBudget, removals
+    );
+  }
+
+  if (removals.length > 0) {
+    compactRelatedDocs['CONTEXT_COMPRESSION.md'] = [
+      'Context compression report (removed content and reason):',
+      ...removals
+    ].join('\n');
   }
 
   const compacted = buildUsePrompt({
     taskDescription: taskDescription || '',
     overviewContent: compactOverview,
     relatedDocs: compactRelatedDocs,
-    template: template || ''
+    template: selectedScenario.template || ''
   });
 
   return {
     prompt: compacted,
     originalLength,
-    compactLength: compacted.length
+    compactLength: compacted.length,
+    originalTokens,
+    compactTokens: estimateTokensForContent(compacted),
+    removed: removals
   };
 }
 
@@ -141,8 +210,8 @@ async function buildContext(task, scenario, options = {}) {
 
   prompt = filterSensitive(prompt).content;
 
-  if (prompt.length > COMPACT_THRESHOLD) {
-    const result = compactPrompt(prompt, task, resolved.selectedScenario.template, overviewContent, relatedDocs);
+  if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
+    const result = compactPrompt(prompt, task, resolved.selectedScenario, overviewContent, relatedDocs);
     prompt = filterSensitive(result.prompt).content;
   }
 
@@ -191,12 +260,15 @@ async function useCommand(options = {}) {
 
   // 6. 精简模式：超过阈值时自动压缩
   let compactInfo = null;
-  if (prompt.length > COMPACT_THRESHOLD) {
-    const result = compactPrompt(prompt, taskDescription, selectedScenario.template, overviewContent, relatedDocs);
+  if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
+    const result = compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs);
     prompt = filterSensitive(result.prompt).content;
     compactInfo = {
       originalLength: result.originalLength,
-      compactLength: result.compactLength
+      compactLength: result.compactLength,
+      originalTokens: result.originalTokens,
+      compactTokens: result.compactTokens,
+      removed: result.removed
     };
   }
 

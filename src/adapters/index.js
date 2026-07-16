@@ -1,6 +1,12 @@
-const { BaseAdapter } = require('./base');
+const { BaseAdapter, assertValidAdapter } = require('./base');
 const { AdapterRegistry, loadBuiltinAdapters } = require('./registry');
 
 const defaultRegistry = loadBuiltinAdapters();
 
-module.exports = { BaseAdapter, AdapterRegistry, loadBuiltinAdapters, defaultRegistry };
+module.exports = {
+  BaseAdapter,
+  assertValidAdapter,
+  AdapterRegistry,
+  loadBuiltinAdapters,
+  defaultRegistry
+};

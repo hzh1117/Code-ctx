@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { BaseAdapter } = require('./base');
+const { assertValidAdapter } = require('./base');
 
 class AdapterRegistry {
   constructor() {
@@ -8,9 +8,7 @@ class AdapterRegistry {
   }
 
   register(adapter) {
-    if (!(adapter instanceof BaseAdapter)) {
-      throw new Error('Adapter must extend BaseAdapter');
-    }
+    assertValidAdapter(adapter);
     this.adapters.set(adapter.type, adapter);
   }
 

@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { loadProjectConfig } = require('../utils/config');
 const { getState, setLoaded, addContributions, addError, _reset } = require('./state');
-const { BaseAdapter } = require('../adapters');
+const { BaseAdapter, assertValidAdapter } = require('../adapters');
 const { defaultRegistry } = require('../adapters');
 
 // ─── Plugin security gate ───────────────────────────────────────────────
@@ -161,19 +161,12 @@ function loadPluginModule(spec, rootDir) {
   return typeof mod === 'function' ? mod() : mod;
 }
 
-function isValidAdapter(adapter) {
-  if (!adapter || typeof adapter !== 'object') return false;
-  return typeof adapter.detect === 'function' && typeof adapter.type === 'string';
-}
-
-function instantiateAdapter(candidate) {
+function instantiateAdapter(candidate, label) {
   if (typeof candidate === 'function') {
-    // Looks like a class — try `new`.
     try {
-      const instance = new candidate();
-      return instance;
-    } catch {
-      return null;
+      return new candidate();
+    } catch (error) {
+      throw new Error(`${label} 无法实例化: ${error.message}`);
     }
   }
   return candidate;
@@ -198,16 +191,17 @@ function applyPlugin(pluginExports, name) {
 
   const adapters = [];
   if (Array.isArray(pluginExports.adapters)) {
-    for (const candidate of pluginExports.adapters) {
-      const instance = instantiateAdapter(candidate);
-      if (!isValidAdapter(instance)) {
-        throw new Error(`插件 ${name}: 适配器无效（需要 type getter 和 detect 方法）`);
+    const validated = pluginExports.adapters.map((candidate, index) => {
+      const label = `插件 ${name} 的适配器 #${index + 1}`;
+      const instance = instantiateAdapter(candidate, label);
+      try {
+        return assertValidAdapter(instance, label);
+      } catch (error) {
+        throw new Error(`适配器无效: ${error.message}`);
       }
-      adapters.push(instance);
-      // Register immediately into the global adapter registry so the rest of
-      // the scanner pipeline (project-detector, file-scanner) sees them.
-      defaultRegistry.register(instance);
-    }
+    });
+    adapters.push(...validated);
+    validated.forEach(adapter => defaultRegistry.register(adapter));
   }
 
   const scenarios = Array.isArray(pluginExports.scenarios)

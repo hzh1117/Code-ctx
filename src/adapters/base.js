@@ -46,4 +46,27 @@ class BaseAdapter {
   }
 }
 
-module.exports = { BaseAdapter };
+function assertValidAdapter(adapter, label = 'Adapter') {
+  if (!(adapter instanceof BaseAdapter)) {
+    throw new Error(`${label} must extend BaseAdapter`);
+  }
+
+  let type;
+  try {
+    type = adapter.type;
+  } catch (error) {
+    throw new Error(`${label} type is invalid: ${error.message}`);
+  }
+  if (typeof type !== 'string' || type.trim().length === 0) {
+    throw new Error(`${label} must provide a non-empty type`);
+  }
+  if (typeof adapter.detect !== 'function') {
+    throw new Error(`${label} must implement detect()`);
+  }
+  if (!Array.isArray(adapter.scanPatterns)) {
+    throw new Error(`${label} scanPatterns must be an array`);
+  }
+  return adapter;
+}
+
+module.exports = { BaseAdapter, assertValidAdapter };

@@ -158,7 +158,31 @@ describe('plugin loader', () => {
     try {
       initPlugins(testDir);
       expect(getState().errors.length).toBe(1);
-      expect(getState().errors[0].error).toMatch(/适配器无效/);
+      expect(getState().errors[0].error).toMatch(/适配器无效.*BaseAdapter/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('validates all plugin adapters before registering any of them', () => {
+    const pluginPath = writePlugin(testDir, 'partially-bad.js', `
+      const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
+      class ValidAdapter extends BaseAdapter {
+        get type() { return 'must-not-leak'; }
+        detect() { return false; }
+      }
+      module.exports = {
+        name: 'partially-bad',
+        adapters: [ValidAdapter, { type: 'duck', detect() { return true; } }]
+      };
+    `);
+    writeConfig(testDir, [pluginPath]);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      initPlugins(testDir);
+      expect(getState().errors).toHaveLength(1);
+      expect(defaultRegistry.types).not.toContain('must-not-leak');
+      expect(defaultRegistry.types).not.toContain('duck');
     } finally {
       warn.mockRestore();
     }

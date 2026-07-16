@@ -42,6 +42,14 @@ node bin/cli.js dashboard
 
 `npm run check` 已包含上述格式、lint、类型、测试、覆盖率、Web 构建和 package smoke 门禁。修改依赖时还必须对根目录和 `web/` 分别运行 `npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org`。
 
+真实 Provider smoke 默认不会访问外部服务；普通测试只校验已脱敏的协议快照，并跳过需要凭据的用例。需要手动验证兼容性时，至少提供一组临时环境变量后运行：
+
+```bash
+RUN_PROVIDER_SMOKE=1 OPENAI_API_KEY=... npm test -- tests/smoke/provider-smoke.test.js --runInBand
+```
+
+PowerShell 可先设置 `$env:RUN_PROVIDER_SMOKE = '1'` 和对应的 `OPENAI_API_KEY` 或 `ANTHROPIC_API_KEY`。兼容端点可额外设置相应的 `*_BASE_URL` 与 `*_SMOKE_MODEL`。不要写入仓库、测试快照或日志；计划任务使用 GitHub Actions secrets，并在启用 smoke 但未提供任何 Provider Key 时主动失败。
+
 ### 分支与提交
 
 - 从 `master` 创建分支。
@@ -124,6 +132,14 @@ node bin/cli.js dashboard
 ```
 
 `npm run check` includes the formatting, lint, type, test, coverage, Web build, and package-smoke gates above. Dependency changes must also run `npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org` in both the repository root and `web/`.
+
+The real provider smoke does not contact external services by default. Normal test runs only validate the redacted protocol snapshot and skip credentialed cases. To opt in manually, provide at least one temporary provider key:
+
+```bash
+RUN_PROVIDER_SMOKE=1 OPENAI_API_KEY=... npm test -- tests/smoke/provider-smoke.test.js --runInBand
+```
+
+In PowerShell, set `$env:RUN_PROVIDER_SMOKE = '1'` plus either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` first. Compatible endpoints may also set the matching `*_BASE_URL` and `*_SMOKE_MODEL`. Never write these values to the repository, snapshots, or logs. The scheduled workflow reads GitHub Actions secrets and intentionally fails when smoke is enabled without any provider key.
 
 ### Branches and Commits
 

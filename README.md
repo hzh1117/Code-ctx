@@ -201,7 +201,7 @@ AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网�
 - `scenarios`：追加或覆盖场景（按 `id` 覆盖内置）
 - `sensitivePatterns` / `sensitiveDetectionPatterns`：内部敏感数据脱敏与扫描
 
-最小示例见 [`examples/plugin-basic/`](examples/plugin-basic/)。插件加载失败只会输出 warning，不会破坏内置能力。
+最小示例见 [`examples/plugin-basic/`](examples/plugin-basic/)。插件是会执行代码的 Node.js 模块，只应加载已审查的来源。交互式终端会要求首次确认并持久化信任；CI 等非交互环境必须用 `CODE_CTX_PLUGINS_ALLOW` 精确放行，`CODE_CTX_PLUGINS_ALLOW_ALL=1` 仅用于已隔离的测试环境。插件加载失败只会输出 warning，不会破坏内置能力。
 
 ## Web Dashboard
 

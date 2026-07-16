@@ -1,7 +1,7 @@
 name: Bug report / Bug 反馈
 description: Report a reproducible problem in Code-ctx / 反馈可复现的问题
-title: "[Bug]: "
-labels: ["bug"]
+title: '[Bug]: '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -42,15 +42,50 @@ body:
     validations:
       required: true
   - type: input
+    id: version
+    attributes:
+      label: Code-ctx version / Code-ctx 版本
+      description: Run `code-ctx --version`, or provide the commit hash for a source checkout. / 运行 `code-ctx --version`；源码检出请提供 commit hash。
+      placeholder: '1.0.0 or 260de7c'
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface / 使用入口
+      options:
+        - CLI
+        - Dashboard
+        - Programmatic API
+        - Plugin
+        - Other
+    validations:
+      required: true
+  - type: input
     id: node
     attributes:
       label: Node.js version / Node.js 版本
-      placeholder: "v20.12.0"
+      placeholder: 'v20.12.0'
+    validations:
+      required: true
+  - type: input
+    id: npm
+    attributes:
+      label: npm version / npm 版本
+      placeholder: '10.5.0'
   - type: input
     id: os
     attributes:
       label: Operating system / 操作系统
-      placeholder: "Windows 11, macOS 15, Ubuntu 24.04"
+      placeholder: 'Windows 11, macOS 15, Ubuntu 24.04'
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics / 脱敏诊断
+      description: Include the error code and sanitized `code-ctx doctor --strict` output when relevant. Do not paste config contents, prompts, provider responses, API keys, or absolute paths. / 如适用，请提供错误码和脱敏后的 `code-ctx doctor --strict` 输出。不要粘贴配置内容、Prompt、Provider 响应、API Key 或绝对路径。
+      render: shell
   - type: textarea
     id: extra
     attributes:

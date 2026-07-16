@@ -201,7 +201,7 @@ A plugin can contribute:
 - `scenarios`: scenarios to add or override (override by matching `id`)
 - `sensitivePatterns` / `sensitiveDetectionPatterns`: organization-internal redaction and detection rules
 
-See [`examples/plugin-basic/`](examples/plugin-basic/) for a minimal example. Plugin loading failures only emit a warning and never break builtin functionality.
+See [`examples/plugin-basic/`](examples/plugin-basic/) for a minimal example. Plugins are executable Node.js modules and should only be loaded from reviewed sources. Interactive terminals ask for first-use confirmation and persist trust; non-interactive environments such as CI must allow exact specs with `CODE_CTX_PLUGINS_ALLOW`. Reserve `CODE_CTX_PLUGINS_ALLOW_ALL=1` for isolated test environments whose configuration has already been reviewed. Plugin loading failures only emit a warning and never break builtin functionality.
 
 ## Web Dashboard
 

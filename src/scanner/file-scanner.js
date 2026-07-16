@@ -85,10 +85,7 @@ function scanProject(projectDir, projectType, options = {}) {
   const uniqueFiles = [...new Set(keyFiles)];
 
   // 限制文件数量
-  let limitedFiles = uniqueFiles;
-  if (uniqueFiles.length > maxFiles) {
-    limitedFiles = prioritizeFiles(uniqueFiles, projectType, registry).slice(0, maxFiles);
-  }
+  const limitedFiles = prioritizeFiles(uniqueFiles, projectType, registry).slice(0, maxFiles);
 
   // 限制 token 数量
   const result = limitByTokens(limitedFiles, maxTokens);
@@ -106,7 +103,8 @@ function scanProject(projectDir, projectType, options = {}) {
     promptHints: registry.getPromptHints(projectType),
     totalFiles: uniqueFiles.length,
     limitedTo: result.files.length,
-    estimatedTokens: result.tokens
+    estimatedTokens: result.tokens,
+    skippedFiles: result.skipped
   };
 }
 
@@ -164,13 +162,19 @@ function prioritizeFiles(files, projectType, registry = defaultRegistry) {
   return files.slice().sort((a, b) => {
     const aScore = registry.getFilePriority(projectType, a);
     const bScore = registry.getFilePriority(projectType, b);
-    return aScore - bScore;
+    if (aScore !== bScore) return aScore - bScore;
+    let aSize = Infinity;
+    let bSize = Infinity;
+    try { aSize = fs.statSync(a).size; } catch { /* unreadable files sort last */ }
+    try { bSize = fs.statSync(b).size; } catch { /* unreadable files sort last */ }
+    return aSize - bSize || a.localeCompare(b);
   });
 }
 
 function limitByTokens(files, maxTokens) {
   let totalTokens = 0;
   const resultFiles = [];
+  const skipped = [];
   
   for (const filePath of files) {
     if (!fs.existsSync(filePath)) continue;
@@ -184,15 +188,16 @@ function limitByTokens(files, maxTokens) {
     
     const fileTokens = estimateTokensForContent(content);
     
-    if (totalTokens + fileTokens > maxTokens && resultFiles.length > 0) {
-      break;
+    if (totalTokens + fileTokens > maxTokens) {
+      skipped.push({ path: filePath, reason: 'token-budget', estimatedTokens: fileTokens });
+      continue;
     }
     
     totalTokens += fileTokens;
     resultFiles.push(filePath);
   }
   
-  return { files: resultFiles, tokens: totalTokens };
+  return { files: resultFiles, tokens: totalTokens, skipped };
 }
 
 function buildTree(dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = null) {
@@ -357,11 +362,11 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
     }
   });
   const existing = stats.filter(Boolean);
-  const prioritized = existing.length > maxFiles
-    ? prioritizeFiles(existing.map(item => item.filePath), projectType, registry)
-      .slice(0, maxFiles)
-      .map(filePath => existing.find(item => item.filePath === filePath))
-    : existing;
+  const prioritized = existing.slice().sort((a, b) => {
+    const aScore = registry.getFilePriority(projectType, a.filePath);
+    const bScore = registry.getFilePriority(projectType, b.filePath);
+    return aScore - bScore || a.size - b.size || a.filePath.localeCompare(b.filePath);
+  }).slice(0, maxFiles);
 
   let plannedBytes = 0;
   const planned = [];
@@ -387,7 +392,10 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
     const estimated = item.sampleBytes < item.size && item.sampleBytes > 0
       ? Math.ceil(sampleTokens * (item.size / item.sampleBytes))
       : sampleTokens;
-    if (tokens + estimated > maxTokens && selected.length > 0) break;
+    if (tokens + estimated > maxTokens) {
+      skipped.push({ path: item.filePath, reason: 'token-budget', estimatedTokens: estimated });
+      continue;
+    }
     tokens += estimated;
     selected.push(item);
   }

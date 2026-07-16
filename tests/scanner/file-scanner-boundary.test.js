@@ -54,20 +54,19 @@ describe('scanProject — 限流分支', () => {
     }
   });
 
-  test('内容超过 maxTokens 时提前 break，至少保留 1 个文件', () => {
+  test('超大高优先级文件跳过后继续选择小文件', () => {
     const dir = createTmpDir();
     fs.mkdirSync(path.join(dir, 'src/components'), { recursive: true });
     try {
-      const huge = 'x'.repeat(200000); // 远超 maxTokens
-      for (let i = 0; i < 5; i++) {
-        fs.writeFileSync(path.join(dir, `src/components/Big${i}.jsx`), huge);
-      }
+      fs.writeFileSync(path.join(dir, 'src/App.jsx'), 'x'.repeat(200000));
+      fs.writeFileSync(path.join(dir, 'src/components/Small.jsx'), 'export default 1;');
 
       const result = scanProject(dir, 'react', { maxFiles: 100, maxTokens: 100 });
-      // 由于第一个文件已经超 maxTokens 但 resultFiles 为空，会保留它，
-      // 后续文件应 break
-      expect(result.keyFiles.length).toBeGreaterThanOrEqual(1);
-      expect(result.keyFiles.length).toBeLessThan(5);
+      expect(result.keyFiles.some(file => file.endsWith('Small.jsx'))).toBe(true);
+      expect(result.keyFiles.some(file => file.endsWith('App.jsx'))).toBe(false);
+      expect(result.skippedFiles).toEqual(expect.arrayContaining([
+        expect.objectContaining({ path: expect.stringContaining('App.jsx'), reason: 'token-budget' })
+      ]));
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

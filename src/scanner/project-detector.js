@@ -85,6 +85,7 @@ function detectProjectInDir(dirPath, registry = defaultRegistry) {
 function detectProjects(rootDir, options = {}) {
   const maxDepth = options.maxDepth ?? MAX_SCAN_DEPTH;
   const registry = options.registry || defaultRegistry;
+  const ignoreEngine = options.ignoreEngine || null;
   const projects = [];
   const visited = new Set();
 
@@ -112,6 +113,7 @@ function detectProjects(rootDir, options = {}) {
       if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
 
       const projectDir = path.join(dirPath, entry.name);
+      if (ignoreEngine?.ignores(projectDir)) continue;
       const type = detectProjectInDir(projectDir, registry);
 
       if (type) {

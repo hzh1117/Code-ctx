@@ -135,6 +135,27 @@ describe('updateCommand', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
   });
 
+  test('hash mode respects configured excludeDirs and .gitignore', async () => {
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }],
+      excludeDirs: ['vendor-cache']
+    }));
+    fs.writeFileSync(path.join(testDir, '.gitignore'), 'src/generated/\n');
+    fs.mkdirSync(path.join(testDir, 'src', 'generated'), { recursive: true });
+    fs.mkdirSync(path.join(testDir, 'src', 'vendor-cache'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'src', 'generated', 'ignored.js'), 'ignored');
+    fs.writeFileSync(path.join(testDir, 'src', 'vendor-cache', 'ignored.js'), 'ignored');
+    fs.writeFileSync(path.join(testDir, 'src', 'kept.js'), 'kept');
+    _clearCache();
+
+    const result = await updateCommand(testDir, { dryRun: true });
+    const normalized = result.changedFiles.map(file => file.replace(/\\/g, '/'));
+
+    expect(normalized).toContain('src/kept.js');
+    expect(normalized).not.toContain('src/generated/ignored.js');
+    expect(normalized).not.toContain('src/vendor-cache/ignored.js');
+  });
+
   test('default mode returns one executable merged prompt without state commits', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/app.js'), 'export const feature = true;');

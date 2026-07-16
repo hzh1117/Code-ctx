@@ -3,15 +3,9 @@ const path = require('path');
 const { updateCommand, executeUpdateTransaction } = require('./update');
 const { getAIConfig } = require('../utils/config');
 const { clearCache } = require('../template/engine');
+const { createIgnoreEngine } = require('../utils/ignore-engine');
 
 const DEFAULT_DEBOUNCE_MS = 5000;
-const IGNORED_DIRS = ['node_modules', '.git', 'dist', 'build', 'ai-docs'];
-
-function shouldIgnore(filePath) {
-  const parts = filePath.split(path.sep);
-  return parts.some(part => IGNORED_DIRS.includes(part));
-}
-
 async function watchCommand(rootDir, options = {}) {
   const debounceMs = options.debounce || DEFAULT_DEBOUNCE_MS;
   const autoApply = options.autoApply || false;
@@ -19,6 +13,7 @@ async function watchCommand(rootDir, options = {}) {
   const signal = options.signal || interruptController.signal;
   let debounceTimer = null;
   let isProcessing = false;
+  const ignoreEngine = createIgnoreEngine(rootDir);
 
   console.log('👀 监听文件变化中...');
   console.log(`   防抖间隔: ${debounceMs}ms`);
@@ -66,7 +61,7 @@ async function watchCommand(rootDir, options = {}) {
   }
 
   function onChange(filePath) {
-    if (shouldIgnore(filePath)) return;
+    if (ignoreEngine.ignores(filePath)) return;
 
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(processChanges, debounceMs);
@@ -78,7 +73,7 @@ async function watchCommand(rootDir, options = {}) {
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (IGNORED_DIRS.includes(entry.name)) continue;
+    if (ignoreEngine.ignores(path.join(rootDir, entry.name))) continue;
     if (entry.name.startsWith('.')) continue;
 
     const dirPath = path.join(rootDir, entry.name);

@@ -21,9 +21,7 @@ const {
 } = require('../core/doc-resolver');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
-
-const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'ai-docs'];
-const IGNORE_FILES = ['code-ctx.config.json', 'code-ctx.config.js'];
+const { createIgnoreEngine } = require('../utils/ignore-engine');
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
@@ -45,17 +43,16 @@ function normalizeFileEntry(entry) {
   return { mtimeMs: null, hash: null };
 }
 
-function getAllFiles(dir, ignoreDirs = IGNORE_DIRS) {
+function getAllFiles(dir, ignoreEngine) {
   const files = [];
   if (!fs.existsSync(dir)) return files;
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
-    if (entry.isDirectory() && ignoreDirs.includes(entry.name)) continue;
-    if (!entry.isDirectory() && IGNORE_FILES.includes(entry.name)) continue;
     const fullPath = path.join(dir, entry.name);
+    if (ignoreEngine.ignores(fullPath)) continue;
     if (entry.isDirectory()) {
-      files.push(...getAllFiles(fullPath, ignoreDirs));
+      files.push(...getAllFiles(fullPath, ignoreEngine));
     } else {
       files.push(fullPath);
     }
@@ -74,18 +71,15 @@ function loadLastScan(lastScanPath) {
   }
 }
 
-function filterIgnored(files) {
-  return files.filter(f => {
-    const topDir = f.replace(/\\/g, '/').split('/')[0];
-    return !IGNORE_DIRS.includes(topDir);
-  });
+function filterIgnored(files, ignoreEngine) {
+  return ignoreEngine.filter(files);
 }
 
 function getProjectFromPath(filePath) {
   return String(filePath).replace(/\\/g, '/').split('/')[0] || '.';
 }
 
-function detectFromGit(rootDir) {
+function detectFromGit(rootDir, ignoreEngine) {
   const lastCommit = getLastScanCommit(rootDir);
   const baseRef = lastCommit || 'HEAD';
   const diffFiles = getChangedFilesAgainst(rootDir, baseRef);
@@ -95,11 +89,11 @@ function detectFromGit(rootDir) {
 
   const lastScan = loadLastScan(path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN));
   const processedChanges = lastScan.processedChanges || {};
-  const untracked = filterIgnored(getUntrackedFiles(rootDir));
+  const untracked = filterIgnored(getUntrackedFiles(rootDir), ignoreEngine);
   const untrackedSet = new Set(untracked);
   const candidates = filterIgnored([
     ...new Set([...diffFiles, ...untracked, ...Object.keys(processedChanges)])
-  ]);
+  ], ignoreEngine);
   const changedFiles = candidates.filter(file => {
     const processed = processedChanges[file];
     if (!processed) return true;
@@ -126,10 +120,10 @@ function detectFromGit(rootDir) {
   };
 }
 
-function detectFromHash(rootDir, lastScanPath) {
+function detectFromHash(rootDir, lastScanPath, ignoreEngine) {
   const lastScan = loadLastScan(lastScanPath);
   const currentFiles = {};
-  const files = getAllFiles(rootDir);
+  const files = getAllFiles(rootDir, ignoreEngine);
 
   for (const file of files) {
     const relativePath = path.relative(rootDir, file);
@@ -184,18 +178,18 @@ function detectFromHash(rootDir, lastScanPath) {
   };
 }
 
-function detectChangedFiles(rootDir, lastScanPath) {
+function detectChangedFiles(rootDir, lastScanPath, ignoreEngine = createIgnoreEngine(rootDir)) {
   const useGit = hasGitRepo(rootDir);
 
   if (useGit) {
-    const gitResult = detectFromGit(rootDir);
+    const gitResult = detectFromGit(rootDir, ignoreEngine);
     if (!gitResult.gitFailed) {
       return { ...gitResult, useGit, hashScanState: null };
     }
   }
 
   // Hash fallback: triggered when !useGit, or git mode failed.
-  const hashResult = detectFromHash(rootDir, lastScanPath);
+  const hashResult = detectFromHash(rootDir, lastScanPath, ignoreEngine);
   return { ...hashResult, useGit };
 }
 

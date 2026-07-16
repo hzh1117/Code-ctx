@@ -3,6 +3,7 @@ const path = require('path');
 const { detectProjects } = require('../scanner/project-detector');
 const { loadProjectConfig } = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
+const { createIgnoreEngine } = require('../utils/ignore-engine');
 
 function createDiscoveryService(dependencies = {}) {
   const fileSystem = dependencies.fs || fs;
@@ -10,6 +11,7 @@ function createDiscoveryService(dependencies = {}) {
   const detect = dependencies.detectProjects || detectProjects;
   const loadConfig = dependencies.loadProjectConfig || loadProjectConfig;
   const initializePlugins = dependencies.initPlugins || initPlugins;
+  const buildIgnoreEngine = dependencies.createIgnoreEngine || createIgnoreEngine;
   const clock = dependencies.clock || { now: () => Date.now() };
   const logger = dependencies.logger;
   let runtimeContext = null;
@@ -43,9 +45,10 @@ function createDiscoveryService(dependencies = {}) {
       logger.verbose('目录存在 ✓');
 
       runtimeContext = initializePlugins(rootDir);
+      const ignoreEngine = buildIgnoreEngine(rootDir);
       logger.step('2/7', '检测子项目');
       const startTime = clock.now();
-      let projects = detect(rootDir, { registry: runtimeContext.registry });
+      let projects = detect(rootDir, { registry: runtimeContext.registry, ignoreEngine });
       logger.log(`检测到 ${projects.length} 个项目 (耗时 ${clock.now() - startTime}ms)`);
 
       if (logger.isVerbose()) {

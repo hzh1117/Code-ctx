@@ -118,6 +118,27 @@ describe('scanProject', () => {
     }
   });
 
+  test('excludes configured and gitignored files from snapshots and tree', () => {
+    const dir = createTmpDir();
+    fs.mkdirSync(path.join(dir, 'src', 'generated'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'src', 'vendor-cache'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.gitignore'), 'src/generated/\n');
+    fs.writeFileSync(path.join(dir, 'src', 'generated', 'ignored.js'), 'ignored');
+    fs.writeFileSync(path.join(dir, 'src', 'vendor-cache', 'ignored.js'), 'ignored');
+    fs.writeFileSync(path.join(dir, 'src', 'kept.js'), 'kept');
+    try {
+      const result = scanProject(dir, 'generic-js-ts', { excludeDirs: ['vendor-cache'] });
+      const relative = result.keyFiles.map(file => path.relative(dir, file).replace(/\\/g, '/'));
+      expect(relative).toContain('src/kept.js');
+      expect(relative).not.toContain('src/generated/ignored.js');
+      expect(relative).not.toContain('src/vendor-cache/ignored.js');
+      expect(result.tree).not.toContain('generated/');
+      expect(result.tree).not.toContain('vendor-cache/');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('should return redacted structured source snapshots', () => {
     const dir = createTmpDir();
     setupBaseFixtures(dir);

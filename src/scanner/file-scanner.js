@@ -6,6 +6,7 @@ const { defaultRegistry } = require('../adapters');
 const { CONTEXT_LIMITS, PROJECT_LIMITS } = require('../utils/constants');
 const { estimateTokensForContent } = require('../utils/token-estimator');
 const { filterSensitive } = require('../utils/sensitive-filter');
+const { createIgnoreEngine } = require('../utils/ignore-engine');
 
 const LANGUAGE_BY_EXTENSION = {
   '.c': 'c',
@@ -55,13 +56,16 @@ function scanProject(projectDir, projectType, options = {}) {
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   
   const registry = options.registry || defaultRegistry;
+  const ignoreEngine = options.ignoreEngine || createIgnoreEngine(projectDir, {
+    excludeDirs: options.excludeDirs
+  });
   const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
   const adapterPatterns = configuredPatterns || registry.getScanPatterns(projectType);
   const patterns = adapterPatterns.length > 0
     ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
     : [];
   const keyFiles = [];
-  const tree = buildTree(projectDir);
+  const tree = buildTree(projectDir, '', 0, 5, ignoreEngine);
 
   for (const pattern of patterns) {
     const matches = globSync(pattern, {
@@ -69,11 +73,13 @@ function scanProject(projectDir, projectType, options = {}) {
       absolute: true,
       nodir: true
     });
-    keyFiles.push(...matches);
+    keyFiles.push(...ignoreEngine.filter(matches));
   }
 
   keyFiles.push(...registry.extractKeyFiles(projectType, projectDir)
-    .filter(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile()));
+    .filter(filePath =>
+      fs.existsSync(filePath) && fs.statSync(filePath).isFile() && !ignoreEngine.ignores(filePath)
+    ));
 
   const uniqueFiles = [...new Set(keyFiles)];
 
@@ -188,7 +194,7 @@ function limitByTokens(files, maxTokens) {
   return { files: resultFiles, tokens: totalTokens };
 }
 
-function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
+function buildTree(dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = null) {
   if (depth >= maxDepth) return prefix + '└── ...\n';
 
   let entries;
@@ -204,7 +210,8 @@ function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
     e.name !== 'node_modules' &&
     e.name !== 'ai-docs' &&
     e.name !== 'code-ctx.config.json' &&
-    e.name !== 'code-ctx.config.js'
+    e.name !== 'code-ctx.config.js' &&
+    (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, e.name)))
   );
   let tree = '';
 
@@ -217,7 +224,7 @@ function buildTree(dir, prefix = '', depth = 0, maxDepth = 5) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       tree += `${prefix}${connector}${entry.name}/\n`;
-      tree += buildTree(fullPath, childPrefix, depth + 1, maxDepth);
+      tree += buildTree(fullPath, childPrefix, depth + 1, maxDepth, ignoreEngine);
     } else {
       tree += `${prefix}${connector}${entry.name}\n`;
     }

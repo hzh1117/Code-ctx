@@ -3,6 +3,7 @@ const path = require('path');
 const { scanProject } = require('../scanner/file-scanner');
 const { getProjectLimits } = require('../utils/config');
 const { STATE_FILES } = require('../utils/constants');
+const { createIgnoreEngine } = require('../utils/ignore-engine');
 
 function createFileStateStore(fileSystem = fs, pathImpl = path) {
   return {
@@ -50,6 +51,7 @@ function createSnapshotService(dependencies = {}) {
       logger.verbose('项目限制:', limits);
 
       const state = stateStore.load(outputDir);
+      const ignoreEngine = options.ignoreEngine || createIgnoreEngine(rootDir);
       const scanResults = {};
       logger.step('4/7', '扫描项目文件');
       for (const project of projects) {
@@ -63,7 +65,8 @@ function createSnapshotService(dependencies = {}) {
         const result = scanner(project.path, project.type, {
           ...limits,
           scanPatterns: project.scanPatterns,
-          registry: options.registry
+          registry: options.registry,
+          ignoreEngine
         });
         scanResults[project.alias] = result;
         logger.log(`扫描 ${project.name} 完成 (耗时 ${clock.now() - startedAt}ms)`);

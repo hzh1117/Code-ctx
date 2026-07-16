@@ -1,5 +1,6 @@
 const { renderTemplate, loadTemplate } = require('../template/engine');
 const { CONTEXT_LIMITS } = require('../utils/constants');
+const path = require('path');
 
 const LABELS = {
   zh: {
@@ -62,6 +63,17 @@ function formatSourceFiles(sourceFiles) {
 
     return `<source ${metadata.join(' ')}>\n${file.content || ''}\n</source>`;
   }).join('\n\n');
+}
+
+function relativeProjectPath(projectPath) {
+  if (!projectPath) return '';
+  if (!path.isAbsolute(projectPath)) return String(projectPath).replace(/\\/g, '/');
+
+  const relative = path.relative(process.cwd(), projectPath);
+  if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+    return relative.replace(/\\/g, '/');
+  }
+  return path.basename(projectPath);
 }
 
 function buildUsePrompt({ taskDescription, projectContext, overviewContent, relatedDocs, template, language }) {
@@ -138,7 +150,7 @@ function buildOneShotPrompt({ projects, scanResults, language } = {}) {
     return `## ${p.alias}
 ${labels.projectName}：${p.name}
 ${labels.projectType}：${p.type}
-${labels.projectPath}：${p.path}
+${labels.projectPath}：${relativeProjectPath(p.path)}
 
 ${labels.dirStructure}：
 ${limitText(result.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree')}
@@ -177,7 +189,7 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',
     projectType: projectObj.type || '',
-    projectPath: projectObj.path || '',
+    projectPath: relativeProjectPath(projectObj.path),
     tree: limitText(scanObj.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree'),
     keyFiles: (scanObj.sourceFiles || []).map(file => file.path).join('\n') || (scanObj.keyFiles || []).join('\n'),
     sourceEvidence: formatSourceFiles(scanObj.sourceFiles),
@@ -236,7 +248,7 @@ function buildApiPrompt({ project, scanResult, language }) {
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',
     projectType: projectObj.type || '',
-    projectPath: projectObj.path || '',
+    projectPath: relativeProjectPath(projectObj.path),
     tree: scanObj.tree || '',
     controllerFiles: categories.controllerFiles.join('\n') || '未找到 Controller 文件',
     serviceFiles: categories.serviceFiles.join('\n') || '未找到 Service 文件',
@@ -255,7 +267,7 @@ function buildDatabasePrompt({ project, scanResult, language }) {
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',
     projectType: projectObj.type || '',
-    projectPath: projectObj.path || '',
+    projectPath: relativeProjectPath(projectObj.path),
     tree: scanObj.tree || '',
     entityFiles: categories.entityFiles.join('\n') || '未找到 Entity/Model 文件',
     repositoryFiles: categories.repositoryFiles.join('\n') || '未找到 Repository/Mapper 文件',

@@ -4,6 +4,7 @@ const net = require('net');
 const dns = require('dns').promises;
 const { AI_CLIENT } = require('../utils/constants');
 const { evaluateContextBudget } = require('../utils/token-estimator');
+const { redactOutboundMessages } = require('./privacy-gateway');
 
 const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
 const MAX_RETRIES = AI_CLIENT.MAX_RETRIES;
@@ -327,18 +328,19 @@ async function callOpenAIWithMessages(messages, options) {
     dnsLookup
   } = options;
 
-  assertMessagesWithinBudget(messages, options);
+  const safeMessages = redactOutboundMessages(messages, options.onRedactionAudit).messages;
+  assertMessagesWithinBudget(safeMessages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
   await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
   const url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
-  const body = JSON.stringify({ model, max_tokens: maxTokens, messages });
+  const body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages });
 
   debugLog('OpenAI请求开始', {
     url: url.toString(),
     model,
     maxTokens,
     timeout,
-    messagesCount: messages.length,
+    messagesCount: safeMessages.length,
     retry: 1
   });
 
@@ -388,11 +390,12 @@ async function callAnthropicWithMessages(messages, options) {
     dnsLookup
   } = options;
 
-  assertMessagesWithinBudget(messages, options);
+  const safeMessages = redactOutboundMessages(messages, options.onRedactionAudit).messages;
+  assertMessagesWithinBudget(safeMessages, options);
   const parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
   await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
   const normalizedBaseUrl = trimTrailingSlashes(parsedBaseUrl.toString());
-  const anthropicPayload = normalizeAnthropicMessages(messages);
+  const anthropicPayload = normalizeAnthropicMessages(safeMessages);
 
   // 处理不同的 baseUrl 格式：已含 /v1 直接拼 /messages，否则补默认 /v1/messages
   const url = normalizedBaseUrl.includes('/v1')
@@ -414,7 +417,7 @@ async function callAnthropicWithMessages(messages, options) {
     model,
     maxTokens,
     timeout,
-    messagesCount: messages.length,
+    messagesCount: safeMessages.length,
     retry: 1
   });
 
@@ -469,7 +472,8 @@ async function generateWithAI(prompt, options = {}) {
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
-    dnsLookup
+    dnsLookup,
+    onRedactionAudit
   } = options;
 
   if (!apiKey) {
@@ -478,7 +482,7 @@ async function generateWithAI(prompt, options = {}) {
 
   const callOptions = {
     apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
-    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup
+    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit
   };
 
   if (protocol === 'openai') {
@@ -501,7 +505,8 @@ async function generateFromMessages(messages, options = {}) {
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
-    dnsLookup
+    dnsLookup,
+    onRedactionAudit
   } = options;
 
   if (!apiKey) {
@@ -510,7 +515,7 @@ async function generateFromMessages(messages, options = {}) {
 
   const callOptions = {
     apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
-    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup,
+    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit,
     returnMetadata: true
   };
 
@@ -644,7 +649,8 @@ function generateWithAIStream(prompt, options = {}) {
     timeout = DEFAULT_TIMEOUT,
     allowLocalBaseUrl,
     allowInsecureBaseUrl,
-    dnsLookup
+    dnsLookup,
+    onRedactionAudit
   } = options;
 
   if (!apiKey) {
@@ -655,7 +661,11 @@ function generateWithAIStream(prompt, options = {}) {
   const doStream = async () => {
     try {
       let parsedBaseUrl, url, headers, body;
-      assertMessagesWithinBudget([{ role: 'user', content: prompt }], {
+      const safeMessages = redactOutboundMessages(
+        [{ role: 'user', content: prompt }],
+        onRedactionAudit
+      ).messages;
+      assertMessagesWithinBudget(safeMessages, {
         maxInputTokens,
         maxTokens
       });
@@ -668,7 +678,7 @@ function generateWithAIStream(prompt, options = {}) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         };
-        body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }], stream: true });
+        body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages, stream: true });
       } else if (protocol === 'anthropic') {
         parsedBaseUrl = validateBaseUrl(baseUrl, { allowLocalBaseUrl, allowInsecureBaseUrl });
         await validateResolvedBaseUrl(parsedBaseUrl, { allowLocalBaseUrl, dnsLookup });
@@ -681,7 +691,7 @@ function generateWithAIStream(prompt, options = {}) {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
         };
-        body = JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }], stream: true });
+        body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages, stream: true });
       } else {
         throw new Error(`不支持的协议: ${protocol}`);
       }

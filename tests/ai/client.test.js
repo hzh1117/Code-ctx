@@ -468,6 +468,64 @@ describe('generateWithAI', () => {
   });
 });
 
+describe('outbound prompt privacy', () => {
+  test('redacts all roles before real HTTP requests and emits value-free audits', async () => {
+    const requests = [];
+    const server = http.createServer((req, res) => {
+      let body = '';
+      req.setEncoding('utf8');
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        requests.push(JSON.parse(body));
+        res.setHeader('Content-Type', 'application/json');
+        const content = requests.length === 1
+          ? 'api_key = "provider-secret" in /home/provider/private <<<CONTINUE>>>'
+          : 'done';
+        res.end(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }));
+      });
+    });
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+
+    const audits = [];
+    try {
+      const { port } = server.address();
+      await generateWithContinuation(
+        'read C:\\Users\\alice\\private\\config.js with token=initial-secret-value',
+        {
+          apiKey: 'transport-key',
+          protocol: 'openai',
+          baseUrl: `http://127.0.0.1:${port}/v1`,
+          model: 'test-model',
+          maxTokens: 50,
+          systemPrompt: 'workspace /home/alice/private/project',
+          allowLocalBaseUrl: true,
+          allowInsecureBaseUrl: true,
+          onRedactionAudit: audit => audits.push(audit)
+        }
+      );
+
+      expect(requests).toHaveLength(2);
+      const outbound = JSON.stringify(requests);
+      expect(outbound).not.toContain('C:\\\\Users\\\\alice');
+      expect(outbound).not.toContain('/home/alice');
+      expect(outbound).not.toContain('/home/provider');
+      expect(outbound).not.toContain('initial-secret-value');
+      expect(outbound).not.toContain('provider-secret');
+      expect(outbound).toContain('[REDACTED_PATH]');
+      expect(outbound).toContain('[FILTERED]');
+      expect(requests[1].messages.map(message => message.role)).toEqual([
+        'system', 'user', 'assistant', 'user'
+      ]);
+      expect(audits).toHaveLength(2);
+      expect(audits[1].messages.some(message => message.role === 'assistant')).toBe(true);
+      expect(JSON.stringify(audits)).not.toContain('alice');
+      expect(JSON.stringify(audits)).not.toContain('provider-secret');
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+});
+
 describe('AI retry mechanism', () => {
   const baseOpts = {
     apiKey: 'key',

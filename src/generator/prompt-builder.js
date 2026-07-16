@@ -1,6 +1,7 @@
 const { renderTemplate, loadTemplate } = require('../template/engine');
 const { CONTEXT_LIMITS } = require('../utils/constants');
 const path = require('path');
+const { extractSection } = require('../core/section');
 
 const LABELS = {
   zh: {
@@ -123,14 +124,68 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
   return parts.join('\n');
 }
 
-function buildOverviewPrompt({ config, generatedDocs, language } = {}) {
+const OVERVIEW_SUMMARY_SECTIONS = [
+  'overview', 'modules', 'api', 'data', 'dependencies', 'notes', 'quickstart'
+];
+
+function summarizeProjectDocument(doc) {
+  const sections = OVERVIEW_SUMMARY_SECTIONS.map(section => {
+    const content = extractSection(doc || '', section);
+    if (content == null) return null;
+    return `#### section:${section}\n${limitText(content.trim(), 1200, section)}`;
+  }).filter(Boolean);
+  return sections.length > 0 ? sections.join('\n\n') : '(no structured sections available)';
+}
+
+function buildRelationshipEvidence(projects, scanResults) {
+  const aliases = new Set(projects.map(project => project.alias));
+  const evidence = [];
+  for (const project of projects) {
+    const sources = scanResults?.[project.alias]?.sourceFiles || [];
+    for (const source of sources) {
+      if (source.path === 'package.json') {
+        try {
+          const pkg = JSON.parse(source.content);
+          const dependencies = {
+            ...(pkg.dependencies || {}),
+            ...(pkg.devDependencies || {}),
+            ...(pkg.peerDependencies || {})
+          };
+          for (const dependency of Object.keys(dependencies)) {
+            if (aliases.has(dependency) && dependency !== project.alias) {
+              evidence.push(`- [${project.alias}:${source.path}] dependency -> ${dependency}`);
+            }
+          }
+          if (pkg.workspaces) {
+            evidence.push(`- [${project.alias}:${source.path}] workspace declaration: ${JSON.stringify(pkg.workspaces)}`);
+          }
+        } catch {
+          // Truncated or non-JSON package evidence is handled by import evidence below.
+        }
+      }
+
+      const imports = source.content.matchAll(
+        /(?:from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g
+      );
+      for (const match of imports) {
+        const target = [...aliases].find(alias => alias !== project.alias && match[1].includes(alias));
+        if (target) evidence.push(`- [${project.alias}:${source.path}] import "${match[1]}" -> ${target}`);
+      }
+    }
+  }
+  return evidence.length > 0
+    ? [...new Set(evidence)].join('\n')
+    : '- No cross-project relationship evidence found. Do not infer project calls or data flow.';
+}
+
+function buildOverviewPrompt({ config, generatedDocs, scanResults, language } = {}) {
   const configObj = config || {};
   const projects = configObj.projects || [];
   const docs = generatedDocs || {};
 
   const projectSummaries = limitText(projects.map(p => {
     const doc = docs[p.alias] || '';
-    const summary = doc.split('\n').slice(0, 20).join('\n');
+    const summary = summarizeProjectDocument(doc);
     return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
   }).join('\n'), CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS, 'project summaries');
 
@@ -138,7 +193,8 @@ function buildOverviewPrompt({ config, generatedDocs, language } = {}) {
   return renderTemplate(tpl, {
     projectName: configObj.projectName || '',
     projectList: projects.map(p => `- ${p.alias}: ${p.label} (${p.type})`).join('\n'),
-    projectSummaries
+    projectSummaries,
+    relationshipEvidence: buildRelationshipEvidence(projects, scanResults || {})
   });
 }
 
@@ -209,7 +265,7 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
 // 新代码请直接调用 buildOverviewPrompt / buildOneShotPrompt / buildSubprojectPrompt
 function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs, language } = {}) {
   if (type === 'overview') {
-    return buildOverviewPrompt({ config, generatedDocs, language });
+    return buildOverviewPrompt({ config, generatedDocs, scanResults, language });
   }
   if (type === 'one-shot') {
     return buildOneShotPrompt({ projects, scanResults, language });

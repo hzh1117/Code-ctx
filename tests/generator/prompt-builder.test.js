@@ -114,7 +114,7 @@ describe('prompt-builder', () => {
       const result = buildInitPrompt({
         type: 'overview',
         config: { projectName: 'test-app', projects: [{ alias: 'web', label: '前端', type: 'react' }] },
-        generatedDocs: { web: '# 前端项目\n这是一个React应用' }
+        generatedDocs: { web: '<!-- section:overview -->\n# 前端项目\n这是一个React应用\n<!-- /section:overview -->' }
       });
 
       expect(result).toContain('OVERVIEW');
@@ -346,15 +346,51 @@ describe('prompt-builder', () => {
       expect(result).not.toContain('undefined');
     });
 
-    test('generatedDocs 文档被截断到前 20 行', () => {
-      const longDoc = Array.from({ length: 60 }, (_, i) => `Line ${i}`).join('\n');
+    test('按 section 提取摘要而不是截取前 20 行', () => {
+      const longDoc = [
+        ...Array.from({ length: 30 }, (_, i) => `Noise ${i}`),
+        '<!-- section:overview -->',
+        'Structured overview',
+        '<!-- /section:overview -->',
+        '<!-- section:dependencies -->',
+        'Structured dependencies',
+        '<!-- /section:dependencies -->'
+      ].join('\n');
       const result = buildOverviewPrompt({
         config: { projectName: 'p', projects: [{ alias: 'x', label: 'X', type: 't' }] },
         generatedDocs: { x: longDoc }
       });
-      expect(result).toContain('Line 0');
-      expect(result).toContain('Line 19');
-      expect(result).not.toContain('Line 30');
+      expect(result).toContain('Structured overview');
+      expect(result).toContain('Structured dependencies');
+      expect(result).not.toContain('Noise 0');
+    });
+
+    test('cross-project relationships include source citations', () => {
+      const result = buildOverviewPrompt({
+        config: {
+          projectName: 'p',
+          projects: [
+            { alias: 'web', label: 'Web', type: 'react' },
+            { alias: 'api', label: 'API', type: 'node-backend' }
+          ]
+        },
+        generatedDocs: {},
+        scanResults: {
+          web: {
+            sourceFiles: [{
+              path: 'package.json',
+              content: JSON.stringify({ dependencies: { api: 'workspace:*' } })
+            }, {
+              path: 'src/client.js',
+              content: "import client from '@workspace/api';"
+            }]
+          }
+        }
+      });
+
+      expect(result).toContain('[web:package.json] dependency -> api');
+      expect(result).toContain('[web:src/client.js] import "@workspace/api" -> api');
+      expect(result).toContain('禁止根据项目名称猜测');
     });
   });
 

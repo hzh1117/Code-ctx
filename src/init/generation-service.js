@@ -259,7 +259,8 @@ function createGenerationService(dependencies = {}) {
     const raw = await generateDocument(buildPrompt({
       type: 'overview',
       config: ctx.config,
-      generatedDocs: ctx.generatedDocs
+      generatedDocs: ctx.generatedDocs,
+      scanResults: ctx.scanResults
     }), ctx.aiConfig, 'OVERVIEW');
     const overview = await completeMissingSections(
       validator.sanitize(raw),

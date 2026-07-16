@@ -187,103 +187,103 @@
 
 ## P2：架构、维护性与测试缺口
 
-### P2-01 `init.js` 是职责过载的流程巨石
+### P2-01 `init.js` 是职责过载的流程巨石（已完成）
 
 - **影响**：扫描、策略、AI、状态、并发、校验和写盘耦合在 600 多行文件中，难以替换组件或精确测试事务边界。
 - **证据**：`src/commands/init.js:1-636`；主函数在 `src/commands/init.js:608-633` 直接编排所有副作用。
 - **完成标准**：拆为 discovery、snapshot、planning、generation、validation、commit 六个服务；通过依赖注入提供 AI、FS、clock 和 state store。
 
-### P2-02 Adapter 存在未使用的扩展点
+### P2-02 Adapter 存在未使用的扩展点（已完成）
 
 - **影响**：贡献者实现 `getPromptHints()`、`extractKeyFiles()` 不会产生任何效果，接口具有误导性。
 - **证据**：定义见 `src/adapters/base.js:36-41`，各内置适配器均实现；生产代码只使用 registry 的 detect、scanPatterns 和 priority，见 `src/adapters/registry.js:17-35`。
 - **完成标准**：要么接入扫描和 Prompt 规划，要么从公共接口删除；为每个扩展点增加契约测试。
 
-### P2-03 插件 Adapter 校验契约自相矛盾
+### P2-03 插件 Adapter 校验契约自相矛盾（已完成）
 
 - **影响**：鸭子类型对象能通过插件校验，却会被 registry 的 `instanceof BaseAdapter` 拒绝。
 - **证据**：`src/plugins/loader.js:164-166` 与 `src/adapters/registry.js:10-13`。
 - **完成标准**：统一为显式 schema/接口校验或统一继承要求；错误应在加载前一次性报告。
 
-### P2-04 插件使用进程级全局可变状态
+### P2-04 插件使用进程级全局可变状态（已完成）
 
 - **影响**：Dashboard 多项目、程序化 API 和并行测试可能发生跨 root 污染；重新注册 Adapter 后 registry 本身也不会随 `_reset()` 清空。
 - **证据**：`src/plugins/state.js:10-18` 保存单例状态；`src/plugins/loader.js:269-275` reset state 后向全局 `defaultRegistry` 注册。
 - **完成标准**：创建每个 root/request 独立的运行上下文和 registry；插件加载结果可缓存但必须不可变且按 root 键控。
 
-### P2-05 配置 schema 只警告，不阻止无效配置进入运行路径
+### P2-05 配置 schema 只警告，不阻止无效配置进入运行路径（已完成）
 
 - **影响**：类型或字段错误可能在更深层以难懂异常爆炸，schema 的“安全”承诺有限。
 - **证据**：`src/utils/config.js:120-127` 只 `console.warn` 后继续返回配置。
 - **完成标准**：区分可迁移警告与阻断错误；CLI 提供 `config validate`；写入和加载共享同一严格 schema。
 
-### P2-06 JS 配置仍执行动态代码
+### P2-06 JS 配置仍执行动态代码（已完成）
 
 - **影响**：VM 并非可靠安全边界，项目自己也把它列为已知风险；插件和旧配置共同扩大执行面。
 - **证据**：`src/utils/config.js:130-142` 使用 `vm.runInNewContext`；`README.md:280-283` 仍将沙箱边界列为风险。
 - **完成标准**：默认停止生成 JS 配置，给出迁移工具；长期移除执行式配置或只解析受限数据语法。
 
-### P2-07 更新扫描忽略用户配置的 excludeDirs
+### P2-07 更新扫描忽略用户配置的 excludeDirs（已完成）
 
 - **影响**：大型仓库会遍历 coverage、vendor、缓存或生成目录，造成性能和错误变更噪声。
 - **证据**：`src/commands/update.js:15` 使用硬编码列表；`src/commands/update.js:37-51` 全量递归，不读取项目配置。
 - **完成标准**：统一 ignore engine，合并 `.gitignore`、默认规则和 `excludeDirs`；Scanner、update、doctor、watch 共用。
 
-### P2-08 大量同步文件系统操作阻塞 CLI 和 Dashboard
+### P2-08 大量同步文件系统操作阻塞 CLI 和 Dashboard（已完成）
 
 - **影响**：大仓库中 `readdirSync/readFileSync/statSync` 会阻塞事件循环，Dashboard 请求期间尤为明显。
 - **证据**：`src/scanner/file-scanner.js:68`、`src/commands/update.js:41-48`、`src/commands/update.js:103-119`。
 - **完成标准**：使用受控并发的异步 IO；大文件先 stat 和采样；为扫描设置时间、文件数和字节预算。
 
-### P2-09 token 限制算法会因一个大文件提前停止
+### P2-09 token 限制算法会因一个大文件提前停止（已完成）
 
 - **影响**：遇到超预算文件后直接 `break`，后面大量更小、更关键的文件不会被考虑；第一个文件即使超预算仍会被加入。
 - **证据**：`src/scanner/file-scanner.js:73-80`。
 - **完成标准**：先按价值/大小规划；超大文件分段或跳过并继续；返回被跳过原因。
 
-### P2-10 生成配置存在内存配置与磁盘配置不一致
+### P2-10 生成配置存在内存配置与磁盘配置不一致（已完成）
 
 - **影响**：已有配置且未 force 时，函数不加载磁盘内容，而是返回本轮新构造的默认配置；后续 overview 可能忽略已有 label、插件或自定义项目信息。
 - **证据**：`src/commands/init.js:223-247` 在配置存在时直接返回局部 `config`。
 - **完成标准**：读取并规范化现有配置，与新探测结果执行可审计 merge；明确冲突策略。
 
-### P2-11 Overview 只取子文档前 20 行却要求推断全局关系
+### P2-11 Overview 只取子文档前 20 行却要求推断全局关系（已完成）
 
 - **影响**：API、依赖和数据流常位于后续 section，模型依据残缺摘要生成依赖矩阵，容易幻觉。
 - **证据**：`src/generator/prompt-builder.js:88-99`；模板要求架构和依赖矩阵见 `templates/scan-prompt-overview.md:10-16`。
 - **完成标准**：按 section 提取结构化摘要；关系必须从 import、workspace、调用配置等证据生成并带引用。
 
-### P2-12 `use` 的压缩策略固定丢弃关键 section
+### P2-12 `use` 的压缩策略固定丢弃关键 section（已完成）
 
 - **影响**：Prompt 超过 8000 字符后，只保留 overview、modules、notes，API、data、dependencies 等任务关键内容会消失。
 - **证据**：`src/commands/use.js:13-18` 定义固定 section；`src/commands/use.js:94-119` 执行压缩。
 - **完成标准**：根据任务场景选择 section；按 token 而不是字符预算；输出被删除内容的摘要和原因。
 
-### P2-13 英文 Prompt 压缩后可能退回中文标签
+### P2-13 英文 Prompt 压缩后可能退回中文标签（已完成）
 
 - **影响**：`compactPrompt` 重建 Prompt 时没有把 `language` 传给 `buildUsePrompt`，英文工作流在触发压缩后语言不一致。
 - **证据**：`src/commands/use.js:94-119` 缺少 language 参数；调用处 `src/commands/use.js:194-196` 也未传入。
 - **完成标准**：压缩函数接收完整构建上下文；增加英文超阈值测试。
 
-### P2-14 Web 生成 Prompt 重复执行上下文构建
+### P2-14 Web 生成 Prompt 重复执行上下文构建（已完成）
 
 - **影响**：先调用 `useCommand`，随后又调用 `buildContext`，重复场景解析和文件读取，且两个结果存在漂移风险。
 - **证据**：`src/web/api/handlers/generate-prompt.js:12-28`。
 - **完成标准**：一次调用返回最终 Prompt、场景和预算；Web 和 CLI 使用同一 application service。
 
-### P2-15 集成测试绕过真实核心链路
+### P2-15 集成测试绕过真实核心链路（已完成）
 
 - **影响**：被命名为 Full Flow 的测试无法发现源码未进入 Prompt、模型响应不兼容或文档事实错误。
 - **证据**：`tests/integration/full-flow.test.js:21-40` 使用 `skipAi: true`；`tests/commands/init-continuation.test.js:4-9` 完全 mock AI。
 - **完成标准**：使用本地兼容 HTTP server 跑 `init -> docs -> update --apply -> use`；断言实际请求体含源码/diff和最终 Markdown 事实。
 
-### P2-16 update 测试存在明显假阳性
+### P2-16 update 测试存在明显假阳性（已完成）
 
 - **影响**：“生成增量 Prompt”用例仅检查属性存在，不要求非空、含 diff 或可执行，因此当前默认无输出缺陷仍能通过。
 - **证据**：`tests/commands/update.test.js:81-98`；文件级 mock 见 `tests/commands/update.test.js:2-8`。
 - **完成标准**：断言 Prompt 内容、状态提交时机、失败重试、删除文件、dry-run 纯度和 CLI 退出码。
 
-### P2-17 没有真实模型或可选兼容性 smoke test
+### P2-17 没有真实模型或可选兼容性 smoke test（已完成）
 
 - **影响**：本地 HTTP 测试能证明重试传输，却不能证明当前默认模型、请求字段和返回格式在真实提供商可用。
 - **证据**：AI 测试全部使用 mock 或本地 server，例如 `tests/ai/client.test.js:324-448`。
@@ -291,61 +291,61 @@
 
 ## P3：工程质量与体验完善
 
-### P3-01 安装流程不符合常见 npm CLI 预期
+### P3-01 安装流程不符合常见 npm CLI 预期（已完成）
 
 - **影响**：首次使用需要 clone、根目录安装、Web 安装与构建、`npm link`，五分钟上手困难。
 - **证据**：`README.md:55-63`。
 - **完成标准**：README 首选 `npm install -g code-ctx` 或 `npx code-ctx`；源码开发流程移到贡献章节；发布前增加 `npm pack` smoke test。
 
-### P3-02 快速开始在配置 API Key 之前要求运行 init
+### P3-02 快速开始在配置 API Key 之前要求运行 init（已完成）
 
 - **影响**：用户按顺序操作会得到空文档和误导性成功消息。
 - **证据**：初始化步骤在 `README.md:65-71`，Key 配置到 `README.md:120-135` 才出现。
 - **完成标准**：提供 setup 向导；快速开始按安装、配置、连接测试、init、检查产物排序。
 
-### P3-03 AI 阶段缺少进度、取消和请求摘要
+### P3-03 AI 阶段缺少进度、取消和请求摘要（已完成）
 
 - **影响**：长时间等待时用户无法区分正常生成、限流重试和卡死。
 - **证据**：`src/commands/init.js:332-346` one-shot 阶段只有普通日志；底层重试只打印等待秒数，见 `src/ai/client.js:239-247`。
 - **完成标准**：显示阶段、项目、请求序号、累计耗时和 deadline；非 TTY 输出结构化日志；支持 Ctrl+C。
 
-### P3-04 自定义 help 漏掉 dashboard
+### P3-04 自定义 help 漏掉 dashboard（已完成）
 
 - **影响**：命令已经注册，但手写帮助清单不完整，帮助信息存在两个事实来源。
 - **证据**：注册见 `bin/cli.js:13-21`；手写命令列表见 `bin/cli.js:33-42`。
 - **完成标准**：删除手写重复清单或从 Commander 元数据自动生成；增加 help 快照测试。
 
-### P3-05 `npm run check` 不包含 lint
+### P3-05 `npm run check` 不包含 lint（已完成）
 
 - **影响**：贡献指南和 PR 模板要求运行 check，但它无法发现 lint 问题。
 - **证据**：`package.json:24-29`；PR 模板只要求 `npm run check`，见 `.github/PULL_REQUEST_TEMPLATE.md:14-17`。
 - **完成标准**：`check` 至少包含 lint、test、coverage threshold、Web build 和 package smoke test。
 
-### P3-06 lint 脚本没有检查 Web 源码
+### P3-06 lint 脚本没有检查 Web 源码（已完成）
 
 - **影响**：ESLint 配置虽包含 Web override，脚本只扫描 `src/ bin/`，前端代码不会进入 lint。
 - **证据**：`package.json:27` 与 `.eslintrc.json:35-40`。
 - **完成标准**：根 lint 覆盖 `web/src`，或在 Web package 定义独立 lint 并由根 check/CI 调用。
 
-### P3-07 没有格式化、类型检查和覆盖率门槛
+### P3-07 没有格式化、类型检查和覆盖率门槛（已完成）
 
 - **影响**：大量 CommonJS/JSDoc 代码只能靠运行时测试，风格和接口漂移缺少自动门禁；覆盖率下降不会阻断 CI。
 - **证据**：`package.json:24-32` 没有 format/typecheck；`package.json:72-78` 只有 coverage ignore，没有 threshold。
 - **完成标准**：增加 Prettier 检查、TypeScript `checkJs` 或迁移计划、分层覆盖率阈值。
 
-### P3-08 CI 平台和 Node 矩阵与声明不一致
+### P3-08 CI 平台和 Node 矩阵与声明不一致（已完成）
 
 - **影响**：只在 Ubuntu 测试一个高度依赖路径和剪贴板行为的跨平台 CLI；同时测试不受支持的 Node 18。
 - **证据**：`package.json:55-56` 要求 Node 20；`.github/workflows/ci.yml:14-21` 矩阵含 18；注释还声称 engines 为 `>=16`。
 - **完成标准**：主矩阵改为 Node 20/22；增加 Windows smoke job；修正文档注释。
 
-### P3-09 高危依赖审计不阻断 CI
+### P3-09 高危依赖审计不阻断 CI（已完成）
 
 - **影响**：即使根 CLI 或 Dashboard 出现 high severity 漏洞，主分支仍可保持绿色。
 - **证据**：`.github/workflows/ci.yml:52-56` 设置 `continue-on-error: true`。
 - **完成标准**：生产依赖 high/critical 阻断；允许的例外必须有带到期日的审计清单。
 
-### P3-10 第二次“深度扫描”实际是无效调用
+### P3-10 第二次“深度扫描”实际是无效调用（已完成）
 
 - **影响**：代码和注释误导维护者，以为存在第二阶段 monorepo 扫描；根目录已在 visited 中，第二次调用立即返回。
 - **证据**：visited 判断见 `src/scanner/project-detector.js:82-84`；第二次调用见 `src/scanner/project-detector.js:119-122`。

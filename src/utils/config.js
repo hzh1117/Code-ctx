@@ -158,9 +158,12 @@ function loadProjectConfig(rootDir) {
     : loadConfigWithVM(info.path);
   const value = normalizeProjectPaths(rootDir, parsedValue, info.path);
 
-  const errors = validateProjectConfig(value);
-  if (errors.length > 0 && !warnedSchema.has(info.path)) {
-    console.warn(`[code-ctx] 配置 schema 警告 (${path.basename(info.path)}): ${errors.join('; ')}`);
+  const validation = validateProjectConfigDetailed(value);
+  if (validation.errors.length > 0) {
+    throw new ConfigValidationError(info.path, validation.errors, validation.warnings);
+  }
+  if (validation.warnings.length > 0 && !warnedSchema.has(info.path)) {
+    console.warn(`[code-ctx] 配置迁移警告 (${path.basename(info.path)}): ${validation.warnings.join('; ')}`);
     warnedSchema.add(info.path);
   }
 
@@ -193,17 +196,28 @@ const ALLOWED_TOP_KEYS = new Set([
 
 const ALLOWED_AI_MODES = new Set(['clipboard', 'auto', 'manual']);
 
-function validateProjectConfig(config) {
+class ConfigValidationError extends Error {
+  constructor(configPath, errors, warnings = []) {
+    super(`配置 schema 校验失败 (${path.basename(configPath)}): ${errors.join('; ')}`);
+    this.name = 'ConfigValidationError';
+    this.configPath = configPath;
+    this.errors = errors;
+    this.warnings = warnings;
+  }
+}
+
+function validateProjectConfigDetailed(config) {
   const errors = [];
-  if (config == null) return errors;
+  const warnings = [];
+  if (config == null) return { errors, warnings };
   if (typeof config !== 'object' || Array.isArray(config)) {
     errors.push('配置必须是对象');
-    return errors;
+    return { errors, warnings };
   }
 
   for (const key of Object.keys(config)) {
     if (!ALLOWED_TOP_KEYS.has(key)) {
-      errors.push(`未知字段: ${key}`);
+      warnings.push(`未知字段: ${key}`);
     }
   }
 
@@ -219,15 +233,23 @@ function validateProjectConfig(config) {
   if (config.gitTrack !== undefined && typeof config.gitTrack !== 'boolean') {
     errors.push('gitTrack 必须是布尔值');
   }
-  if (config.excludeDirs !== undefined && !Array.isArray(config.excludeDirs)) {
-    errors.push('excludeDirs 必须是数组');
+  if (config.excludeDirs !== undefined && (
+    !Array.isArray(config.excludeDirs) || config.excludeDirs.some(dir => typeof dir !== 'string')
+  )) {
+    errors.push('excludeDirs 必须是字符串数组');
   }
-  if (config.plugins !== undefined && !Array.isArray(config.plugins)) {
-    errors.push('plugins 必须是数组');
+  if (config.plugins !== undefined && (
+    !Array.isArray(config.plugins) || config.plugins.some(plugin => typeof plugin !== 'string')
+  )) {
+    errors.push('plugins 必须是字符串数组');
   }
   if (config.projects !== undefined) {
     if (!Array.isArray(config.projects)) {
-      errors.push('projects 必须是数组');
+      if (config.projects && typeof config.projects === 'object') {
+        warnings.push('projects 对象映射是旧格式，建议迁移为数组');
+      } else {
+        errors.push('projects 必须是数组');
+      }
     } else {
       config.projects.forEach((p, i) => {
         if (!p || typeof p !== 'object' || Array.isArray(p)) {
@@ -253,12 +275,34 @@ function validateProjectConfig(config) {
   }
   if (config.ai !== undefined && (typeof config.ai !== 'object' || Array.isArray(config.ai))) {
     errors.push('ai 必须是对象');
+  } else if (config.ai) {
+    if (config.ai.protocol !== undefined && !['openai', 'anthropic'].includes(config.ai.protocol)) {
+      errors.push('ai.protocol 必须是 openai|anthropic 之一');
+    }
+    for (const field of ['timeout', 'maxInputTokens']) {
+      if (config.ai[field] !== undefined && (
+        typeof config.ai[field] !== 'number' || !Number.isFinite(config.ai[field]) || config.ai[field] <= 0
+      )) errors.push(`ai.${field} 必须是正数`);
+    }
   }
   if (config.projectLimits !== undefined && (typeof config.projectLimits !== 'object' || Array.isArray(config.projectLimits))) {
     errors.push('projectLimits 必须是对象');
+  } else if (config.projectLimits) {
+    for (const field of ['maxFiles', 'maxTokens']) {
+      if (config.projectLimits[field] !== undefined && (
+        typeof config.projectLimits[field] !== 'number' ||
+        !Number.isFinite(config.projectLimits[field]) ||
+        config.projectLimits[field] <= 0
+      )) errors.push(`projectLimits.${field} 必须是正数`);
+    }
   }
 
-  return errors;
+  return { errors, warnings };
+}
+
+function validateProjectConfig(config) {
+  const result = validateProjectConfigDetailed(config);
+  return [...result.errors, ...result.warnings];
 }
 
 // Write project config back to disk. Chooses the format based on what's
@@ -271,6 +315,12 @@ function saveProjectConfig(rootDir, config, options = {}) {
     ? path.join(rootDir, CONFIG_FILE_JS)
     : path.join(rootDir, CONFIG_FILE_JSON);
 
+  const portableConfig = normalizeProjectPaths(rootDir, config);
+  const validation = validateProjectConfigDetailed(portableConfig);
+  if (validation.errors.length > 0) {
+    throw new ConfigValidationError(targetPath, validation.errors, validation.warnings);
+  }
+
   if (fs.existsSync(targetPath)) {
     try {
       fs.copyFileSync(targetPath, targetPath + '.bak');
@@ -279,7 +329,6 @@ function saveProjectConfig(rootDir, config, options = {}) {
     }
   }
 
-  const portableConfig = normalizeProjectPaths(rootDir, config);
   const content = targetFormat === 'js'
     ? `module.exports = ${JSON.stringify(portableConfig, null, 2)};\n`
     : `${JSON.stringify(portableConfig, null, 2)}\n`;
@@ -287,6 +336,26 @@ function saveProjectConfig(rootDir, config, options = {}) {
 
   projectConfigCache.delete(targetPath);
   return { path: targetPath, format: targetFormat };
+}
+
+function inspectProjectConfig(rootDir) {
+  const info = getConfigFile(rootDir);
+  if (!info.exists) {
+    return { ...info, config: {}, errors: ['配置文件不存在'], warnings: [] };
+  }
+  try {
+    const parsed = info.format === 'json' ? loadJsonConfig(info.path) : loadConfigWithVM(info.path);
+    const config = normalizeProjectPaths(rootDir, parsed, info.path);
+    const validation = validateProjectConfigDetailed(config);
+    return { ...info, config, ...validation };
+  } catch (error) {
+    return {
+      ...info,
+      config: {},
+      errors: error.errors || [error.message],
+      warnings: error.warnings || []
+    };
+  }
 }
 
 // 默认模型依据官方废弃文档校准（2026-05 复核）：
@@ -563,6 +632,9 @@ module.exports = {
   saveProjectConfig,
   getConfigFile,
   validateProjectConfig,
+  validateProjectConfigDetailed,
+  inspectProjectConfig,
+  ConfigValidationError,
   normalizeProjectPaths,
   toPortableProjectPath,
   getAIProviders,

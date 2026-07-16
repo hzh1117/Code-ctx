@@ -19,6 +19,7 @@ program.addCommand(require('./commands/doctor'));
 program.addCommand(require('./commands/watch'));
 program.addCommand(require('./commands/hook'));
 program.addCommand(require('./commands/dashboard'));
+program.addCommand(require('./commands/config'));
 
 program
   .command('help')

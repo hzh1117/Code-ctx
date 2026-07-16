@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { loadProjectConfig, validateProjectConfig } = require('../../../utils/config');
+const { inspectProjectConfig } = require('../../../utils/config');
 const { runDoctor } = require('../../../commands/doctor');
 const { scoreDocs } = require('../../../utils/doc-quality');
 const { getState: getPluginState } = require('../../../plugins/state');
@@ -14,13 +14,8 @@ module.exports = function register(router, rootDir) {
       const aiDocsDir = path.join(rootDir, 'ai-docs');
       const sensitive = fs.existsSync(aiDocsDir) ? scanSensitive(aiDocsDir) : [];
 
-      let config = {};
-      try {
-        config = loadProjectConfig(rootDir);
-      } catch (err) {
-        // surfaced as schema/config error below
-      }
-      const schemaErrors = validateProjectConfig(config);
+      const configInspection = inspectProjectConfig(rootDir);
+      const schemaErrors = [...configInspection.errors, ...configInspection.warnings];
       const pluginState = getPluginState();
 
       res.json({

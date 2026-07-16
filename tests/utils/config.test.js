@@ -7,6 +7,7 @@ const {
   loadJsonConfig,
   getConfigFile,
   validateProjectConfig,
+  validateProjectConfigDetailed,
   saveProjectConfig,
   _clearCache
 } = require('../../src/utils/config');
@@ -348,6 +349,28 @@ describe('config', () => {
       });
       expect(errors.some(e => e.includes('projects[0].alias'))).toBe(true);
       expect(errors.some(e => e.includes('projects[2].path'))).toBe(true);
+    });
+
+    test('classifies unknown fields as migration warnings', () => {
+      expect(validateProjectConfigDetailed({ projectName: 'x', futureField: true }))
+        .toEqual({ errors: [], warnings: ['未知字段: futureField'] });
+    });
+
+    test('loadProjectConfig blocks invalid schema types', () => {
+      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+        projectName: 123,
+        projects: 'invalid'
+      }));
+      expect(() => loadProjectConfig(testDir)).toThrow(/schema 校验失败.*projectName/);
+    });
+
+    test('saveProjectConfig validates before changing the existing file', () => {
+      const configPath = path.join(testDir, 'code-ctx.config.json');
+      fs.writeFileSync(configPath, JSON.stringify({ projectName: 'original' }));
+
+      expect(() => saveProjectConfig(testDir, { projectName: false })).toThrow(/schema 校验失败/);
+      expect(JSON.parse(fs.readFileSync(configPath, 'utf8')).projectName).toBe('original');
+      expect(fs.existsSync(`${configPath}.bak`)).toBe(false);
     });
 
     test('validateProjectConfig: accepts string scan pattern overrides', () => {

@@ -20,6 +20,7 @@ describe('fixCommand', () => {
     fs.mkdirSync(testDir, { recursive: true });
     fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), '# Old content');
+    fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=test-key\n');
   });
 
   afterEach(() => {

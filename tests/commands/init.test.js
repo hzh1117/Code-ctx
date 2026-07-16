@@ -192,6 +192,45 @@ describe('initCommand', () => {
     expect(result).toHaveProperty('config');
     expect(result.config.projectName).toBe('init-test');
   });
+
+  test('returns merged disk configuration and an audit report', async () => {
+    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
+      dependencies: { express: '^5.0.0' }
+    }));
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
+      projectName: 'custom-name',
+      outputDir: './custom-docs',
+      projects: [{
+        alias: 'init-test',
+        path: '.',
+        type: 'generic-js-ts',
+        label: 'Configured Label',
+        scanPatterns: ['**/*.js']
+      }],
+      excludeDirs: ['generated']
+    }));
+    _clearCache();
+
+    const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    expect(result.config).toEqual(expect.objectContaining({
+      projectName: 'custom-name',
+      outputDir: './custom-docs',
+      excludeDirs: ['generated']
+    }));
+    expect(result.config.projects[0]).toEqual(expect.objectContaining({
+      label: 'Configured Label',
+      scanPatterns: ['**/*.js']
+    }));
+    expect(result.configMerge).toEqual(expect.objectContaining({
+      source: 'merged',
+      matched: 1,
+      retained: []
+    }));
+    expect(result.configMerge.conflicts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ field: 'label', kept: 'Configured Label' })
+    ]));
+  });
 });
 
 describe('initCommand enhanced features', () => {

@@ -66,6 +66,7 @@ function createInitCommand(dependencies = {}) {
     return {
       projects,
       config: plan.config,
+      configMerge: plan.mergeReport,
       warnings,
       generation,
       success: generation.success,

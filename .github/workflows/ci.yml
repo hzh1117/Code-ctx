@@ -16,9 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Node 16 已 EOL（2023-09），不再纳入测试矩阵；package.json engines 仍声明 >=16，
-        # 仅作为安装兼容下限，未保证持续验证。
-        node-version: [18.x, 20.x, 22.x]
+        # Keep this matrix aligned with package.json engines (Node >=20).
+        node-version: [20.x, 22.x]
 
     steps:
       - name: Checkout
@@ -37,8 +36,14 @@ jobs:
         run: npm ci
         working-directory: web
 
+      - name: Check formatting
+        run: npm run format:check
+
       - name: Lint
         run: npm run lint
+
+      - name: Type-check JavaScript
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test -- --runInBand
@@ -48,6 +53,32 @@ jobs:
 
       - name: Build dashboard
         run: npm run build:web
+
+      - name: Test published package
+        run: npm run pack:smoke
+
+  windows-smoke:
+    name: Windows smoke (Node.js 20)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install CLI dependencies
+        run: npm ci
+
+      - name: Test published package
+        run: npm run pack:smoke
+
+      - name: Run Windows CLI smoke tests
+        run: npm test -- tests/bin/cli-help.test.js tests/utils/clipboard.test.js tests/smoke/package-scripts.test.js --runInBand
 
   audit:
     name: npm audit (high)

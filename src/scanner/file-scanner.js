@@ -54,8 +54,9 @@ function scanProject(projectDir, projectType, options = {}) {
   const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   
+  const registry = options.registry || defaultRegistry;
   const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
-  const adapterPatterns = configuredPatterns || defaultRegistry.getScanPatterns(projectType);
+  const adapterPatterns = configuredPatterns || registry.getScanPatterns(projectType);
   const patterns = adapterPatterns.length > 0
     ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
     : [];
@@ -71,7 +72,7 @@ function scanProject(projectDir, projectType, options = {}) {
     keyFiles.push(...matches);
   }
 
-  keyFiles.push(...defaultRegistry.extractKeyFiles(projectType, projectDir)
+  keyFiles.push(...registry.extractKeyFiles(projectType, projectDir)
     .filter(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile()));
 
   const uniqueFiles = [...new Set(keyFiles)];
@@ -79,7 +80,7 @@ function scanProject(projectDir, projectType, options = {}) {
   // 限制文件数量
   let limitedFiles = uniqueFiles;
   if (uniqueFiles.length > maxFiles) {
-    limitedFiles = prioritizeFiles(uniqueFiles, projectType).slice(0, maxFiles);
+    limitedFiles = prioritizeFiles(uniqueFiles, projectType, registry).slice(0, maxFiles);
   }
 
   // 限制 token 数量
@@ -95,7 +96,7 @@ function scanProject(projectDir, projectType, options = {}) {
     tree,
     keyFiles: result.files,
     sourceFiles,
-    promptHints: defaultRegistry.getPromptHints(projectType),
+    promptHints: registry.getPromptHints(projectType),
     totalFiles: uniqueFiles.length,
     limitedTo: result.files.length,
     estimatedTokens: result.tokens
@@ -150,12 +151,12 @@ function buildSourceSnapshots(files, projectDir, maxTotalChars, maxFileChars) {
   }).filter(Boolean);
 }
 
-function prioritizeFiles(files, projectType) {
+function prioritizeFiles(files, projectType, registry = defaultRegistry) {
   // Adapter-driven: each project type contributes its own priorityKeywords map.
   // Unknown / unranked files get priority 100 and sort to the end.
   return files.slice().sort((a, b) => {
-    const aScore = defaultRegistry.getFilePriority(projectType, a);
-    const bScore = defaultRegistry.getFilePriority(projectType, b);
+    const aScore = registry.getFilePriority(projectType, a);
+    const bScore = registry.getFilePriority(projectType, b);
     return aScore - bScore;
   });
 }

@@ -34,7 +34,13 @@ function createInitCommand(dependencies = {}) {
     services.logger.setVerbose(options.verbose);
 
     const projects = services.discovery.discover(rootDir, options);
-    const snapshot = services.snapshot.capture(rootDir, projects, options);
+    const runtimeContext = services.discovery.getRuntimeContext
+      ? services.discovery.getRuntimeContext()
+      : null;
+    const snapshot = services.snapshot.capture(rootDir, projects, {
+      ...options,
+      registry: runtimeContext?.registry
+    });
     const plan = services.planning.plan(rootDir, projects, snapshot.scanResults, options);
     const generation = await services.generation.generate({
       rootDir,

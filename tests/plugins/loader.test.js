@@ -3,7 +3,7 @@ const path = require('path');
 const os = require('os');
 
 const { initPlugins, _resetPluginState } = require('../../src/plugins/loader');
-const { defaultRegistry, BaseAdapter } = require('../../src/adapters');
+const { defaultRegistry } = require('../../src/adapters');
 const { _clearCache } = require('../../src/utils/config');
 const { getState } = require('../../src/plugins/state');
 const { filterSensitive, scanDirectory } = require('../../src/utils/sensitive-filter');
@@ -24,12 +24,7 @@ function writePlugin(dir, name, body) {
 
 describe('plugin loader', () => {
   let testDir;
-  const originalAdapterTypes = new Set();
   let originalAllowAll;
-
-  beforeAll(() => {
-    for (const t of defaultRegistry.types) originalAdapterTypes.add(t);
-  });
 
   beforeEach(() => {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-plugin-'));
@@ -45,10 +40,6 @@ describe('plugin loader', () => {
   afterEach(() => {
     _resetPluginState();
     _clearCache();
-    // Remove plugin-added adapters so each test starts from builtin baseline.
-    for (const t of [...defaultRegistry.types]) {
-      if (!originalAdapterTypes.has(t)) defaultRegistry.adapters.delete(t);
-    }
     fs.rmSync(testDir, { recursive: true, force: true });
     if (originalAllowAll === undefined) {
       delete process.env.CODE_CTX_PLUGINS_ALLOW_ALL;
@@ -65,7 +56,7 @@ describe('plugin loader', () => {
     expect(getState().errors).toEqual([]);
   });
 
-  test('loads adapter from a local plugin and makes it available via defaultRegistry', () => {
+  test('loads adapter into the root-scoped registry', () => {
     const pluginPath = writePlugin(testDir, 'p.js', `
       const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
       class CustomAdapter extends BaseAdapter {
@@ -77,10 +68,12 @@ describe('plugin loader', () => {
     `);
     writeConfig(testDir, [pluginPath]);
 
-    initPlugins(testDir);
+    const context = initPlugins(testDir);
 
-    expect(defaultRegistry.types).toContain('custom-stack');
-    expect(defaultRegistry.detect({ dependencies: { 'custom-stack': '1.0.0' } }, [])).toBe('custom-stack');
+    expect(context.registry.types).toContain('custom-stack');
+    expect(context.registry.detect({ dependencies: { 'custom-stack': '1.0.0' } }, []))
+      .toBe('custom-stack');
+    expect(defaultRegistry.types).not.toContain('custom-stack');
   });
 
   test('merges scenarios; plugin id can override a builtin', () => {
@@ -179,12 +172,48 @@ describe('plugin loader', () => {
     writeConfig(testDir, [pluginPath]);
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      initPlugins(testDir);
-      expect(getState().errors).toHaveLength(1);
-      expect(defaultRegistry.types).not.toContain('must-not-leak');
-      expect(defaultRegistry.types).not.toContain('duck');
+      const context = initPlugins(testDir);
+      expect(context.errors).toHaveLength(1);
+      expect(context.registry.types).not.toContain('must-not-leak');
+      expect(context.registry.types).not.toContain('duck');
     } finally {
       warn.mockRestore();
+    }
+  });
+
+  test('keeps immutable plugin contributions and registries isolated by root', () => {
+    const secondRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-plugin-second-'));
+    try {
+      const firstPlugin = writePlugin(testDir, 'first.js', `
+        const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
+        module.exports = { name: 'first', adapters: [class extends BaseAdapter {
+          get type() { return 'first-only'; }
+          detect() { return false; }
+        }] };
+      `);
+      const secondPlugin = writePlugin(secondRoot, 'second.js', `
+        const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
+        module.exports = { name: 'second', adapters: [class extends BaseAdapter {
+          get type() { return 'second-only'; }
+          detect() { return false; }
+        }] };
+      `);
+      writeConfig(testDir, [firstPlugin]);
+      writeConfig(secondRoot, [secondPlugin]);
+
+      const first = initPlugins(testDir);
+      const second = initPlugins(secondRoot);
+
+      expect(first.registry.types).toContain('first-only');
+      expect(first.registry.types).not.toContain('second-only');
+      expect(second.registry.types).toContain('second-only');
+      expect(second.registry.types).not.toContain('first-only');
+      expect(Object.isFrozen(first)).toBe(true);
+      expect(Object.isFrozen(first.plugins)).toBe(true);
+      expect(getState(testDir)).toBe(first);
+      expect(getState(secondRoot)).toBe(second);
+    } finally {
+      fs.rmSync(secondRoot, { recursive: true, force: true });
     }
   });
 

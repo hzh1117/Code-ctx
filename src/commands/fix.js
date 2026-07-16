@@ -9,7 +9,7 @@ const { filterSensitive } = require('../utils/sensitive-filter');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 
 async function fixCommand(rootDir, projectAlias, options = {}) {
-  initPlugins(rootDir);
+  const pluginContext = initPlugins(rootDir);
   const info = getConfigFile(rootDir);
 
   if (!info.exists) {
@@ -24,7 +24,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   }
 
   const projectDir = path.join(rootDir, project.path);
-  const scanResult = scanProject(projectDir, project.type);
+  const scanResult = scanProject(projectDir, project.type, { registry: pluginContext.registry });
 
   const prompt = buildInitPrompt({
     project,

@@ -1,53 +1,67 @@
-// Process-wide plugin state. Each Code-ctx CLI invocation is a short-lived
-// Node process, so a module-level singleton is fine; tests use _reset() to
-// keep state out of cross-test leakage.
-//
-// Why a singleton: callers like filterSensitive and getScenarios are reached
-// from many call sites and threading per-rootDir state through every call
-// signature would be invasive. The loader installs contributions here, and
-// the consumers (sensitive-filter, template/engine) read from the same place.
+const path = require('path');
+const { AsyncLocalStorage } = require('async_hooks');
 
-const state = {
+const contexts = new Map();
+const storage = new AsyncLocalStorage();
+let lastContext = null;
+
+const EMPTY_STATE = Object.freeze({
   loadedRoot: null,
   loadedSignature: null,
-  sensitivePatterns: [],
-  sensitiveDetectionPatterns: [],
-  scenarios: [],
-  adapters: [],
-  errors: [],
-  plugins: []
-};
+  sensitivePatterns: Object.freeze([]),
+  sensitiveDetectionPatterns: Object.freeze([]),
+  scenarios: Object.freeze([]),
+  adapters: Object.freeze([]),
+  errors: Object.freeze([]),
+  plugins: Object.freeze([]),
+  registry: null
+});
 
-function getState() {
-  return state;
+function normalizeRoot(rootDir) {
+  return rootDir ? path.resolve(rootDir) : null;
 }
 
-function setLoaded(rootDir, signature) {
-  state.loadedRoot = rootDir;
-  state.loadedSignature = signature;
+function getState(rootDir) {
+  if (rootDir) return contexts.get(normalizeRoot(rootDir)) || EMPTY_STATE;
+  return storage.getStore() || lastContext || EMPTY_STATE;
 }
 
-function addContributions({ adapters = [], scenarios = [], sensitivePatterns = [], sensitiveDetectionPatterns = [], plugin }) {
-  if (adapters.length) state.adapters.push(...adapters);
-  if (scenarios.length) state.scenarios.push(...scenarios);
-  if (sensitivePatterns.length) state.sensitivePatterns.push(...sensitivePatterns);
-  if (sensitiveDetectionPatterns.length) state.sensitiveDetectionPatterns.push(...sensitiveDetectionPatterns);
-  if (plugin) state.plugins.push(plugin);
+function publishState(rootDir, state) {
+  const normalizedRoot = normalizeRoot(rootDir);
+  const context = Object.freeze({
+    ...state,
+    loadedRoot: normalizedRoot,
+    sensitivePatterns: Object.freeze([...(state.sensitivePatterns || [])]),
+    sensitiveDetectionPatterns: Object.freeze([...(state.sensitiveDetectionPatterns || [])]),
+    scenarios: Object.freeze([...(state.scenarios || [])]),
+    adapters: Object.freeze([...(state.adapters || [])]),
+    errors: Object.freeze([...(state.errors || [])]),
+    plugins: Object.freeze([...(state.plugins || [])])
+  });
+  contexts.set(normalizedRoot, context);
+  lastContext = context;
+  storage.enterWith(context);
+  return context;
 }
 
-function addError(name, error) {
-  state.errors.push({ plugin: name, error: error.message || String(error) });
+function activateState(state) {
+  if (state && state.loadedRoot) {
+    lastContext = state;
+    storage.enterWith(state);
+  }
+  return state || EMPTY_STATE;
 }
 
-function _reset() {
-  state.loadedRoot = null;
-  state.loadedSignature = null;
-  state.sensitivePatterns = [];
-  state.sensitiveDetectionPatterns = [];
-  state.scenarios = [];
-  state.adapters = [];
-  state.errors = [];
-  state.plugins = [];
+function _reset(rootDir) {
+  if (rootDir) {
+    const normalizedRoot = normalizeRoot(rootDir);
+    contexts.delete(normalizedRoot);
+    if (lastContext?.loadedRoot === normalizedRoot) lastContext = null;
+    return;
+  }
+  contexts.clear();
+  lastContext = null;
+  storage.disable();
 }
 
-module.exports = { getState, setLoaded, addContributions, addError, _reset };
+module.exports = { getState, publishState, activateState, _reset, EMPTY_STATE };

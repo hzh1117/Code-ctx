@@ -12,6 +12,7 @@ function createDiscoveryService(dependencies = {}) {
   const initializePlugins = dependencies.initPlugins || initPlugins;
   const clock = dependencies.clock || { now: () => Date.now() };
   const logger = dependencies.logger;
+  let runtimeContext = null;
 
   function applyConfiguredOverrides(rootDir, projects) {
     const config = loadConfig(rootDir);
@@ -41,10 +42,10 @@ function createDiscoveryService(dependencies = {}) {
       if (!fileSystem.existsSync(rootDir)) throw new Error(`目录不存在: ${rootDir}`);
       logger.verbose('目录存在 ✓');
 
-      initializePlugins(rootDir);
+      runtimeContext = initializePlugins(rootDir);
       logger.step('2/7', '检测子项目');
       const startTime = clock.now();
-      let projects = detect(rootDir);
+      let projects = detect(rootDir, { registry: runtimeContext.registry });
       logger.log(`检测到 ${projects.length} 个项目 (耗时 ${clock.now() - startTime}ms)`);
 
       if (logger.isVerbose()) {
@@ -72,6 +73,9 @@ function createDiscoveryService(dependencies = {}) {
       }
 
       return applyConfiguredOverrides(rootDir, projects);
+    },
+    getRuntimeContext() {
+      return runtimeContext;
     }
   };
 }

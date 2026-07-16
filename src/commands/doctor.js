@@ -108,7 +108,7 @@ function checkDocsVsCode(rootDir, configResult) {
   return issues;
 }
 
-function checkDocsVsActual(rootDir, configResult, aiDocsDir) {
+function checkDocsVsActual(rootDir, configResult, aiDocsDir, registry = defaultRegistry) {
   const issues = [];
   if (!configResult.config || !fs.existsSync(aiDocsDir)) return issues;
 
@@ -123,7 +123,7 @@ function checkDocsVsActual(rootDir, configResult, aiDocsDir) {
       const projectDir = path.join(rootDir, project.path);
       if (!fs.existsSync(projectDir)) continue;
 
-      const scanResult = scanProject(projectDir, project.type);
+      const scanResult = scanProject(projectDir, project.type, { registry });
       const docContent = readFileUTF8(docPath);
 
       const keyFileNames = scanResult.keyFiles
@@ -166,12 +166,12 @@ function checkDocsVsActual(rootDir, configResult, aiDocsDir) {
   return issues;
 }
 
-function extractRoutesFromCode(projectDir, projectType) {
+function extractRoutesFromCode(projectDir, projectType, registry = defaultRegistry) {
   const routes = [];
   const { globSync } = require('glob');
 
   try {
-    const patterns = defaultRegistry.getScanPatterns(projectType);
+    const patterns = registry.getScanPatterns(projectType);
     if (patterns.length === 0) return routes;
 
     const files = [];
@@ -217,9 +217,9 @@ function extractRoutesFromCode(projectDir, projectType) {
   return routes;
 }
 
-function checkProjectStructure(rootDir, info) {
+function checkProjectStructure(rootDir, info, registry = defaultRegistry) {
   console.log('📁 检测项目结构...');
-  const projects = detectProjects(rootDir);
+  const projects = detectProjects(rootDir, { registry });
   info.projects = projects.map(p => ({ alias: p.alias, type: p.type, name: p.name }));
 
   if (projects.length === 0) {
@@ -258,9 +258,9 @@ function checkDocsCompleteness(aiDocsDir, issues, warnings) {
   }
 }
 
-function checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings) {
+function checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings, registry) {
   console.log('\n🔄 检查文档与代码一致性...');
-  const consistencyIssues = checkDocsVsActual(rootDir, configResult, aiDocsDir);
+  const consistencyIssues = checkDocsVsActual(rootDir, configResult, aiDocsDir, registry);
   for (const issue of consistencyIssues) {
     if (issue.type === 'outdated' || issue.type === 'structure-mismatch') {
       warnings.push(issue);
@@ -272,10 +272,10 @@ function checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warn
   }
 }
 
-function checkStrictRoutes(projects, aiDocsDir, info, warnings) {
+function checkStrictRoutes(projects, aiDocsDir, info, warnings, registry) {
   console.log('\n🔎 严格模式：解析代码路由...');
   for (const project of projects) {
-    const routes = extractRoutesFromCode(project.path, project.type);
+    const routes = extractRoutesFromCode(project.path, project.type, registry);
     if (routes.length === 0) continue;
 
     info.routes.push(...routes);
@@ -360,7 +360,8 @@ function printDoctorSummary(issues, warnings, info, quality) {
 }
 
 async function doctorCommand(rootDir, options = {}) {
-  initPlugins(rootDir);
+  const pluginContext = initPlugins(rootDir);
+  const registry = pluginContext.registry || defaultRegistry;
   const aiDocsDir = path.join(rootDir, 'ai-docs');
   const issues = [];
   const warnings = [];
@@ -374,17 +375,17 @@ async function doctorCommand(rootDir, options = {}) {
     return { issues: [{ type: 'no-ai-docs', message: 'ai-docs/ 目录不存在' }], warnings, info };
   }
 
-  const projects = checkProjectStructure(rootDir, info);
+  const projects = checkProjectStructure(rootDir, info, registry);
 
   // Load config once; shared by checkConfigConsistency and checkDocsCodeConsistency.
   const configResult = loadDoctorConfig(rootDir);
 
   checkConfigConsistency(rootDir, configResult, issues, warnings);
   checkDocsCompleteness(aiDocsDir, issues, warnings);
-  checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings);
+  checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings, registry);
 
   if (options.strict) {
-    checkStrictRoutes(projects, aiDocsDir, info, warnings);
+    checkStrictRoutes(projects, aiDocsDir, info, warnings, registry);
   }
 
   checkSensitiveInfo(aiDocsDir, warnings);
@@ -396,7 +397,8 @@ async function doctorCommand(rootDir, options = {}) {
 }
 
 async function doctorFix(rootDir, options = {}) {
-  initPlugins(rootDir);
+  const pluginContext = initPlugins(rootDir);
+  const registry = pluginContext.registry || defaultRegistry;
   const aiDocsDir = path.join(rootDir, 'ai-docs');
   const info = getConfigFile(rootDir);
 
@@ -445,7 +447,7 @@ async function doctorFix(rootDir, options = {}) {
     } else {
       try {
         if (fs.existsSync(projectDir)) {
-          const scanResult = scanProject(projectDir, project.type);
+          const scanResult = scanProject(projectDir, project.type, { registry });
           const docContent = readFileUTF8(docPath);
           const keyFileNames = scanResult.keyFiles
             .map(f => path.basename(f))
@@ -477,7 +479,7 @@ async function doctorFix(rootDir, options = {}) {
         continue;
       }
 
-      const scanResult = scanProject(projectDir, project.type);
+      const scanResult = scanProject(projectDir, project.type, { registry });
       const prompt = buildInitPrompt({ project, scanResult });
       const doc = await generateWithContinuation(prompt, aiConfig);
       const safeDoc = filterSensitive(doc).content;

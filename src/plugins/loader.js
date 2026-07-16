@@ -2,9 +2,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { loadProjectConfig } = require('../utils/config');
-const { getState, setLoaded, addContributions, addError, _reset } = require('./state');
-const { BaseAdapter, assertValidAdapter } = require('../adapters');
-const { defaultRegistry } = require('../adapters');
+const { getState, publishState, activateState, _reset } = require('./state');
+const { BaseAdapter, assertValidAdapter, loadBuiltinAdapters } = require('../adapters');
 
 // ─── Plugin security gate ───────────────────────────────────────────────
 // Plugins are arbitrary Node modules; require()-ing one executes its code.
@@ -184,7 +183,7 @@ function isValidDetection(p) {
   return p && p.regex instanceof RegExp && typeof p.name === 'string';
 }
 
-function applyPlugin(pluginExports, name) {
+function applyPlugin(pluginExports, name, runtime) {
   if (!pluginExports || typeof pluginExports !== 'object') {
     throw new Error('插件必须导出对象或工厂函数');
   }
@@ -201,7 +200,7 @@ function applyPlugin(pluginExports, name) {
       }
     });
     adapters.push(...validated);
-    validated.forEach(adapter => defaultRegistry.register(adapter));
+    validated.forEach(adapter => runtime.registry.register(adapter));
   }
 
   const scenarios = Array.isArray(pluginExports.scenarios)
@@ -216,13 +215,11 @@ function applyPlugin(pluginExports, name) {
     ? pluginExports.sensitiveDetectionPatterns.filter(isValidDetection)
     : [];
 
-  addContributions({
-    adapters,
-    scenarios,
-    sensitivePatterns,
-    sensitiveDetectionPatterns,
-    plugin: { name, adapterCount: adapters.length, scenarioCount: scenarios.length }
-  });
+  runtime.adapters.push(...adapters);
+  runtime.scenarios.push(...scenarios);
+  runtime.sensitivePatterns.push(...sensitivePatterns);
+  runtime.sensitiveDetectionPatterns.push(...sensitiveDetectionPatterns);
+  runtime.plugins.push({ name, adapterCount: adapters.length, scenarioCount: scenarios.length });
 }
 
 function pluginSignature(rootDir, specs) {
@@ -244,37 +241,45 @@ function pluginSignature(rootDir, specs) {
 // Idempotent. Re-invoking with the same rootDir is a no-op unless config
 // mtimes or the spec list changed.
 function initPlugins(rootDir) {
+  const normalizedRoot = path.resolve(rootDir);
   let config;
   try {
     config = loadProjectConfig(rootDir);
   } catch {
-    // Config load problems aren't a plugin concern — just no-op.
-    return getState();
+    config = {};
   }
 
   const specs = Array.isArray(config.plugins) ? config.plugins.filter(s => typeof s === 'string') : [];
   const signature = pluginSignature(rootDir, specs);
-  const current = getState();
+  const current = getState(rootDir);
 
-  if (current.loadedRoot === rootDir && current.loadedSignature === signature) {
-    return current;
+  if (current.loadedRoot === normalizedRoot && current.loadedSignature === signature) {
+    return activateState(current);
   }
 
-  _reset();
+  const runtime = {
+    loadedSignature: signature,
+    registry: loadBuiltinAdapters(),
+    sensitivePatterns: [],
+    sensitiveDetectionPatterns: [],
+    scenarios: [],
+    adapters: [],
+    errors: [],
+    plugins: []
+  };
 
   for (const spec of specs) {
     try {
       const mod = loadPluginModule(spec, rootDir);
       const name = (mod && typeof mod === 'object' && typeof mod.name === 'string') ? mod.name : spec;
-      applyPlugin(mod, name);
+      applyPlugin(mod, name, runtime);
     } catch (err) {
-      addError(spec, err);
+      runtime.errors.push({ plugin: spec, error: err.message || String(err) });
       console.warn(`[code-ctx] 插件加载失败: ${spec} — ${err.message}（已跳过，内置能力不受影响）`);
     }
   }
 
-  setLoaded(rootDir, signature);
-  return getState();
+  return publishState(rootDir, runtime);
 }
 
 module.exports = {

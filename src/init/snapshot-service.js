@@ -62,7 +62,8 @@ function createSnapshotService(dependencies = {}) {
         const startedAt = clock.now();
         const result = scanner(project.path, project.type, {
           ...limits,
-          scanPatterns: project.scanPatterns
+          scanPatterns: project.scanPatterns,
+          registry: options.registry
         });
         scanResults[project.alias] = result;
         logger.log(`扫描 ${project.name} 完成 (耗时 ${clock.now() - startedAt}ms)`);

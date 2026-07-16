@@ -50,7 +50,7 @@ function deduplicateAliases(projects) {
  * Check if a directory contains a detectable project.
  * Returns the detected type or null.
  */
-function detectProjectInDir(dirPath) {
+function detectProjectInDir(dirPath, registry = defaultRegistry) {
   let files;
   try {
     files = fs.readdirSync(dirPath);
@@ -68,7 +68,7 @@ function detectProjectInDir(dirPath) {
     }
   }
 
-  return defaultRegistry.detect(pkg, files);
+  return registry.detect(pkg, files);
 }
 
 /**
@@ -84,11 +84,12 @@ function detectProjectInDir(dirPath) {
  */
 function detectProjects(rootDir, options = {}) {
   const maxDepth = options.maxDepth ?? MAX_SCAN_DEPTH;
+  const registry = options.registry || defaultRegistry;
   const projects = [];
   const visited = new Set();
 
   const resolvedRoot = path.resolve(rootDir);
-  const rootType = detectProjectInDir(resolvedRoot);
+  const rootType = detectProjectInDir(resolvedRoot, registry);
   if (rootType) {
     projects.push(createProject(resolvedRoot, rootType, path.basename(resolvedRoot)));
   }
@@ -111,7 +112,7 @@ function detectProjects(rootDir, options = {}) {
       if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
 
       const projectDir = path.join(dirPath, entry.name);
-      const type = detectProjectInDir(projectDir);
+      const type = detectProjectInDir(projectDir, registry);
 
       if (type) {
         const name = prefix ? `${prefix}/${entry.name}` : entry.name;

@@ -34,9 +34,16 @@
     },
     {
       "files": ["web/**/*.js", "web/**/*.vue"],
+      "extends": ["plugin:vue/vue3-essential"],
       "env": {
         "browser": true,
         "node": true
+      },
+      "parserOptions": {
+        "sourceType": "module"
+      },
+      "rules": {
+        "vue/multi-word-component-names": "off"
       }
     }
   ],

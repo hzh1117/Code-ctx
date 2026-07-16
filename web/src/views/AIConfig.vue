@@ -246,12 +246,8 @@ export default {
     async saveApiKey(protocol) {
       const apiKey = this.apiKeys[protocol];
       if (!apiKey) return;
-      try {
-        await axios.post('/api/ai/save-key', { apiKey, protocol });
-        this.apiKeys[protocol] = '';
-      } catch (err) {
-        throw err;
-      }
+      await axios.post('/api/ai/save-key', { apiKey, protocol });
+      this.apiKeys[protocol] = '';
     },
     async saveAll() {
       this.saving = true;

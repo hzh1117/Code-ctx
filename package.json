@@ -24,7 +24,7 @@
   "scripts": {
     "test": "jest",
     "coverage": "jest --coverage --runInBand",
-    "lint": "eslint src/ bin/",
+    "lint": "eslint src/ bin/ web/src/ --ext .js,.vue",
     "check": "npm run lint && npm test -- --runInBand && npm run build:web",
     "build:web": "cd web && npm run build",
     "pack:smoke": "node scripts/package-smoke.js",
@@ -70,6 +70,7 @@
   },
   "devDependencies": {
     "eslint": "^8.0.0",
+    "eslint-plugin-vue": "^9.33.0",
     "jest": "^29.0.0"
   },
   "jest": {

@@ -52,15 +52,15 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 - **Node.js >= 20.0.0** (this project uses commander 14, express 5, and other modern dependencies — Node 20+ is required)
 - Git
 
-### Install and Build
+### Install
 
 ```bash
-git clone https://github.com/hzh1117/Code-ctx.git
-cd Code-ctx
-npm install
-cd web && npm install && npm run build && cd ..
-npm link
+npm install -g code-ctx
+# Or run without a global install
+npx code-ctx --version
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) when developing from source; those steps are not required for normal installation.
 
 ### Initialize Your Project
 

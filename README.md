@@ -52,14 +52,14 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 - **Node.js >= 20.0.0**（项目使用 commander 14、express 5 等现代依赖，需 Node 20+）
 - Git
 
-### 安装和构建
+### 安装
+
+从源码参与开发请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)，无需作为普通用户的安装步骤执行。
 
 ```bash
-git clone https://github.com/hzh1117/Code-ctx.git
-cd Code-ctx
-npm install
-cd web && npm install && npm run build && cd ..
-npm link
+npm install -g code-ctx
+# 或者无需全局安装
+npx code-ctx --version
 ```
 
 ### 初始化你的项目

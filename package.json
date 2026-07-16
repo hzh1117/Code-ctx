@@ -27,6 +27,7 @@
     "lint": "eslint src/ bin/",
     "check": "npm test -- --runInBand && npm run build:web",
     "build:web": "cd web && npm run build",
+    "pack:smoke": "node scripts/package-smoke.js",
     "dashboard": "node bin/cli.js dashboard",
     "dashboard:dev": "node bin/cli.js dashboard --dev",
     "api": "node -e \"const { startServer } = require('./src/web/server'); startServer(process.cwd(), 3456);\""

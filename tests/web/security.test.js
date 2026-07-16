@@ -38,7 +38,7 @@ describe('Security: config API whitelist', () => {
     const res = await requestJson(server, '/api/config', { method: 'PUT', body });
     expect(res.status).toBe(200);
 
-    const configContent = fs.readFileSync(path.join(testDir, 'code-ctx.config.js'), 'utf8');
+    const configContent = fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8');
     expect(configContent).toContain('updated');
     expect(configContent).not.toContain('unknownKey');
     expect(configContent).not.toContain('anotherUnknown');
@@ -112,7 +112,7 @@ describe('Security: scenarios API', () => {
 describe('Security: error responses', () => {
   test('does not leak internal paths in error responses', async () => {
     // Corrupt the config to force a 500 error from /api/config
-    const configPath = path.join(testDir, 'code-ctx.config.js');
+    const configPath = path.join(testDir, 'code-ctx.config.json');
     const backup = fs.readFileSync(configPath, 'utf8');
     fs.writeFileSync(configPath, 'module.exports = INVALID SYNTAX !!!');
     try {

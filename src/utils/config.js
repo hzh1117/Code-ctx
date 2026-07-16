@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
+const JSON5 = require('json5');
 const { AI_CLIENT, PROJECT_LIMITS } = require('./constants');
 const { listPresets } = require('../ai/presets');
 
@@ -174,15 +174,15 @@ function loadProjectConfig(rootDir) {
 function loadConfigWithVM(configPath) {
   const code = fs.readFileSync(configPath, 'utf8');
   try {
-    const module = { exports: {} };
-    const sandbox = {
-      module,
-      exports: module.exports
-    };
-    vm.runInNewContext(code, sandbox, { filename: configPath });
-    return module.exports;
-  } catch (err) {
-    throw new Error(`配置文件解析失败`);
+    const match = code.match(/^\s*module\.exports\s*=\s*([\s\S]*?)\s*;?\s*$/);
+    if (!match) throw new Error('仅支持 module.exports = {...} 数据对象');
+    const parsed = JSON5.parse(match[1]);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('配置必须导出对象');
+    }
+    return parsed;
+  } catch {
+    throw new Error('配置文件解析失败：旧 JS 配置仅允许 module.exports = {...} 静态数据，请运行 code-ctx config migrate');
   }
 }
 
@@ -309,11 +309,11 @@ function validateProjectConfig(config) {
 // already present, defaulting to JSON. Callers can force a specific format
 // with options.format ('json' | 'js'). Backs up the existing file first.
 function saveProjectConfig(rootDir, config, options = {}) {
-  const info = getConfigFile(rootDir);
-  const targetFormat = options.format || (info.exists ? info.format : 'json');
-  const targetPath = targetFormat === 'js'
-    ? path.join(rootDir, CONFIG_FILE_JS)
-    : path.join(rootDir, CONFIG_FILE_JSON);
+  const targetFormat = options.format || 'json';
+  if (targetFormat !== 'json') {
+    throw new Error('不再支持写入 JS 配置，请使用 JSON 格式');
+  }
+  const targetPath = path.join(rootDir, CONFIG_FILE_JSON);
 
   const portableConfig = normalizeProjectPaths(rootDir, config);
   const validation = validateProjectConfigDetailed(portableConfig);
@@ -329,13 +329,30 @@ function saveProjectConfig(rootDir, config, options = {}) {
     }
   }
 
-  const content = targetFormat === 'js'
-    ? `module.exports = ${JSON.stringify(portableConfig, null, 2)};\n`
-    : `${JSON.stringify(portableConfig, null, 2)}\n`;
+  const content = `${JSON.stringify(portableConfig, null, 2)}\n`;
   fs.writeFileSync(targetPath, content);
 
   projectConfigCache.delete(targetPath);
   return { path: targetPath, format: targetFormat };
+}
+
+function migrateProjectConfig(rootDir) {
+  const info = getConfigFile(rootDir);
+  if (!info.exists) throw new Error('配置文件不存在');
+  if (info.format === 'json') {
+    return { status: 'already-json', path: info.path, backupPath: null };
+  }
+
+  const config = loadProjectConfig(rootDir);
+  const written = saveProjectConfig(rootDir, config, { format: 'json' });
+  let backupPath = `${info.path}.bak`;
+  let suffix = 1;
+  while (fs.existsSync(backupPath)) {
+    backupPath = `${info.path}.bak.${suffix++}`;
+  }
+  fs.renameSync(info.path, backupPath);
+  _clearCache();
+  return { status: 'migrated', path: written.path, backupPath };
 }
 
 function inspectProjectConfig(rootDir) {
@@ -634,6 +651,7 @@ module.exports = {
   validateProjectConfig,
   validateProjectConfigDetailed,
   inspectProjectConfig,
+  migrateProjectConfig,
   ConfigValidationError,
   normalizeProjectPaths,
   toPortableProjectPath,

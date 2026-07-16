@@ -46,4 +46,42 @@ describe('config validate CLI', () => {
     expect(process.exitCode).toBe(1);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('projectName'));
   });
+
+  test('migrates a static JS config and retains a backup', async () => {
+    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.js'), [
+      'module.exports = {',
+      "  projectName: 'legacy',",
+      "  projects: [{ alias: 'app', path: '.', type: 'unknown' }]",
+      '};'
+    ].join('\n'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const command = require('../../bin/commands/config');
+
+    await command.parseAsync(['node', 'config', 'migrate', rootDir]);
+
+    const migrated = JSON.parse(fs.readFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      'utf8'
+    ));
+    expect(migrated.projectName).toBe('legacy');
+    expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.js'))).toBe(false);
+    expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.js.bak'))).toBe(true);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('迁移完成'));
+  });
+
+  test('migration rejects dynamic JS without executing it', async () => {
+    const marker = path.join(rootDir, 'executed.txt').replace(/\\/g, '/');
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.js'),
+      `require('fs').writeFileSync('${marker}', 'bad'); module.exports = {};`
+    );
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const command = require('../../bin/commands/config');
+
+    await command.parseAsync(['node', 'config', 'migrate', rootDir]);
+
+    expect(process.exitCode).toBe(1);
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.json'))).toBe(false);
+  });
 });

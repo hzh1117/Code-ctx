@@ -63,7 +63,8 @@
     "concurrently": "^9.2.1",
     "express": "~5.2.1",
     "glob": "^10.5.0",
-    "iconv-lite": "^0.7.2"
+    "iconv-lite": "^0.7.2",
+    "json5": "^2.2.3"
   },
   "devDependencies": {
     "eslint": "^8.0.0",

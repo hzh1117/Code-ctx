@@ -48,14 +48,14 @@ describe('initCommand', () => {
     expect(config.gitTrack).toBe(true);
   });
 
-  test('should generate JS config when --config-format=js', async () => {
+  test('should always generate JSON config for new projects', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
     _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true, configFormat: 'js' });
 
-    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
-    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(false);
+    expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
   });
 
   test('should keep existing JS config and not create JSON', async () => {

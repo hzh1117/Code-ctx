@@ -47,11 +47,7 @@ function createPlanningService(dependencies = {}) {
           logger.log('  cp code-ctx.config.js code-ctx.config.json # 然后改为纯 JSON');
         }
       } else {
-        const format = options.configFormat === 'js' ? 'js'
-          : options.configFormat === 'json' ? 'json'
-          : info.exists ? info.format
-          : 'json';
-        const written = saveConfig(rootDir, config, { format });
+        const written = saveConfig(rootDir, config, { format: 'json' });
         logger.verbose('配置文件已写入:', written.path);
       }
 

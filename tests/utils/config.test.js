@@ -201,12 +201,10 @@ describe('config', () => {
     expect(config.ai.protocol).toBe('openai');
   });
 
-  test('loadConfigWithVM: exports.xxx pattern loads correctly', () => {
+  test('loadConfigWithVM: rejects executable assignment sequences', () => {
     const configPath = path.join(testDir, 'code-ctx.config.js');
     fs.writeFileSync(configPath, `exports.projectName = 'test'; exports.ai = { protocol: 'openai' };`);
-    const config = loadConfigWithVM(configPath);
-    expect(config.projectName).toBe('test');
-    expect(config.ai.protocol).toBe('openai');
+    expect(() => loadConfigWithVM(configPath)).toThrow(/静态数据/);
   });
 
   test('loadConfigWithVM: malicious config cannot require child_process', () => {
@@ -388,20 +386,18 @@ describe('config', () => {
       expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(false);
     });
 
-    test('saveProjectConfig: preserves JS when JS already exists', () => {
+    test('saveProjectConfig: writes JSON when a legacy JS config exists', () => {
       fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'old' };`);
       saveProjectConfig(testDir, { projectName: 'updated' });
-      const content = fs.readFileSync(path.join(testDir, 'code-ctx.config.js'), 'utf8');
-      expect(content).toContain('module.exports');
-      expect(content).toContain('updated');
-      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(false);
+      const content = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
+      expect(content.projectName).toBe('updated');
+      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.js'))).toBe(true);
     });
 
-    test('saveProjectConfig: forced format overrides existing', () => {
+    test('saveProjectConfig: rejects JS output format', () => {
       fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'old' };`);
-      const written = saveProjectConfig(testDir, { projectName: 'new' }, { format: 'json' });
-      expect(written.format).toBe('json');
-      expect(fs.existsSync(path.join(testDir, 'code-ctx.config.json'))).toBe(true);
+      expect(() => saveProjectConfig(testDir, { projectName: 'new' }, { format: 'js' }))
+        .toThrow(/不再支持写入 JS/);
     });
 
     test('saveProjectConfig: writes a .bak alongside existing file', () => {

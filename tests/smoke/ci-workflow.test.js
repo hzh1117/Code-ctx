@@ -16,4 +16,11 @@ describe('CI workflow contract', () => {
     expect(workflow.match(/run: npm run pack:smoke/g)).toHaveLength(2);
     expect(workflow).toContain('tests/utils/clipboard.test.js');
   });
+
+  test('blocks on high-severity production dependency findings', () => {
+    expect(workflow).not.toContain('continue-on-error');
+    expect(
+      workflow.match(/npm audit --omit=dev --audit-level=high --registry=https:\/\/registry\.npmjs\.org/g)
+    ).toHaveLength(2);
+  });
 });

@@ -301,5 +301,30 @@ describe('useCommand', () => {
       expect(result.prompt).toContain('api.md#api: not selected for scenario');
       expect(result.prompt).not.toContain(longContent);
     });
+
+    test('keeps English labels after compacting an oversized prompt', async () => {
+      const aiDocsDir = path.join(fixturesDir, 'ai-docs');
+      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), [
+        '<!-- section:overview -->',
+        'English overview',
+        '<!-- /section:overview -->',
+        '<!-- section:architecture -->',
+        'x'.repeat(10000),
+        '<!-- /section:architecture -->'
+      ].join('\n'));
+
+      const result = await useCommand({
+        scenario: 'F',
+        taskDescription: 'Fix login failure',
+        rootDir: fixturesDir,
+        language: 'en'
+      });
+
+      expect(result.compactInfo).not.toBeNull();
+      expect(result.prompt).toContain('[Part 1: Project Context]');
+      expect(result.prompt).toContain('[Part 2: Task Template]');
+      expect(result.prompt).not.toContain('【第一部分：项目上下文】');
+      expect(result.prompt).not.toContain('【第二部分：任务模板】');
+    });
   });
 });

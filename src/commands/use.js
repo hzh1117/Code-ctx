@@ -142,7 +142,9 @@ function compactDocument(name, content, preferredSections, budget, removals) {
   return selected.join('\n\n');
 }
 
-function compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs) {
+function compactPrompt(
+  prompt, taskDescription, selectedScenario, overviewContent, relatedDocs, language
+) {
   const originalLength = prompt.length;
   const originalTokens = estimateTokensForContent(prompt);
   const preferredSections = sectionsForScenario(selectedScenario.id, taskDescription);
@@ -150,7 +152,8 @@ function compactPrompt(prompt, taskDescription, selectedScenario, overviewConten
     taskDescription: taskDescription || '',
     overviewContent: '',
     relatedDocs: {},
-    template: selectedScenario.template || ''
+    template: selectedScenario.template || '',
+    language
   });
   const contentBudget = Math.max(
     200,
@@ -181,7 +184,8 @@ function compactPrompt(prompt, taskDescription, selectedScenario, overviewConten
     taskDescription: taskDescription || '',
     overviewContent: compactOverview,
     relatedDocs: compactRelatedDocs,
-    template: selectedScenario.template || ''
+    template: selectedScenario.template || '',
+    language
   });
 
   return {
@@ -211,7 +215,9 @@ async function buildContext(task, scenario, options = {}) {
   prompt = filterSensitive(prompt).content;
 
   if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
-    const result = compactPrompt(prompt, task, resolved.selectedScenario, overviewContent, relatedDocs);
+    const result = compactPrompt(
+      prompt, task, resolved.selectedScenario, overviewContent, relatedDocs, language
+    );
     prompt = filterSensitive(result.prompt).content;
   }
 
@@ -261,7 +267,14 @@ async function useCommand(options = {}) {
   // 6. 精简模式：超过阈值时自动压缩
   let compactInfo = null;
   if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
-    const result = compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs);
+    const result = compactPrompt(
+      prompt,
+      taskDescription,
+      selectedScenario,
+      overviewContent,
+      relatedDocs,
+      language
+    );
     prompt = filterSensitive(result.prompt).content;
     compactInfo = {
       originalLength: result.originalLength,

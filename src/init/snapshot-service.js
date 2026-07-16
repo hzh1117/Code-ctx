@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { scanProject } = require('../scanner/file-scanner');
+const { scanProjectAsync } = require('../scanner/file-scanner');
 const { getProjectLimits } = require('../utils/config');
 const { STATE_FILES } = require('../utils/constants');
 const { createIgnoreEngine } = require('../utils/ignore-engine');
@@ -28,14 +28,14 @@ function createFileStateStore(fileSystem = fs, pathImpl = path) {
 function createSnapshotService(dependencies = {}) {
   const fileSystem = dependencies.fs || fs;
   const pathImpl = dependencies.path || path;
-  const scanner = dependencies.scanProject || scanProject;
+  const scanner = dependencies.scanProject || scanProjectAsync;
   const getLimits = dependencies.getProjectLimits || getProjectLimits;
   const clock = dependencies.clock || { now: () => Date.now() };
   const stateStore = dependencies.stateStore || createFileStateStore(fileSystem, pathImpl);
   const logger = dependencies.logger;
 
   return {
-    capture(rootDir, projects, options = {}) {
+    async capture(rootDir, projects, options = {}) {
       logger.step('3/7', '创建输出目录');
       const outputDir = pathImpl.join(rootDir, 'ai-docs');
       if (!fileSystem.existsSync(outputDir)) {
@@ -62,7 +62,7 @@ function createSnapshotService(dependencies = {}) {
 
         logger.verbose(`\n开始扫描: ${project.alias}`);
         const startedAt = clock.now();
-        const result = scanner(project.path, project.type, {
+        const result = await scanner(project.path, project.type, {
           ...limits,
           scanPatterns: project.scanPatterns,
           registry: options.registry,

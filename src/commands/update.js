@@ -22,6 +22,7 @@ const {
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
 const { createIgnoreEngine } = require('../utils/ignore-engine');
+const { mapWithConcurrency } = require('../utils/async-pool');
 
 function getFileHash(filePath) {
   const content = fs.readFileSync(filePath);
@@ -43,23 +44,6 @@ function normalizeFileEntry(entry) {
   return { mtimeMs: null, hash: null };
 }
 
-function getAllFiles(dir, ignoreEngine) {
-  const files = [];
-  if (!fs.existsSync(dir)) return files;
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (ignoreEngine.ignores(fullPath)) continue;
-    if (entry.isDirectory()) {
-      files.push(...getAllFiles(fullPath, ignoreEngine));
-    } else {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
-
 function loadLastScan(lastScanPath) {
   if (!fs.existsSync(lastScanPath)) {
     return { timestamp: null, files: {} };
@@ -77,6 +61,40 @@ function filterIgnored(files, ignoreEngine) {
 
 function getProjectFromPath(filePath) {
   return String(filePath).replace(/\\/g, '/').split('/')[0] || '.';
+}
+
+async function getAllFilesAsync(rootDir, ignoreEngine, options = {}) {
+  const maxFiles = options.maxFiles || 50000;
+  const deadline = Date.now() + (options.maxTimeMs || 30000);
+  const files = [];
+  const directories = [rootDir];
+  while (directories.length > 0 && files.length < maxFiles && Date.now() <= deadline) {
+    const dir = directories.shift();
+    let entries;
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (ignoreEngine.ignores(fullPath)) continue;
+      if (entry.isDirectory()) directories.push(fullPath);
+      else files.push(fullPath);
+      if (files.length >= maxFiles) break;
+    }
+  }
+  return files;
+}
+
+async function getFileHashAsync(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('md5');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
 }
 
 function detectFromGit(rootDir, ignoreEngine) {
@@ -120,28 +138,30 @@ function detectFromGit(rootDir, ignoreEngine) {
   };
 }
 
-function detectFromHash(rootDir, lastScanPath, ignoreEngine) {
+async function detectFromHash(rootDir, lastScanPath, ignoreEngine) {
   const lastScan = loadLastScan(lastScanPath);
   const currentFiles = {};
-  const files = getAllFiles(rootDir, ignoreEngine);
-
-  for (const file of files) {
+  const files = await getAllFilesAsync(rootDir, ignoreEngine);
+  const entries = await mapWithConcurrency(files, 8, async file => {
     const relativePath = path.relative(rootDir, file);
     const prev = normalizeFileEntry(lastScan.files && lastScan.files[relativePath]);
     let stat;
     try {
-      stat = fs.statSync(file);
+      stat = await fs.promises.stat(file);
     } catch {
-      continue;
+      return null;
     }
     // Skip hash computation when mtime matches and we have a cached hash.
     // Tradeoff: a content change that preserves mtime (rare in practice)
     // would be missed; the speedup on unchanged trees is worth it.
     if (prev.mtimeMs !== null && prev.hash && stat.mtimeMs === prev.mtimeMs) {
-      currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: prev.hash };
+      return [relativePath, { mtimeMs: stat.mtimeMs, hash: prev.hash }];
     } else {
-      currentFiles[relativePath] = { mtimeMs: stat.mtimeMs, hash: getFileHash(file) };
+      return [relativePath, { mtimeMs: stat.mtimeMs, hash: await getFileHashAsync(file) }];
     }
+  });
+  for (const entry of entries.filter(Boolean)) {
+    currentFiles[entry[0]] = entry[1];
   }
 
   const changes = [];
@@ -178,7 +198,7 @@ function detectFromHash(rootDir, lastScanPath, ignoreEngine) {
   };
 }
 
-function detectChangedFiles(rootDir, lastScanPath, ignoreEngine = createIgnoreEngine(rootDir)) {
+async function detectChangedFiles(rootDir, lastScanPath, ignoreEngine = createIgnoreEngine(rootDir)) {
   const useGit = hasGitRepo(rootDir);
 
   if (useGit) {
@@ -189,7 +209,7 @@ function detectChangedFiles(rootDir, lastScanPath, ignoreEngine = createIgnoreEn
   }
 
   // Hash fallback: triggered when !useGit, or git mode failed.
-  const hashResult = detectFromHash(rootDir, lastScanPath, ignoreEngine);
+  const hashResult = await detectFromHash(rootDir, lastScanPath, ignoreEngine);
   return { ...hashResult, useGit };
 }
 
@@ -813,7 +833,7 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
   }
 
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
-  const freshDetection = detectChangedFiles(rootDir, lastScanPath);
+  const freshDetection = await detectChangedFiles(rootDir, lastScanPath);
   const freshChanges = attachChangeEvidence(rootDir, freshDetection.changes, {
     ...transaction.evidenceOptions,
     gitBaseRef: freshDetection.gitBaseRef
@@ -851,7 +871,7 @@ async function updateCommand(rootDir, options = {}) {
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 
   const { changedFiles, changes, detectionMethod, useGit, hashScanState, gitBaseRef } =
-    detectChangedFiles(rootDir, lastScanPath);
+    await detectChangedFiles(rootDir, lastScanPath);
 
   const evidenceOptions = {
     maxFileChars: options.maxEvidenceFileChars,

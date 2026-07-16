@@ -37,7 +37,7 @@ function createInitCommand(dependencies = {}) {
     const runtimeContext = services.discovery.getRuntimeContext
       ? services.discovery.getRuntimeContext()
       : null;
-    const snapshot = services.snapshot.capture(rootDir, projects, {
+    const snapshot = await services.snapshot.capture(rootDir, projects, {
       ...options,
       registry: runtimeContext?.registry
     });

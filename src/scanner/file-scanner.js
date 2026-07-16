@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { globSync } = require('glob');
+const { glob, globSync } = require('glob');
 const { defaultRegistry } = require('../adapters');
 const { CONTEXT_LIMITS, PROJECT_LIMITS } = require('../utils/constants');
 const { estimateTokensForContent } = require('../utils/token-estimator');
 const { filterSensitive } = require('../utils/sensitive-filter');
 const { createIgnoreEngine } = require('../utils/ignore-engine');
+const { mapWithConcurrency } = require('../utils/async-pool');
 
 const LANGUAGE_BY_EXTENSION = {
   '.c': 'c',
@@ -252,4 +253,182 @@ function estimateTokens(filePaths) {
   return Math.round(totalTokens);
 }
 
-module.exports = { scanProject, estimateTokens };
+async function buildTreeAsync(
+  dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = null, deadline = Infinity
+) {
+  if (Date.now() > deadline) return prefix + '└── (扫描时间预算已用尽)\n';
+  if (depth >= maxDepth) return prefix + '└── ...\n';
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return prefix + '└── (无法读取目录)\n';
+  }
+  const visible = entries.filter(entry =>
+    !entry.name.startsWith('.') &&
+    entry.name !== 'node_modules' &&
+    entry.name !== 'ai-docs' &&
+    entry.name !== 'code-ctx.config.json' &&
+    entry.name !== 'code-ctx.config.js' &&
+    (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, entry.name)))
+  );
+  let tree = '';
+  for (let index = 0; index < visible.length; index++) {
+    const entry = visible[index];
+    const isLast = index === visible.length - 1;
+    const connector = isLast ? '└── ' : '├── ';
+    const childPrefix = isLast ? prefix + '    ' : prefix + '│   ';
+    const fullPath = path.join(dir, entry.name);
+    tree += `${prefix}${connector}${entry.name}${entry.isDirectory() ? '/' : ''}\n`;
+    if (entry.isDirectory()) {
+      tree += await buildTreeAsync(
+        fullPath, childPrefix, depth + 1, maxDepth, ignoreEngine, deadline
+      );
+    }
+  }
+  return tree;
+}
+
+async function readSample(filePath, bytes) {
+  const handle = await fs.promises.open(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(bytes);
+    const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
+    return buffer.subarray(0, bytesRead).toString('utf8');
+  } finally {
+    await handle.close();
+  }
+}
+
+async function hashFile(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('data', chunk => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+async function scanProjectAsync(projectDir, projectType, options = {}) {
+  let projectStat;
+  try {
+    projectStat = await fs.promises.stat(projectDir);
+  } catch {
+    projectStat = null;
+  }
+  if (!projectStat?.isDirectory()) throw new Error(`Directory does not exist: ${projectDir}`);
+
+  const startedAt = Date.now();
+  const deadline = startedAt + (options.maxScanTimeMs ?? PROJECT_LIMITS.MAX_SCAN_TIME_MS);
+  const maxFiles = options.maxFiles || PROJECT_LIMITS.MAX_FILES_PER_PROJECT;
+  const maxTokens = options.maxTokens || PROJECT_LIMITS.MAX_PROJECT_TOKENS;
+  const maxScanBytes = options.maxScanBytes ?? PROJECT_LIMITS.MAX_SCAN_BYTES;
+  const maxSampleBytes = options.maxSampleBytesPerFile ?? PROJECT_LIMITS.MAX_SAMPLE_BYTES_PER_FILE;
+  const concurrency = options.ioConcurrency ?? PROJECT_LIMITS.IO_CONCURRENCY;
+  const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
+  const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
+  const registry = options.registry || defaultRegistry;
+  const ignoreEngine = options.ignoreEngine || createIgnoreEngine(projectDir, {
+    excludeDirs: options.excludeDirs
+  });
+  const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
+  const adapterPatterns = configuredPatterns || registry.getScanPatterns(projectType);
+  const patterns = adapterPatterns.length > 0
+    ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
+    : [];
+
+  const [tree, patternMatches] = await Promise.all([
+    buildTreeAsync(projectDir, '', 0, 5, ignoreEngine, deadline),
+    Promise.all(patterns.map(pattern => glob(pattern, {
+      cwd: projectDir,
+      absolute: true,
+      nodir: true
+    })))
+  ]);
+  const extracted = registry.extractKeyFiles(projectType, projectDir);
+  const candidates = [...new Set(ignoreEngine.filter([...patternMatches.flat(), ...extracted]))];
+  const stats = await mapWithConcurrency(candidates, concurrency, async filePath => {
+    try {
+      const stat = await fs.promises.stat(filePath);
+      return stat.isFile() ? { filePath, size: stat.size } : null;
+    } catch {
+      return null;
+    }
+  });
+  const existing = stats.filter(Boolean);
+  const prioritized = existing.length > maxFiles
+    ? prioritizeFiles(existing.map(item => item.filePath), projectType, registry)
+      .slice(0, maxFiles)
+      .map(filePath => existing.find(item => item.filePath === filePath))
+    : existing;
+
+  let plannedBytes = 0;
+  const planned = [];
+  const skipped = [];
+  for (const item of prioritized) {
+    const sampleBytes = Math.min(item.size, maxSampleBytes);
+    if (plannedBytes + sampleBytes > maxScanBytes || Date.now() > deadline) {
+      skipped.push({ path: item.filePath, reason: Date.now() > deadline ? 'time-budget' : 'byte-budget' });
+      continue;
+    }
+    plannedBytes += sampleBytes;
+    planned.push({ ...item, sampleBytes });
+  }
+  const sampled = await mapWithConcurrency(planned, concurrency, async item => ({
+    ...item,
+    content: await readSample(item.filePath, item.sampleBytes)
+  }));
+
+  let tokens = 0;
+  const selected = [];
+  for (const item of sampled) {
+    const sampleTokens = estimateTokensForContent(item.content);
+    const estimated = item.sampleBytes < item.size && item.sampleBytes > 0
+      ? Math.ceil(sampleTokens * (item.size / item.sampleBytes))
+      : sampleTokens;
+    if (tokens + estimated > maxTokens && selected.length > 0) break;
+    tokens += estimated;
+    selected.push(item);
+  }
+
+  let remainingChars = Math.max(0, maxSourceChars);
+  const sourceFiles = await mapWithConcurrency(selected, concurrency, async item => {
+    const safe = filterSensitive(item.content);
+    const originalChars = safe.content.length;
+    const includedChars = Math.min(originalChars, maxSourceFileChars, remainingChars);
+    remainingChars -= includedChars;
+    return {
+      path: path.relative(projectDir, item.filePath).split(path.sep).join('/'),
+      language: detectLanguage(item.filePath),
+      hash: await hashFile(item.filePath),
+      hashAlgorithm: 'sha256',
+      content: safe.content.slice(0, includedChars),
+      redactions: safe.count,
+      truncation: {
+        truncated: includedChars < originalChars || item.sampleBytes < item.size,
+        originalChars: item.sampleBytes < item.size ? item.size : originalChars,
+        includedChars,
+        reason: item.sampleBytes < item.size ? 'sample-limit' :
+          (includedChars < originalChars ? 'file-limit' : null)
+      }
+    };
+  });
+
+  return {
+    tree,
+    keyFiles: selected.map(item => item.filePath),
+    sourceFiles,
+    promptHints: registry.getPromptHints(projectType),
+    totalFiles: candidates.length,
+    limitedTo: selected.length,
+    estimatedTokens: tokens,
+    scanBudget: {
+      elapsedMs: Date.now() - startedAt,
+      sampledBytes: plannedBytes,
+      skipped
+    }
+  };
+}
+
+module.exports = { scanProject, scanProjectAsync, estimateTokens };

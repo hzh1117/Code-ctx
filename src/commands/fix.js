@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { scanProject } = require('../scanner/file-scanner');
+const { scanProjectAsync } = require('../scanner/file-scanner');
 const { getAIConfig, loadProjectConfig, getConfigFile } = require('../utils/config');
 const { initPlugins } = require('../plugins/loader');
 const { generateWithContinuation } = require('../ai/client');
@@ -24,7 +24,11 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   }
 
   const projectDir = path.join(rootDir, project.path);
-  const scanResult = scanProject(projectDir, project.type, { registry: pluginContext.registry });
+  const scanResult = await scanProjectAsync(
+    projectDir,
+    project.type,
+    { registry: pluginContext.registry }
+  );
 
   const prompt = buildInitPrompt({
     project,

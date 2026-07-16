@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { scanProject, estimateTokens } = require('../../src/scanner/file-scanner');
+const { scanProject, scanProjectAsync, estimateTokens } = require('../../src/scanner/file-scanner');
 
 function createTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'scan-bound-'));
@@ -186,5 +186,33 @@ describe('estimateTokens', () => {
 
   test('空数组返回 0', () => {
     expect(estimateTokens([])).toBe(0);
+  });
+});
+
+describe('scanProjectAsync budgets', () => {
+  test('yields the event loop and reports byte-budget skips', async () => {
+    const dir = createTmpDir();
+    try {
+      fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+      fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+      fs.writeFileSync(path.join(dir, 'src', 'large.js'), 'x'.repeat(10000));
+      fs.writeFileSync(path.join(dir, 'src', 'small.js'), 'export const small = true;');
+      let eventLoopAdvanced = false;
+      setImmediate(() => { eventLoopAdvanced = true; });
+
+      const result = await scanProjectAsync(dir, 'generic-js-ts', {
+        maxScanBytes: 100,
+        maxSampleBytesPerFile: 1000,
+        ioConcurrency: 2
+      });
+
+      expect(eventLoopAdvanced).toBe(true);
+      expect(result.scanBudget.sampledBytes).toBeLessThanOrEqual(100);
+      expect(result.scanBudget.skipped).toEqual(expect.arrayContaining([
+        expect.objectContaining({ reason: 'byte-budget' })
+      ]));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

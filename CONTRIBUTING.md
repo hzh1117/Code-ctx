@@ -8,12 +8,13 @@
 
 维护者本地可能保留 `docs/` 规划和审计资料，但该目录默认不上传 Git。公开贡献请以 README、SECURITY、CHANGELOG 和当前代码为准。
 
-当前最需要的贡献方向：
+P0-P3 技术问题清单已经完成。当前最需要的贡献方向：
 
-- P0 安全修复：配置文件执行、命令拼接、Dashboard 配置写入、SSRF、错误信息泄露、速率限制。
-- 测试补齐：`core/section.js`、`core/doc-resolver.js`、`web/middleware/security.js`、`utils/git-utils.js`。
-- 性能优化：AI 并发、hash 模式 mtime 预筛选、Dashboard 状态缓存、前端懒加载。
-- 文档同步：README、配置示例、AI 使用指令和安全说明。
+- 类型覆盖：按 `TYPE_CHECKING.md` 扩大 `checkJs`，优先处理 Adapter、命令返回对象、Web API 和 Vue。
+- 工具链维护：升级 ESLint、Vite、Glob 等依赖，同时保持 Node 20/22 与 Windows/Ubuntu CI 兼容。
+- 运行边界：改进 provider 兼容性 smoke、失败诊断、配额可观测性和 Dashboard 公网部署基线。
+- 发布工程：自动版本、npm provenance、安装包内容验证和可复现 release notes。
+- 文档同步：README、配置示例、AI 使用指令、安全说明和变更记录。
 
 ### 开发环境
 
@@ -27,12 +28,19 @@ cd web && npm install && cd ..
 常用命令：
 
 ```bash
+npm run format:check
+npm run lint
+npm run typecheck
 npm test -- --runInBand
+npm run coverage
 npm run build:web
+npm run pack:smoke
 npm run check
-node bin/cli.js help
+node bin/cli.js --help
 node bin/cli.js dashboard
 ```
+
+`npm run check` 已包含上述格式、lint、类型、测试、覆盖率、Web 构建和 package smoke 门禁。修改依赖时还必须对根目录和 `web/` 分别运行 `npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org`。
 
 ### 分支与提交
 
@@ -83,12 +91,13 @@ Thanks for helping improve Code-ctx. The project is released under the MIT Licen
 
 Maintainers may keep local planning and audit material under `docs/`, but that directory is ignored by Git by default. Public contributions should use README, SECURITY, CHANGELOG, and the current code as the source of truth.
 
-The highest-value contribution areas are:
+The P0-P3 technical issue list is complete. The highest-value contribution areas are now:
 
-- P0 security fixes: config execution, command construction, Dashboard config writes, SSRF, error disclosure, and rate limiting.
-- Test coverage: `core/section.js`, `core/doc-resolver.js`, `web/middleware/security.js`, and `utils/git-utils.js`.
-- Performance: AI concurrency, mtime prefiltering for hash mode, Dashboard status caching, and frontend lazy loading.
-- Documentation sync: README, config examples, AI handoff prompts, and security guidance.
+- Type coverage: expand `checkJs` following `TYPE_CHECKING.md`, starting with adapters, command result objects, Web APIs, and Vue.
+- Toolchain maintenance: update ESLint, Vite, Glob, and related dependencies while preserving Node 20/22 and Windows/Ubuntu CI support.
+- Runtime boundaries: improve provider compatibility smoke, failure diagnostics, quota observability, and the Dashboard public-deployment baseline.
+- Release engineering: automated versions, npm provenance, package-content verification, and reproducible release notes.
+- Documentation sync: README, config examples, AI handoff guidance, security notes, and changelog entries.
 
 ### Development Setup
 
@@ -102,12 +111,19 @@ cd web && npm install && cd ..
 Useful commands:
 
 ```bash
+npm run format:check
+npm run lint
+npm run typecheck
 npm test -- --runInBand
+npm run coverage
 npm run build:web
+npm run pack:smoke
 npm run check
-node bin/cli.js help
+node bin/cli.js --help
 node bin/cli.js dashboard
 ```
+
+`npm run check` includes the formatting, lint, type, test, coverage, Web build, and package-smoke gates above. Dependency changes must also run `npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org` in both the repository root and `web/`.
 
 ### Branches and Commits
 

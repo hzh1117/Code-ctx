@@ -10,9 +10,36 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 ### [Unreleased]
 
+#### Added
+
+- 扫描器输出带相对路径、语言、SHA-256、截断信息和脱敏源码的结构化证据；Git 与 hash 更新模式都会向 Prompt 提供有界变更证据，并识别删除文件。
+- 新增 `project-manifest.json` 作为文档归属和事实校验的信任锚；doctor 会校验文件 hash、路由和依赖声明，而不只检查格式。
+- `init --skip-ai` 现在生成确定性项目文档、`OVERVIEW.md` 和 manifest；新增 generic JS/TS、generic backend 与 unknown adapter，并支持配置覆盖扫描模式。
+- AI 客户端新增统一出站隐私网关、结构化脱敏审计、AbortSignal、五分钟总 deadline 和可取消重试等待。
+- `init` 已拆分为 discovery、snapshot、planning、generation、validation 和 commit 服务；插件 Registry/状态按项目根目录隔离，扫描与 hash 路径使用带预算的异步 I/O。
+- 新增 `code-ctx config setup` 引导式 AI 配置与连接测试、TTY/JSON 双模式 AI 进度报告、真实本地 HTTP AI 全流程测试和可选 nightly provider smoke。
+- 新增 Prettier、增量 TypeScript `checkJs`、全局与关键文件覆盖率阈值、真实 npm package smoke，以及 Ubuntu Node 20/22 + Windows smoke CI。
+
+#### Fixed
+
+- init/update 只在目标文档成功写盘后提交扫描基线；AI 失败、缺少 Key、section 写入失败和部分失败不再被报告为成功或消费变化。
+- 默认 `update` 始终输出合并 Prompt；`--dry-run` 与 `--apply` 互斥；`--apply` 只刷新有源码证据影响的 section，未知变化进入确认队列。
+- 修复根项目漏探测、零项目成功、hash 模式删除遗漏、绝对项目路径、输出 token 与输入预算混用等问题。
+- continuation 会结合 provider 截断原因和输出结构校验；one-shot 使用严格机器边界并逐项目校验，不再依赖自由标题拆分。
+- 配置未知字段会给出迁移警告，类型错误会阻止运行；旧 `code-ctx.config.js` 只按静态 `module.exports = {...}` 数据解析，不再执行 JavaScript。
+- `use` 按场景和 token 预算压缩上下文并报告删除摘要；Web Prompt 生成不再重复构建上下文；项目检测只执行一次有界深度遍历。
+
+#### Security
+
+- OpenAI、Anthropic、continuation 和流式请求的所有出站消息统一脱敏密钥、连接串和绝对路径，包括回传的 assistant 内容。
+- CLI 的 init/update/fix/doctor/use/watch 支持 Ctrl+C 取消并清理 socket、timer 和监听器；单次超时、总 deadline 与用户取消使用不同错误码。
+- 删除会打印 API Key 前缀、模型完整响应和错误堆栈的本地调试脚本。
+- CI 对根 CLI 和 Dashboard 的生产依赖执行官方 npm high/critical 阻断审计；修复 `shell-quote` critical 与 `form-data` high 漏洞。
+
 #### Changed
 
 - 项目许可证从 Code-ctx Non-Commercial Source License 切换回 MIT License，允许个人和商业自由使用、修改和分发。同步更新 README、README_EN、CONTRIBUTING、SUPPORT、CODE_OF_CONDUCT、Issue 模板和 `package.json` 的 license 字段。
+- 技术问题清单中的 P0（7/7）、P1（15/15）、P2（17/17）与 P3（10/10）已全部完成；README、安全策略、贡献指南和 CI 已同步当前实现。
 
 ### [1.0.0] - 2026-05-23
 
@@ -41,8 +68,8 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 #### Known Issues
 
-- 当前仍存在 P0/P1 风险：配置文件执行、命令拼接、Dashboard 配置写入和统一错误处理；AI baseUrl 和敏感 AI API 已有基础防护，但仍需更细的 token/IP 限流策略和分布式部署方案。
-- 当前测试覆盖仍不均衡：`core/`、`web/middleware/`、`utils/git-utils.js` 和适配器缺少直接测试。
+- 技术问题清单 P0-P3 已全部完成。后续工作转为扩大 `checkJs` 范围、持续依赖升级、provider 兼容性观察和发布自动化。
+- Dashboard 仍仅面向本机；当前内存级限流不适用于多进程或分布式公网部署。
 
 ---
 
@@ -50,9 +77,36 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 ### [Unreleased]
 
+#### Added
+
+- Scanner output now carries structured source evidence with relative paths, language, SHA-256, truncation metadata, and redacted content. Git and hash update modes include bounded change evidence and detect deleted files.
+- Added `project-manifest.json` as the trust anchor for document ownership and fact verification. Doctor checks file hashes, routes, and dependency claims instead of format alone.
+- `init --skip-ai` now generates deterministic project docs, `OVERVIEW.md`, and a manifest. Generic JS/TS, generic backend, and unknown adapters were added with configurable scan-pattern overrides.
+- The AI client now provides one outbound privacy gateway, structured redaction audits, AbortSignal support, a five-minute operation deadline, and cancellable retry waits.
+- `init` is split into discovery, snapshot, planning, generation, validation, and commit services. Plugin registries/state are isolated by project root, and scanner/hash paths use budgeted asynchronous I/O.
+- Added guided `code-ctx config setup`, TTY/JSON AI progress events, a real local-HTTP AI flow test, and opt-in nightly provider smoke coverage.
+- Added Prettier, incremental TypeScript `checkJs`, global and critical-file coverage thresholds, real npm package smoke, and Ubuntu Node 20/22 plus Windows smoke CI.
+
+#### Fixed
+
+- Init/update commit scan baselines only after target documents are written successfully. AI failures, missing keys, section-write failures, and partial failures no longer report success or consume changes.
+- Default `update` always emits a merged prompt; `--dry-run` conflicts with `--apply`; apply mode refreshes only source-evidenced sections and sends unknown changes to confirmation.
+- Fixed missed root projects, zero-project success, deleted files in hash mode, absolute persisted project paths, and mixed input/output token budgeting.
+- Continuation uses provider truncation reasons plus output-structure validation. One-shot output uses strict machine boundaries with per-project validation instead of free-form headings.
+- Unknown config fields produce migration warnings while invalid types block execution. Legacy `code-ctx.config.js` is parsed only as static `module.exports = {...}` data and is never executed.
+- `use` compresses context by scenario and token budget with a removal summary; Web prompt generation reuses one context build; project detection performs one bounded traversal.
+
+#### Security
+
+- Every outbound OpenAI, Anthropic, continuation, and streaming message now redacts secrets, connection strings, and absolute paths, including assistant content sent back for continuation.
+- CLI init/update/fix/doctor/use/watch commands support Ctrl+C cancellation and clean up sockets, timers, and listeners. Request timeout, operation deadline, and user cancellation have distinct error codes.
+- Removed the local debug script that printed API-key prefixes, complete model responses, and error stacks.
+- CI blocks on official npm high/critical production-dependency audits for both the CLI and Dashboard; the `shell-quote` critical and `form-data` high findings were fixed.
+
 #### Changed
 
 - Switched the project license from the Code-ctx Non-Commercial Source License back to the MIT License. The project is now free for personal and commercial use, modification, and redistribution. README, README_EN, CONTRIBUTING, SUPPORT, CODE_OF_CONDUCT, the issue template, and the `package.json` license field were updated accordingly.
+- All technical P0 (7/7), P1 (15/15), P2 (17/17), and P3 (10/10) items are complete. README, security guidance, contribution guidance, and CI now reflect the current implementation.
 
 ### [1.0.0] - 2026-05-23
 
@@ -75,5 +129,5 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 #### Known Issues
 
-- Remaining P0/P1 risks include config execution, command construction, Dashboard config writes, and unified error handling. AI `baseUrl` and sensitive AI APIs have baseline protection, but finer token/IP rate-limit policies and distributed deployment support still need follow-up work.
-- Test coverage is still uneven: `core/`, `web/middleware/`, `utils/git-utils.js`, and adapters need direct tests.
+- The P0-P3 technical issue list is complete. Follow-up work focuses on expanding `checkJs`, routine dependency upgrades, provider compatibility monitoring, and release automation.
+- The Dashboard remains local-only; current in-memory rate limiting is not sufficient for multi-process or distributed public deployment.

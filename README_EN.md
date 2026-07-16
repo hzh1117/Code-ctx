@@ -15,7 +15,7 @@ English | [中文](README.md)
 
 ---
 
-> **Project status:** v1.0.0 has shipped. The CLI, local Dashboard, plugin system, JSON config, document quality scoring, task history, and token budgeting are all in place. For production deployment, please review "Known Risks" below and harden as needed.
+> **Project status:** v1.0.0 has shipped, and the current `master` has completed every P0-P3 item in the technical issue list. Initialization, incremental updates, fact verification, privacy filtering, AI request control, and engineering gates have passed the full regression suite. Review "Known Risks" before production deployment.
 
 > **License:** Released under the [MIT License](LICENSE). Free for personal and commercial use, modification, and redistribution.
 
@@ -31,19 +31,20 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 
 | Feature | Current Implementation |
 |---------|------------------------|
-| Project detection | Built-in adapters for Vue 2/3, React, Next.js, uni-app, Java, Node.js, Go, Python, and more |
-| Documentation generation | `code-ctx init` scans projects and writes `ai-docs/` |
+| Project detection | Built-in Vue 2/3, React, Next.js, uni-app, Java, Node.js, Go, Python, and generic JS/TS/backend/unknown adapters with configurable scan-pattern overrides |
+| Documentation generation | `code-ctx init` writes `ai-docs/`; `--skip-ai` writes deterministic Markdown, OVERVIEW, and a project manifest |
 | Prompt generation | `code-ctx use "task"` matches scenarios and builds context-aware prompts; 8 built-in scenarios (A–H) |
-| Incremental updates | `code-ctx update` detects changes using Git diff or hash fallback |
+| Incremental updates | `code-ctx update` detects additions, edits, and deletions using Git diff or hashes; `--apply` targets only evidence-backed sections |
 | Health checks | `code-ctx doctor` checks documentation completeness and consistency; supports `--fix` |
-| Document quality scoring | Completeness, freshness, and risk scoring with an overall `OK / WARN / HIGH_RISK` verdict and 0–100 score |
+| Document quality scoring | Completeness, freshness, risk, and manifest-backed fact scoring with an overall `OK / WARN / HIGH_RISK` verdict and 0–100 score |
 | Local Dashboard | Vue 3 + Express dashboard for config, AI generation, project status, doc quality, security & health, and task history |
 | AI protocols | OpenAI-compatible and Anthropic-compatible protocols; built-in presets for OpenAI, Anthropic, DeepSeek, Kimi, MiniMax |
-| Token budgeting | `code-ctx use` and the Dashboard report prompt token estimates and over-budget warnings |
+| Token budgeting | Budgets the serialized outbound request, reserves output tokens separately, and validates continuation structure |
 | Task history | `use` / `update` automatically append history entries; raw prompts are never written to disk — only hash, length, and a sanitized preview are kept, with automatic rotation |
 | Config format | Recommended `code-ctx.config.json` (schema-validated, non-executable); read-only compatibility with `code-ctx.config.js` |
 | Plugin system | Mount local paths or npm packages via `plugins: [...]`; contribute adapters, scenarios, and sensitive-pattern rules |
-| Sensitive filtering | Basic filtering for passwords, API keys, JWTs, SSH keys, database URLs, and related secrets |
+| Sensitive filtering | One outbound gateway redacts secrets, connection strings, and absolute paths from every AI message and emits value-free audit summaries |
+| AI request control | Per-request timeout plus a five-minute operation deadline; normal, continuation, streaming, and retry waits support AbortSignal and CLI Ctrl+C cleanup |
 
 ## Quick Start
 
@@ -93,6 +94,7 @@ code-ctx use "Add order export" --stdout
 | `code-ctx watch` | Watch file changes and trigger incremental updates |
 | `code-ctx hook` | Manage the Git post-commit hook |
 | `code-ctx dashboard` | Start the local Web Dashboard |
+| `code-ctx config validate/migrate/setup` | Validate, migrate, or interactively configure the project and AI provider |
 
 Common options:
 
@@ -117,6 +119,8 @@ code-ctx dashboard -p 8080
 code-ctx dashboard --dir D:/workspace/your-project
 code-ctx dashboard --dev
 ```
+
+`init --skip-ai` needs no API key and produces deterministic documents containing scan evidence only. In AI mode, `project-manifest.json` is the trust anchor for document ownership and fact verification. `update --apply` does not guess a section or commit the scan baseline when impact cannot be confirmed. AI calls default to a 180-second request timeout and a five-minute total operation deadline; Ctrl+C cancels active requests and retry waits.
 
 ## Configuration
 
@@ -174,9 +178,9 @@ AI `baseUrl` values accept public HTTPS endpoints by default and reject localhos
 
 Config-loading priority: `code-ctx.config.json` > `code-ctx.config.js`. When both exist the JSON file wins and the JS file is ignored (with a one-shot warning).
 
-> **Migrating from JS to JSON**: copy the object literal from `module.exports = {...}` into a new `code-ctx.config.json`, quote keys properly, and remove the `.js` file. Dashboard writes and `saveAIConfig` follow the currently active format (JSON preferred).
+> **Migrating from JS to JSON**: run `code-ctx config migrate`. It statically parses `module.exports = {...}`, backs up the legacy file, and writes `code-ctx.config.json`. Later Dashboard and `saveAIConfig` changes are also written to JSON.
 
-The legacy `code-ctx.config.js` continues to load read-only. Use `code-ctx init --config-format=js` if you specifically want the legacy JS format for a new project. JS configs are evaluated inside a VM sandbox and cannot `require()` or touch `process`.
+Legacy `code-ctx.config.js` is supported as static, read-only data only. The loader extracts `module.exports = {...}` and parses it with JSON5; it never executes JavaScript and rejects `require`, `process`, function calls, and computed expressions. Run `code-ctx config migrate` to create a backed-up JSON config. All subsequent writes use `code-ctx.config.json`.
 
 ### Plugin system (MVP)
 
@@ -205,7 +209,7 @@ See [`examples/plugin-basic/`](examples/plugin-basic/) for a minimal example. Pl
 code-ctx dashboard
 ```
 
-The default URL is `http://localhost:3456`. The Dashboard reads the managed project's `code-ctx.config.js` and `ai-docs/`. Start it inside the project directory or pass `--dir`.
+The default URL is `http://localhost:3456`. The Dashboard reads the managed project's `code-ctx.config.json` (with static legacy-JS compatibility) and `ai-docs/`. Start it inside the project directory or pass `--dir`.
 
 Current Dashboard pages include:
 
@@ -247,26 +251,32 @@ codecontext/
 
 ## Roadmap
 
-Post-1.0.0 priorities:
+Continuous improvement after completing the P0-P3 technical issue list:
 
-1. Continue tightening the security surface: `loadConfigWithVM()` sandbox boundaries, command construction in dashboard dev mode and Git utilities, unified Web API error handling, and finer-grained token/IP rate-limit policies.
-2. Close test gaps in `core/`, `web/middleware/`, `utils/git-utils.js`, built-in adapters, and plugin loading.
-3. Performance: serial AI calls in `init` and `update --apply`, mtime prefiltering in the scanner, Dashboard status-page caching.
-4. AI client enhancements: streaming, request cancellation, and automatic truncation or chunking when prompts exceed the token budget.
-5. Plugin ecosystem: example plugins, official adapter templates, and plugin schema validation.
+1. Expand `checkJs` in phases using [`TYPE_CHECKING.md`](TYPE_CHECKING.md), eventually covering adapters, commands, Web APIs, and the Vue frontend.
+2. Keep ESLint, Vite, Glob, and production dependencies current while preserving Node 20/22 and Windows/Ubuntu compatibility.
+3. Extend provider compatibility smoke tests, failure diagnostics, and trend reporting while keeping credentialed tests explicitly opt-in.
+4. Improve release automation, version notes, npm provenance, and verification that packages contain only intended artifacts.
+5. If the Dashboard is deployed publicly or across processes, add persistent rate limiting, standalone authentication, proxy trust boundaries, and a deployment security baseline.
 
 Maintainers may keep `docs/` locally for planning and audit material; `docs/` is ignored by Git by default and is not included in the npm package.
 
 ## Development
 
 ```bash
+npm run format:check
+npm run lint
+npm run typecheck
 npm test -- --runInBand
 npm run coverage
 npm run build:web
+npm run pack:smoke
 npm run check
-node bin/cli.js help
+node bin/cli.js --help
 node bin/cli.js dashboard
 ```
+
+`npm run check` runs formatting, CLI/backend/Vue lint, incremental `checkJs`, regular tests, thresholded coverage, the production Web build, and a real npm pack/install smoke in order. CI runs the complete gates on Ubuntu with Node 20/22 and CLI/package smoke on Windows with Node 20. High/critical production dependency audits for both the CLI and Dashboard block CI.
 
 For frontend changes, run at least:
 
@@ -278,15 +288,15 @@ For security, path, config, or Web API changes, add matching tests.
 
 ## Known Risks
 
-Hardened in v1.0.0: AI `baseUrl` rejects non-HTTPS, loopback, private, link-local, and metadata addresses by default and validates DNS resolution results; saving API keys via the Dashboard validates protocol, base URL, model name, and newline injection; sensitive AI endpoints have basic in-memory rate limiting; `tokenAuth` uses `crypto.timingSafeEqual` with length pre-check to mitigate timing side channels.
+The current `master` has completed all P0-P3 technical issues: bounded source and change evidence reaches prompts; init/update commit state only after successful writes; manifests drive document ownership and fact checks; all outbound AI messages pass through one privacy gateway; requests support total deadlines and Ctrl+C cancellation; and formatting, types, coverage, cross-platform smoke, and dependency audits are enforced. Existing base-URL SSRF, Dashboard key-write, and token timing protections remain in place.
 
-Current priority risks:
+Remaining risks are deployment and ongoing maintenance boundaries:
 
-- Sandbox boundaries of `loadConfigWithVM()` config execution.
-- Command construction in dashboard dev mode and Git utilities.
-- Unified Web API error handling and finer-grained rate limiting (for multi-process / distributed deployments).
-- Test gaps in `core/`, `web/middleware/`, `utils/git-utils.js`, and built-in adapters.
-- Serial AI calls in `init` and `update --apply`.
+- Legacy `code-ctx.config.js` is no longer executed, but only static object syntax is supported; migrate to strictly validated `code-ctx.config.json`.
+- The Dashboard is local-only, and in-memory rate limiting is not sufficient for multi-process or distributed public deployment.
+- `checkJs` currently covers an incremental set; historical JavaScript outside that set remains on the documented migration plan.
+- Nightly provider smoke needs external credentials and is explicitly opt-in, so it cannot guarantee every third-party compatible endpoint remains available.
+- Automated fact checks rely on manifests and source evidence and do not replace manual review before publishing private documentation.
 
 The Dashboard is intended for local development and should not be exposed directly to the public internet.
 

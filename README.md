@@ -15,7 +15,7 @@
 
 ---
 
-> **项目状态：** v1.0.0 已发布，CLI、本地 Dashboard、插件系统、JSON 配置、文档质量评分、任务历史与 token 预算等核心能力已上线。生产部署仍建议参考下文「已知风险」按需加固。
+> **项目状态：** v1.0.0 已发布；当前 `master` 已完成技术问题清单中的全部 P0-P3。初始化、增量更新、事实校验、隐私过滤、AI 请求控制和工程门禁已经过完整回归。生产部署仍建议参考下文「已知风险」按需加固。
 
 > **许可说明：** 本项目采用 [MIT 许可证](LICENSE)，允许个人和商业自由使用、修改、分发，无需支付费用或取得额外授权。
 
@@ -31,19 +31,20 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 
 | 能力 | 当前实现 |
 |------|----------|
-| 项目探测 | 内置 Vue 2/3、React、Next.js、uni-app、Java、Node.js、Go、Python 等项目类型适配器 |
-| 文档生成 | `code-ctx init` 扫描项目并生成 `ai-docs/` |
+| 项目探测 | 内置 Vue 2/3、React、Next.js、uni-app、Java、Node.js、Go、Python 及 generic JS/TS/backend/unknown 适配器，扫描模式可配置覆盖 |
+| 文档生成 | `code-ctx init` 扫描项目并生成 `ai-docs/`；`--skip-ai` 生成确定性 Markdown、OVERVIEW 和项目 manifest |
 | Prompt 生成 | `code-ctx use "任务"` 按场景匹配文档生成上下文 prompt，内置 8 个场景（A–H） |
-| 增量更新 | `code-ctx update` 通过 Git diff 或 hash 检测变化 |
+| 增量更新 | `code-ctx update` 通过 Git diff 或 hash 检测新增、修改和删除；`--apply` 只更新有源码证据影响的 section |
 | 健康检查 | `code-ctx doctor` 检查文档完整性和一致性，支持 `--fix` |
-| 文档质量评分 | 完整度、新鲜度、风险三维度评分，输出 `OK / WARN / HIGH_RISK` 与 0–100 综合分 |
+| 文档质量评分 | 完整度、新鲜度、风险和 manifest 事实证据评分，输出 `OK / WARN / HIGH_RISK` 与 0–100 综合分 |
 | 本地 Dashboard | Vue 3 + Express，可视化配置、AI 生成、项目状态、文档评分、安全与健康、任务历史 |
 | AI 协议 | OpenAI 兼容协议和 Anthropic 协议，内置 OpenAI / Anthropic / DeepSeek / Kimi / MiniMax 五个服务商模板 |
-| Token 预算 | `code-ctx use` 和 Dashboard 输出 prompt token 估算与超限警告 |
+| Token 预算 | 按实际序列化请求计算输入预算，独立保留输出 token 配额，并校验续写结构完整性 |
 | 任务历史 | `use` / `update` 自动写入历史；不落盘原始 prompt，仅保留 hash、长度和脱敏 preview，自动轮转 |
 | 配置格式 | 推荐 `code-ctx.config.json`（schema 校验、不可执行），兼容只读 `code-ctx.config.js` |
 | 插件系统 | 通过 `plugins: [...]` 挂载本地路径或 npm 包，可贡献 adapters、scenarios、敏感词规则 |
-| 安全过滤 | 对密码、API Key、JWT、SSH Key、数据库连接串等敏感信息做基础过滤 |
+| 安全过滤 | 所有出站 AI 消息统一过滤密钥、连接串和绝对路径，支持无原值的结构化脱敏审计 |
+| AI 请求控制 | 单次请求 timeout 与 5 分钟总 deadline 分离；普通、续写、流式和重试等待均支持 AbortSignal，CLI 可用 Ctrl+C 清理取消 |
 
 ## 快速开始
 
@@ -93,6 +94,7 @@ code-ctx use "新增订单导出" --stdout
 | `code-ctx watch` | 监听文件变化，自动触发增量更新 |
 | `code-ctx hook` | 管理 Git post-commit hook |
 | `code-ctx dashboard` | 启动本地 Web 管理界面 |
+| `code-ctx config validate/migrate/setup` | 校验、迁移或引导配置项目与 AI provider |
 
 常用参数：
 
@@ -117,6 +119,8 @@ code-ctx dashboard -p 8080
 code-ctx dashboard --dir D:/workspace/your-project
 code-ctx dashboard --dev
 ```
+
+`init --skip-ai` 不需要 API Key，会生成只包含扫描证据的确定性文档。AI 模式下，`project-manifest.json` 是文档归属和事实验证的信任锚；`update --apply` 遇到无法确认影响范围的变化时不会猜测 section，也不会提交扫描基线。AI 请求默认单次超时为 180 秒、整个生成操作上限为 5 分钟，按 Ctrl+C 会取消活动请求和重试等待。
 
 ## 配置
 
@@ -174,9 +178,9 @@ AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网�
 
 配置加载优先级：`code-ctx.config.json` > `code-ctx.config.js`。两者同时存在时，使用 JSON 并忽略 JS。
 
-> **从 JS 迁移到 JSON**：把原 `code-ctx.config.js` 中 `module.exports = {...}` 的对象直接复制为 `code-ctx.config.json` 的内容（注意 key 加双引号），然后删除 `.js` 文件即可。Dashboard 和 `saveAIConfig` 会写回到当前生效的格式（即 JSON 优先）。
+> **从 JS 迁移到 JSON**：运行 `code-ctx config migrate`。命令会静态解析 `module.exports = {...}`、备份旧文件并写入 `code-ctx.config.json`；Dashboard 和 `saveAIConfig` 的后续变更也统一写入 JSON。
 
-仍想使用 JS 配置时，`code-ctx.config.js` 完全保留可读兼容；新项目如需生成 JS 配置可使用 `code-ctx init --config-format=js`。注意：JS 配置在 VM 沙箱内加载，不允许 `require` 或访问 `process`。
+旧 `code-ctx.config.js` 只保留静态只读兼容：加载器提取 `module.exports = {...}` 对象并使用 JSON5 解析，不执行 JavaScript，也不允许 `require`、`process`、函数调用或计算表达式。推荐运行 `code-ctx config migrate` 生成带备份的 JSON 配置；所有后续写入都使用 `code-ctx.config.json`。
 
 ### 插件系统（MVP）
 
@@ -205,7 +209,7 @@ AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网�
 code-ctx dashboard
 ```
 
-默认访问 `http://localhost:3456`。Dashboard 读取的是被管理项目的 `code-ctx.config.js` 和 `ai-docs/`，可以在项目目录内启动，也可以用 `--dir` 指定项目目录。
+默认访问 `http://localhost:3456`。Dashboard 读取的是被管理项目的 `code-ctx.config.json`（兼容静态旧 JS 配置）和 `ai-docs/`，可以在项目目录内启动，也可以用 `--dir` 指定项目目录。
 
 Dashboard 当前包含：
 
@@ -247,26 +251,32 @@ codecontext/
 
 ## 路线图
 
-v1.0.0 后的优先方向：
+P0-P3 技术问题清单完成后的持续改进方向：
 
-1. 收紧仍待加固的安全面：`loadConfigWithVM()` 沙箱、dashboard dev 与 Git 工具的命令构造、Web API 统一错误处理与更细的 token/IP 限流策略。
-2. 补齐覆盖缺口：`core/`、`web/middleware/`、`utils/git-utils.js`、内置适配器和插件加载的直接测试。
-3. 性能优化：`init` 与 `update --apply` 的 AI 串行调用、扫描阶段的 mtime 预筛选与 Dashboard 状态页缓存。
-4. AI 客户端增强：流式输出、请求取消、超出 token 时的自动截断或分段策略。
-5. 插件生态：示例插件、官方适配器模板和插件 schema 校验。
+1. 按 [`TYPE_CHECKING.md`](TYPE_CHECKING.md) 分阶段扩大 `checkJs`，最终覆盖 Adapter、命令、Web API 和 Vue 前端。
+2. 持续升级 ESLint、Vite、Glob 等工具链与生产依赖，保持 Node 20/22 和 Windows/Ubuntu 兼容。
+3. 扩展 provider 兼容性 smoke、失败诊断和长期趋势记录，同时保持真实凭据测试为显式 opt-in。
+4. 完善发布自动化、版本说明和 npm provenance，并持续验证安装包只包含预期产物。
+5. 如需公网或多进程部署 Dashboard，增加持久化限流、独立认证、代理信任边界和部署级安全基线。
 
 维护者本地可以保留 `docs/` 作为规划和审计资料，但 `docs/` 默认不上传 Git，也不进入 npm 发布包。
 
 ## 开发
 
 ```bash
+npm run format:check
+npm run lint
+npm run typecheck
 npm test -- --runInBand
 npm run coverage
 npm run build:web
+npm run pack:smoke
 npm run check
-node bin/cli.js help
+node bin/cli.js --help
 node bin/cli.js dashboard
 ```
+
+`npm run check` 会按顺序执行格式检查、根 CLI/后端/Vue lint、增量 `checkJs`、普通测试、带阈值覆盖率、Web 生产构建和真实 npm 打包安装 smoke。CI 在 Ubuntu Node 20/22 上运行完整门禁，并在 Windows Node 20 上执行 CLI/package smoke；根项目和 Dashboard 的生产依赖 high/critical 审计会阻断 CI。
 
 涉及前端改动时，请至少运行：
 
@@ -278,15 +288,15 @@ npm run build:web
 
 ## 已知风险
 
-v1.0.0 已加固：AI baseUrl 默认拒绝非 HTTPS / 本机 / 内网 / metadata 地址并校验 DNS 解析结果；Dashboard 保存 API Key 时校验协议、baseUrl、模型名与换行注入；敏感 AI API 加入内存级基础限流；`tokenAuth` 使用 `crypto.timingSafeEqual` + 长度预检规避时序旁路。
+当前 `master` 已完成技术问题清单中的全部 P0-P3：源码证据和变更证据会进入受预算约束的 Prompt；init/update 使用写盘后提交状态的事务边界；manifest 驱动文档归属和事实校验；出站消息统一脱敏；AI 请求支持总 deadline 和 Ctrl+C 取消；格式、类型、覆盖率、跨平台 smoke 与依赖审计均已进入门禁。此前的 baseUrl SSRF、Dashboard 密钥写入和 token 时序比较加固仍然有效。
 
-当前版本仍需重点处理：
+当前剩余风险主要是部署和持续维护边界：
 
-- `loadConfigWithVM()` 配置执行的沙箱边界。
-- dashboard dev 命令和 Git 工具的命令构造。
-- Web API 统一错误处理与更细粒度的速率限制（多进程 / 分布式部署场景）。
-- `core/`、`web/middleware/`、`utils/git-utils.js` 与内置适配器的测试缺口。
-- `init` 和 `update --apply` 的 AI 串行调用性能瓶颈。
+- 旧 `code-ctx.config.js` 虽不再执行代码，但仅支持静态对象语法；应迁移到严格校验的 `code-ctx.config.json`。
+- Dashboard 只面向本机；内存级限流不适用于多进程或分布式公网部署。
+- 当前 `checkJs` 是增量范围，未覆盖的历史 JavaScript 仍需按迁移计划逐步纳入。
+- nightly provider smoke 需要外部凭据且为显式 opt-in，不能保证所有第三方兼容端点持续可用。
+- 自动事实校验依赖 manifest 与源码证据，不能替代发布前人工审查私有文档。
 
 Dashboard 面向本机开发使用，不建议直接暴露到公网。
 

@@ -8,16 +8,17 @@ Code-ctx 正在积极开发中。安全修复会应用到 `master` 分支的最�
 
 ### 当前安全状态
 
-公开部署或商业授权评估前，请优先处理当前 P0/P1 安全项。维护者本地可保留 `docs/` 审计资料，但该目录默认不上传 Git。
+当前 `master` 已完成技术问题清单中的全部 P0-P3，并通过格式、lint、增量类型检查、测试、覆盖率、Web 构建、跨平台 package smoke 和生产依赖审计门禁。该状态不等于适合直接公网部署；维护者仍应以本策略评估部署边界。维护者本地可保留 `docs/` 审计资料，但该目录默认不上传 Git。
 
 当前重点风险包括：
 
-- `code-ctx.config.js` 解析和执行链路。
-- Dashboard 的 `/api/config`、`/api/ai/*`、`/api/docs/*` 等本地接口。
-- 命令行路径、Git 参数和 shell 命令构造。
-- AI `baseUrl` 可配置导致的 SSRF 风险；当前已阻断本机、内网和 metadata 字面地址及 DNS 解析后的内网地址，并对敏感 AI API 加入基础内存限流。后续仍需更细的 token/IP 策略和分布式限流方案。
-- `.env`、API Key、生成文档和 prompt 中的敏感信息泄漏。
-- 错误信息直接暴露内部路径或运行细节。
+- 旧 `code-ctx.config.js` 只按静态 `module.exports = {...}` 数据使用 JSON5 解析，不执行 JavaScript；仍建议迁移到严格校验的 `code-ctx.config.json`。
+- Dashboard 的 `/api/config`、`/api/ai/*`、`/api/docs/*` 只按本机开发边界设计，不应直接暴露公网。
+- AI `baseUrl` 已阻断非 HTTPS、本机、内网、metadata 字面地址和 DNS 解析后的内网地址；基础内存限流仍不能替代多进程或分布式部署策略。
+- 所有出站 AI 消息会统一脱敏密钥、连接串和绝对路径，并提供不含原值的审计摘要；生成文档和模型输入仍需人工复核。
+- AI 请求具有单次 timeout、五分钟总 deadline 和 AbortSignal/Ctrl+C 清理；调用方仍应控制模型配额、并发和第三方 provider 数据保留策略。
+- manifest 事实校验只能核对已有源码证据，不能证明业务语义完整，也不能替代发布前安全审查。
+- CI 使用官方 npm registry 对根 CLI 和 Dashboard 的生产依赖执行 high/critical 阻断审计；依赖变更必须在两个目录复核，不能通过 `continue-on-error` 绕过。
 
 ### 报告漏洞
 
@@ -71,16 +72,17 @@ Code-ctx is in active development. Security fixes are applied to the latest vers
 
 ### Current Security Status
 
-Resolve current P0/P1 security items before public deployment or commercial license evaluation. Maintainers may keep local audit material under `docs/`, but that directory is ignored by Git by default.
+The current `master` has completed every P0-P3 item in the technical issue list and passes formatting, lint, incremental type checks, tests, coverage, the Web build, cross-platform package smoke, and production dependency audit gates. This does not make the Dashboard suitable for direct public deployment; evaluate deployment boundaries against this policy. Maintainers may keep local audit material under `docs/`, which is ignored by Git by default.
 
 Current high-risk areas include:
 
-- The `code-ctx.config.js` parsing and execution path.
-- Local Dashboard endpoints such as `/api/config`, `/api/ai/*`, and `/api/docs/*`.
-- CLI paths, Git arguments, and shell command construction.
-- SSRF risk from configurable AI `baseUrl` values. Literal and DNS-resolved localhost, private-network, and metadata addresses are blocked now, and sensitive AI APIs have baseline in-memory rate limits. Finer token/IP policies and distributed rate limiting still need follow-up work.
-- Secret leakage through `.env`, API keys, generated docs, and prompts.
-- Error responses exposing internal paths or runtime details.
+- Legacy `code-ctx.config.js` is parsed with JSON5 as static `module.exports = {...}` data and is never executed. Migration to strictly validated `code-ctx.config.json` is still recommended.
+- Local Dashboard endpoints such as `/api/config`, `/api/ai/*`, and `/api/docs/*` are designed for local development and must not be exposed directly to the public internet.
+- AI `baseUrl` validation blocks non-HTTPS, localhost, private-network, metadata, and DNS-resolved private addresses. Baseline in-memory rate limiting is not a multi-process or distributed deployment control.
+- One outbound gateway redacts secrets, connection strings, and absolute paths from every AI message and emits audit summaries without original values. Generated docs and model inputs still require human review.
+- AI calls have a per-request timeout, a five-minute operation deadline, and AbortSignal/Ctrl+C cleanup. Operators must still control provider quotas, concurrency, and third-party data-retention policies.
+- Manifest-based fact checks validate available source evidence only; they cannot prove complete business semantics or replace a pre-publication security review.
+- CI uses the official npm registry and blocks on high/critical production dependency findings for both the CLI and Dashboard. Dependency changes must audit both directories without `continue-on-error`.
 
 ### Reporting a Vulnerability
 

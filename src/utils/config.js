@@ -532,6 +532,8 @@ function getAIConfig(rootDir) {
     maxInputTokens,
     apiKey,
     timeout,
+    allowLocalBaseUrl: envConfig.AI_ALLOW_LOCAL_BASE_URL === 'true',
+    allowInsecureBaseUrl: envConfig.AI_ALLOW_INSECURE_BASE_URL === 'true',
     providers
   };
 }

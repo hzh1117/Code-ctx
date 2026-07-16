@@ -13,6 +13,7 @@ const {
   writeProjectManifest
 } = require('../generator/deterministic-docs');
 const { parseOneShotDocuments } = require('../generator/one-shot-parser');
+const { createProgressReporter } = require('./progress-reporter');
 
 const CONCURRENCY = 2;
 
@@ -49,14 +50,27 @@ function createGenerationService(dependencies = {}) {
   const clock = dependencies.clock || { now: () => Date.now() };
   const logger = dependencies.logger;
   const validator = dependencies.validator;
+  let progress = null;
 
   async function generateDocument(prompt, aiConfig, alias) {
-    return generateAI(prompt, {
-      ...aiConfig,
-      onProgress: ({ attempt, maxAttempts }) => {
-        logger.log(`[续写 ${attempt}/${maxAttempts}] ${alias}...`);
-      }
-    });
+    const request = progress?.requestStarted(alias, prompt);
+    try {
+      const result = await generateAI(prompt, {
+        ...aiConfig,
+        onProgress: ({ attempt, maxAttempts }) => {
+          progress?.continuation(request, alias, attempt, maxAttempts);
+        }
+      });
+      progress?.requestFinished(request, alias, 'request-complete', {
+        outputChars: String(result || '').length
+      });
+      return result;
+    } catch (error) {
+      progress?.requestFinished(request, alias, 'request-failed', {
+        errorName: error.name || 'Error'
+      });
+      throw error;
+    }
   }
 
   async function completeMissingSections(doc, expected, aiConfig, alias) {
@@ -311,9 +325,21 @@ function createGenerationService(dependencies = {}) {
         return { generatedDocs: {}, failedDocs: [], status: 'unchanged', success: true };
       }
 
+      progress = createProgressReporter({
+        clock,
+        emit: message => logger.log(message),
+        isTTY: dependencies.isTTY,
+        deadlineMs: ctx.options.deadlineMs
+      });
+      progress.phase('generation-planning', { projectCount: pending.length });
+
       logger.step('6/7', '生成项目文档');
       try {
-        ctx.aiConfig = { ...loadAIConfig(ctx.rootDir), signal: ctx.options.signal };
+        ctx.aiConfig = {
+          ...loadAIConfig(ctx.rootDir),
+          signal: ctx.options.signal,
+          deadlineMs: ctx.options.deadlineMs
+        };
         if (!ctx.aiConfig.apiKey) {
           logger.log('\n未配置 API Key，请先在 .env 文件中配置');
           pending.forEach(project => {

@@ -24,11 +24,7 @@ async function fixCommand(rootDir, projectAlias, options = {}) {
   }
 
   const projectDir = path.join(rootDir, project.path);
-  const scanResult = await scanProjectAsync(
-    projectDir,
-    project.type,
-    { registry: pluginContext.registry }
-  );
+  const scanResult = await scanProjectAsync(projectDir, project.type, { registry: pluginContext.registry });
 
   const prompt = buildInitPrompt({
     project,

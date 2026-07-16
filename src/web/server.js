@@ -46,7 +46,7 @@ function createServer(rootDir) {
 
 function startServer(rootDir, port = 3456) {
   const app = createServer(rootDir);
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const server = app.listen(port, () => {
       console.log(`API 服务器运行在 http://localhost:${port}`);
       resolve(server);

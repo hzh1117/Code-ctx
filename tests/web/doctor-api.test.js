@@ -20,19 +20,22 @@ describe('GET /api/doctor', () => {
 
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'doctor-api-'));
     fs.mkdirSync(path.join(testDir, 'ai-docs'));
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'doctor-api-test',
-      outputDir: 'ai-docs',
-      projects: []
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'doctor-api-test',
+        outputDir: 'ai-docs',
+        projects: []
+      })
+    );
 
-    await new Promise((resolve) => {
+    await new Promise(resolve => {
       const app = createServer(testDir);
       server = app.listen(0, '127.0.0.1', resolve);
     });
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(() => {
       _clearCache();
       _clearDoctorCache();
@@ -57,10 +60,7 @@ describe('GET /api/doctor', () => {
   });
 
   test('flags sensitive info as HIGH_RISK', async () => {
-    fs.writeFileSync(
-      path.join(testDir, 'ai-docs', 'doc.md'),
-      '# x\n\napi_key = "abcdef1234567890abcdef"\n'
-    );
+    fs.writeFileSync(path.join(testDir, 'ai-docs', 'doc.md'), '# x\n\napi_key = "abcdef1234567890abcdef"\n');
     const res = await requestJson(server, '/api/doctor');
     expect(res.status).toBe(200);
     expect(res.body.overall).toBe('HIGH_RISK');
@@ -68,11 +68,14 @@ describe('GET /api/doctor', () => {
   });
 
   test('reports schema errors for invalid config fields', async () => {
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'x',
-      aiMode: 'rocket-launcher',
-      unknownField: true
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'x',
+        aiMode: 'rocket-launcher',
+        unknownField: true
+      })
+    );
     _clearCache();
     _clearDoctorCache();
     const res = await requestJson(server, '/api/doctor');

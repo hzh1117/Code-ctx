@@ -5,9 +5,24 @@ const { defaultRegistry } = require('../adapters');
 
 // Directories that are never project roots and should not be recursed into.
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', 'dist', 'build', 'ai-docs', 'coverage',
-  '.next', '.nuxt', '.output', '.cache', '.temp', '.tmp', 'tmp',
-  '__pycache__', '.tox', '.venv', 'venv', 'vendor'
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'ai-docs',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.output',
+  '.cache',
+  '.temp',
+  '.tmp',
+  'tmp',
+  '__pycache__',
+  '.tox',
+  '.venv',
+  'venv',
+  'vendor'
 ]);
 
 // Maximum depth for recursive monorepo scanning. Prevents crawling into

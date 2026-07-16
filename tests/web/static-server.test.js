@@ -10,7 +10,7 @@ describe('web static server', () => {
   let hadIndex = false;
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     fs.mkdirSync(distDir, { recursive: true });
     hadIndex = fs.existsSync(indexPath);
@@ -23,7 +23,7 @@ describe('web static server', () => {
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (hadIndex) {
       fs.writeFileSync(indexPath, originalIndex);

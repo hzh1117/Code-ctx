@@ -214,14 +214,16 @@ describe('prompt-builder', () => {
         scanResult: {
           tree: 'src/',
           keyFiles: ['C:\\private\\repo\\src\\routes.js'],
-          sourceFiles: [{
-            path: 'src/routes.js',
-            language: 'javascript',
-            hash: 'abc123',
-            content: 'router.get("/users", listUsers);',
-            redactions: 0,
-            truncation: { truncated: false, originalChars: 32, includedChars: 32, reason: null }
-          }]
+          sourceFiles: [
+            {
+              path: 'src/routes.js',
+              language: 'javascript',
+              hash: 'abc123',
+              content: 'router.get("/users", listUsers);',
+              redactions: 0,
+              truncation: { truncated: false, originalChars: 32, includedChars: 32, reason: null }
+            }
+          ]
         }
       });
 
@@ -252,8 +254,7 @@ describe('prompt-builder', () => {
         config: { projectName: 'eq', projects: [{ alias: 'a', label: 'A', type: 't' }] },
         generatedDocs: { a: 'doc' }
       };
-      expect(buildInitPrompt({ type: 'overview', ...args }))
-        .toBe(buildOverviewPrompt(args));
+      expect(buildInitPrompt({ type: 'overview', ...args })).toBe(buildOverviewPrompt(args));
     });
 
     test('type 为 one-shot 时与 buildOneShotPrompt 等价', () => {
@@ -261,8 +262,7 @@ describe('prompt-builder', () => {
         projects: [{ alias: 'a', name: 'A', type: 't', path: '/a' }],
         scanResults: { a: { tree: 'tree-a', keyFiles: ['f.js'] } }
       };
-      expect(buildInitPrompt({ type: 'one-shot', ...args }))
-        .toBe(buildOneShotPrompt(args));
+      expect(buildInitPrompt({ type: 'one-shot', ...args })).toBe(buildOneShotPrompt(args));
     });
 
     test('默认分支等价于 buildSubprojectPrompt', () => {
@@ -377,13 +377,16 @@ describe('prompt-builder', () => {
         generatedDocs: {},
         scanResults: {
           web: {
-            sourceFiles: [{
-              path: 'package.json',
-              content: JSON.stringify({ dependencies: { api: 'workspace:*' } })
-            }, {
-              path: 'src/client.js',
-              content: "import client from '@workspace/api';"
-            }]
+            sourceFiles: [
+              {
+                path: 'package.json',
+                content: JSON.stringify({ dependencies: { api: 'workspace:*' } })
+              },
+              {
+                path: 'src/client.js',
+                content: "import client from '@workspace/api';"
+              }
+            ]
           }
         }
       });

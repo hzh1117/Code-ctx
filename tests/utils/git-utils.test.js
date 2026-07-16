@@ -220,18 +220,12 @@ describe('git-utils', () => {
     });
 
     test('returns null when .last-scan.json has no lastCommitHash', () => {
-      fs.writeFileSync(
-        path.join(scanDir, 'ai-docs', '.last-scan.json'),
-        JSON.stringify({ timestamp: '2026-01-01' })
-      );
+      fs.writeFileSync(path.join(scanDir, 'ai-docs', '.last-scan.json'), JSON.stringify({ timestamp: '2026-01-01' }));
       expect(getLastScanCommit(scanDir)).toBeNull();
     });
 
     test('returns null when .last-scan.json is invalid JSON', () => {
-      fs.writeFileSync(
-        path.join(scanDir, 'ai-docs', '.last-scan.json'),
-        'not valid json{{{'
-      );
+      fs.writeFileSync(path.join(scanDir, 'ai-docs', '.last-scan.json'), 'not valid json{{{');
       expect(getLastScanCommit(scanDir)).toBeNull();
     });
   });

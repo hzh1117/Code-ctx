@@ -7,7 +7,7 @@ describe('basic web api', () => {
   const testDir = path.join(__dirname, '../fixtures/basic-web-api');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     delete process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
@@ -16,20 +16,23 @@ describe('basic web api', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(path.join(testDir, 'web'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = {
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = {
   projectName: 'basic-web-api',
   outputDir: 'ai-docs',
   projects: [
     { alias: 'web', path: './web', type: 'vue3-admin', label: '前端' }
   ]
-};\n`);
+};\n`
+    );
     fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=\nANTHROPIC_API_KEY=\nANTHROPIC_AUTH_TOKEN=');
 
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -67,7 +70,7 @@ describe('basic web api: JSON config preference', () => {
   const testDir = path.join(__dirname, '../fixtures/basic-web-api-json');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     delete process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
@@ -76,18 +79,21 @@ describe('basic web api: JSON config preference', () => {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'json-app',
-      outputDir: 'ai-docs',
-      projects: [{ alias: 'web', path: './web', type: 'vue3-admin', label: '前端' }]
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'json-app',
+        outputDir: 'ai-docs',
+        projects: [{ alias: 'web', path: './web', type: 'vue3-admin', label: '前端' }]
+      })
+    );
     fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=');
 
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });

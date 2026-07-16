@@ -4,8 +4,7 @@ const { inspectProjectConfig, migrateProjectConfig } = require('../../src/utils/
 const { listPresets, getPreset } = require('../../src/ai/presets');
 const { setupAIConfig } = require('../../src/config/setup-service');
 
-const config = new Command('config')
-  .description('检查和管理项目配置');
+const config = new Command('config').description('检查和管理项目配置');
 
 config
   .command('validate [root]')
@@ -61,24 +60,40 @@ config
         if (!prompts) prompts = await import('@inquirer/prompts');
         return prompts;
       };
-      const provider = options.provider || await (await getPrompts()).select({
-        message: '选择 AI provider',
-        choices: listPresets().map(preset => ({ name: preset.name, value: preset.id }))
-      });
+      const provider =
+        options.provider ||
+        (await (
+          await getPrompts()
+        ).select({
+          message: '选择 AI provider',
+          choices: listPresets().map(preset => ({ name: preset.name, value: preset.id }))
+        }));
       const preset = getPreset(provider);
       if (!preset) throw new Error(`未知 provider: ${provider}`);
-      const baseUrl = options.baseUrl || await (await getPrompts()).input({
-        message: 'API Base URL',
-        default: preset.baseUrl
-      });
-      const model = options.model || await (await getPrompts()).input({
-        message: '模型',
-        default: preset.model
-      });
-      const apiKey = process.env.CODE_CTX_SETUP_API_KEY || await (await getPrompts()).password({
-        message: 'API Key',
-        mask: '*'
-      });
+      const baseUrl =
+        options.baseUrl ||
+        (await (
+          await getPrompts()
+        ).input({
+          message: 'API Base URL',
+          default: preset.baseUrl
+        }));
+      const model =
+        options.model ||
+        (await (
+          await getPrompts()
+        ).input({
+          message: '模型',
+          default: preset.model
+        }));
+      const apiKey =
+        process.env.CODE_CTX_SETUP_API_KEY ||
+        (await (
+          await getPrompts()
+        ).password({
+          message: 'API Key',
+          mask: '*'
+        }));
       const result = await setupAIConfig(rootDir, {
         provider,
         baseUrl,

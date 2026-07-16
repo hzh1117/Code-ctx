@@ -76,7 +76,11 @@ function checkDocsVsCode(rootDir, configResult) {
   for (const project of configProjects) {
     const projectDir = path.join(rootDir, project.path);
     if (!fs.existsSync(projectDir)) {
-      issues.push({ type: 'project-missing', alias: project.alias, message: `子项目 ${project.alias} 目录不存在: ${project.path}` });
+      issues.push({
+        type: 'project-missing',
+        alias: project.alias,
+        message: `子项目 ${project.alias} 目录不存在: ${project.path}`
+      });
     }
   }
 
@@ -94,12 +98,18 @@ function checkDocsVsCode(rootDir, configResult) {
         continue;
       }
 
-      const hasProjectFile = files.some(f => ['package.json', 'pom.xml', 'build.gradle', 'go.mod', 'requirements.txt', 'pyproject.toml'].includes(f));
+      const hasProjectFile = files.some(f =>
+        ['package.json', 'pom.xml', 'build.gradle', 'go.mod', 'requirements.txt', 'pyproject.toml'].includes(f)
+      );
       if (!hasProjectFile) continue;
 
       const isConfigured = configProjects.some(p => p.path === `./${entry.name}` || p.path === entry.name);
       if (!isConfigured) {
-        issues.push({ type: 'unconfigured', directory: entry.name, message: `目录 ${entry.name} 看起来是子项目但未在配置中` });
+        issues.push({
+          type: 'unconfigured',
+          directory: entry.name,
+          message: `目录 ${entry.name} 看起来是子项目但未在配置中`
+        });
       }
     }
   } catch (err) {
@@ -113,7 +123,7 @@ function checkDocsVsActual(rootDir, configResult, aiDocsDir, registry = defaultR
   const issues = [];
   if (!configResult.config || !fs.existsSync(aiDocsDir)) return issues;
 
-  for (const project of (configResult.config.projects || [])) {
+  for (const project of configResult.config.projects || []) {
     const docPath = path.join(aiDocsDir, `${project.alias}.md`);
     if (!fs.existsSync(docPath)) {
       issues.push({ type: 'doc-missing', alias: project.alias, message: `${project.alias}.md 不存在` });
@@ -188,7 +198,9 @@ function extractRoutesFromCode(projectDir, projectType, registry = defaultRegist
 
       if (basename.endsWith('.java')) {
         const classMapping = content.match(/@RequestMapping\(["']([^"']+)["']\)/)?.[1] || '';
-        const methodMappings = content.matchAll(/@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*(?:\(\s*)?(?:["']([^"']+)["'])?/g);
+        const methodMappings = content.matchAll(
+          /@(GetMapping|PostMapping|PutMapping|DeleteMapping|PatchMapping|RequestMapping)\s*(?:\(\s*)?(?:["']([^"']+)["'])?/g
+        );
         for (const match of methodMappings) {
           const method = match[1].replace('Mapping', '').toUpperCase();
           const subPath = match[2] || '';
@@ -259,13 +271,9 @@ function checkDocsCompleteness(aiDocsDir, issues, warnings) {
   }
 }
 
-function checkDocsCodeConsistency(
-  rootDir, configResult, aiDocsDir, issues, warnings, registry, ignoreEngine
-) {
+function checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings, registry, ignoreEngine) {
   console.log('\n🔄 检查文档与代码一致性...');
-  const consistencyIssues = checkDocsVsActual(
-    rootDir, configResult, aiDocsDir, registry, ignoreEngine
-  );
+  const consistencyIssues = checkDocsVsActual(rootDir, configResult, aiDocsDir, registry, ignoreEngine);
   for (const issue of consistencyIssues) {
     if (issue.type === 'outdated' || issue.type === 'structure-mismatch') {
       warnings.push(issue);
@@ -316,17 +324,22 @@ function printDocQuality(quality) {
   console.log('\n📊 文档质量评分');
   console.log(`  整体：${formatLevelLabel(quality.overall)}（综合分 ${quality.score}）`);
   console.log(`  格式健康 ${quality.summary.formatHealth} / 事实可信 ${quality.summary.factualConfidence}`);
-  console.log(`  完整度 ${quality.summary.completeness} / 新鲜度 ${quality.summary.freshness} / 风险 ${quality.summary.risk}`);
+  console.log(
+    `  完整度 ${quality.summary.completeness} / 新鲜度 ${quality.summary.freshness} / 风险 ${quality.summary.risk}`
+  );
   const notOk = quality.perDoc.filter(d => d.level !== 'OK');
   if (notOk.length > 0) {
     console.log('  需关注的文档：');
     for (const d of notOk) {
-      const missing = d.completeness && d.completeness.missing.length > 0
-        ? `，缺失 section：${d.completeness.missing.join(', ')}`
-        : '';
+      const missing =
+        d.completeness && d.completeness.missing.length > 0
+          ? `，缺失 section：${d.completeness.missing.join(', ')}`
+          : '';
       const risk = (d.risks || []).map(r => r.message).join('；');
       const facts = d.factualConfidence ? `，事实可信 ${d.factualConfidence.score}` : '';
-      console.log(`    - ${d.name} ${formatLevelLabel(d.level)}（${d.score}${facts}）${missing}${risk ? '；' + risk : ''}`);
+      console.log(
+        `    - ${d.name} ${formatLevelLabel(d.level)}（${d.score}${facts}）${missing}${risk ? '；' + risk : ''}`
+      );
     }
   }
 }
@@ -388,9 +401,7 @@ async function doctorCommand(rootDir, options = {}) {
 
   checkConfigConsistency(rootDir, configResult, issues, warnings);
   checkDocsCompleteness(aiDocsDir, issues, warnings);
-  checkDocsCodeConsistency(
-    rootDir, configResult, aiDocsDir, issues, warnings, registry, ignoreEngine
-  );
+  checkDocsCodeConsistency(rootDir, configResult, aiDocsDir, issues, warnings, registry, ignoreEngine);
 
   if (options.strict) {
     checkStrictRoutes(projects, aiDocsDir, info, warnings, registry, ignoreEngine);

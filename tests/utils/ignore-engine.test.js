@@ -17,13 +17,13 @@ describe('ignore engine', () => {
   });
 
   test('merges defaults, gitignore and configured excludeDirs', () => {
-    fs.writeFileSync(path.join(rootDir, '.gitignore'), [
-      'generated/*',
-      '!generated/keep.js'
-    ].join('\n'));
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
-      excludeDirs: ['vendor-cache']
-    }));
+    fs.writeFileSync(path.join(rootDir, '.gitignore'), ['generated/*', '!generated/keep.js'].join('\n'));
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        excludeDirs: ['vendor-cache']
+      })
+    );
 
     const engine = createIgnoreEngine(rootDir);
 

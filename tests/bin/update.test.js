@@ -9,10 +9,7 @@ jest.mock('../../src/utils/prompt-output', () => ({
   outputPrompt: jest.fn()
 }));
 
-const {
-  updateCommand,
-  executeUpdateTransaction
-} = require('../../src/commands/update');
+const { updateCommand, executeUpdateTransaction } = require('../../src/commands/update');
 
 describe('update CLI exit codes', () => {
   const originalExitCode = process.exitCode;
@@ -42,12 +39,14 @@ describe('update CLI exit codes', () => {
       failed: 1,
       skipped: 0,
       committed: false,
-      results: [{
-        docName: 'app.md',
-        sectionName: 'modules',
-        status: 'failed',
-        reason: 'provider failed'
-      }]
+      results: [
+        {
+          docName: 'app.md',
+          sectionName: 'modules',
+          status: 'failed',
+          reason: 'provider failed'
+        }
+      ]
     });
     const command = require('../../bin/commands/update');
 

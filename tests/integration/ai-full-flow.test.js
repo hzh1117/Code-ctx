@@ -16,11 +16,9 @@ function projectDocument(alias) {
     ['data', 'No persistent data'],
     ['dependencies', 'express'],
     ['notes', 'Run with node']
-  ].map(([name, content]) => [
-    `<!-- section:${name} -->`,
-    content,
-    `<!-- /section:${name} -->`
-  ].join('\n')).join('\n');
+  ]
+    .map(([name, content]) => [`<!-- section:${name} -->`, content, `<!-- /section:${name} -->`].join('\n'))
+    .join('\n');
   return `<<<CODE_CTX_DOC ${alias}>>>\n# ${alias}\n${sections}\n<<<END_CODE_CTX_DOC ${alias}>>>`;
 }
 
@@ -32,11 +30,9 @@ function overviewDocument() {
     ['architecture', 'No verified cross-project calls'],
     ['dependencies', 'No cross-project dependencies'],
     ['quickstart', 'node src/routes.js']
-  ].map(([name, content]) => [
-    `<!-- section:${name} -->`,
-    content,
-    `<!-- /section:${name} -->`
-  ].join('\n')).join('\n');
+  ]
+    .map(([name, content]) => [`<!-- section:${name} -->`, content, `<!-- /section:${name} -->`].join('\n'))
+    .join('\n');
 }
 
 describe('AI-backed full flow integration', () => {
@@ -49,19 +45,21 @@ describe('AI-backed full flow integration', () => {
     rootDir = path.join(os.tmpdir(), alias);
     fs.rmSync(rootDir, { recursive: true, force: true });
     fs.mkdirSync(path.join(rootDir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(rootDir, 'package.json'), JSON.stringify({
-      name: alias,
-      dependencies: { express: '^5.0.0' }
-    }));
     fs.writeFileSync(
-      path.join(rootDir, 'src', 'routes.js'),
-      'router.get("/health", () => "version-one");'
+      path.join(rootDir, 'package.json'),
+      JSON.stringify({
+        name: alias,
+        dependencies: { express: '^5.0.0' }
+      })
     );
+    fs.writeFileSync(path.join(rootDir, 'src', 'routes.js'), 'router.get("/health", () => "version-one");');
 
     server = http.createServer((req, res) => {
       let body = '';
       req.setEncoding('utf8');
-      req.on('data', chunk => { body += chunk; });
+      req.on('data', chunk => {
+        body += chunk;
+      });
       req.on('end', () => {
         const parsed = JSON.parse(body);
         requests.push(parsed);
@@ -73,21 +71,26 @@ describe('AI-backed full flow integration', () => {
           content = overviewDocument();
         }
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          choices: [{ message: { content }, finish_reason: 'stop' }]
-        }));
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content }, finish_reason: 'stop' }]
+          })
+        );
       });
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const { port } = server.address();
-    fs.writeFileSync(path.join(rootDir, '.env'), [
-      'OPENAI_API_KEY=test-key',
-      `OPENAI_BASE_URL=http://127.0.0.1:${port}/v1`,
-      'OPENAI_MODEL=test-model',
-      'AI_TIMEOUT=5000',
-      'AI_ALLOW_LOCAL_BASE_URL=true',
-      'AI_ALLOW_INSECURE_BASE_URL=true'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(rootDir, '.env'),
+      [
+        'OPENAI_API_KEY=test-key',
+        `OPENAI_BASE_URL=http://127.0.0.1:${port}/v1`,
+        'OPENAI_MODEL=test-model',
+        'AI_TIMEOUT=5000',
+        'AI_ALLOW_LOCAL_BASE_URL=true',
+        'AI_ALLOW_INSECURE_BASE_URL=true'
+      ].join('\n')
+    );
     _clearCache();
   });
 
@@ -100,17 +103,13 @@ describe('AI-backed full flow integration', () => {
   test('runs init, update apply and use through real HTTP requests', async () => {
     const initialized = await initCommand(rootDir, { skipPrompt: true, force: true });
     expect(initialized.success).toBe(true);
-    expect(fs.readFileSync(path.join(rootDir, 'ai-docs', `${alias}.md`), 'utf8'))
-      .toContain('GET /health');
+    expect(fs.readFileSync(path.join(rootDir, 'ai-docs', `${alias}.md`), 'utf8')).toContain('GET /health');
 
     const initRequestText = JSON.stringify(requests);
     expect(initRequestText).toContain('router.get');
     expect(initRequestText).toContain('version-one');
 
-    fs.writeFileSync(
-      path.join(rootDir, 'src', 'routes.js'),
-      'router.post("/health", () => "version-two");'
-    );
+    fs.writeFileSync(path.join(rootDir, 'src', 'routes.js'), 'router.post("/health", () => "version-two");');
     const detection = await updateCommand(rootDir, { prepareApply: true });
     const execution = await executeUpdateTransaction(rootDir, detection, getAIConfig(rootDir));
 

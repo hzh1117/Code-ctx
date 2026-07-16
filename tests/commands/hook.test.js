@@ -46,20 +46,16 @@ describe('commands/hook', () => {
     });
 
     test('hooks 目录不存在时自动创建', async () => {
-      fs.existsSync.mockImplementation((p) => false);
+      fs.existsSync.mockImplementation(p => false);
 
       await hookCommand(rootDir, 'install');
 
       expect(fs.mkdirSync).toHaveBeenCalledWith(hooksDir, { recursive: true });
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        hookPath,
-        expect.stringContaining('code-ctx'),
-        { mode: 0o755 }
-      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(hookPath, expect.stringContaining('code-ctx'), { mode: 0o755 });
     });
 
     test('hook 不存在时写入新 hook，权限 0o755', async () => {
-      fs.existsSync.mockImplementation((p) => p === hooksDir);
+      fs.existsSync.mockImplementation(p => p === hooksDir);
 
       await hookCommand(rootDir, 'install');
 
@@ -86,11 +82,7 @@ describe('commands/hook', () => {
       await hookCommand(rootDir, 'install');
 
       expect(fs.copyFileSync).toHaveBeenCalledWith(hookPath, backupPath);
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        hookPath,
-        expect.stringContaining('code-ctx'),
-        { mode: 0o755 }
-      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(hookPath, expect.stringContaining('code-ctx'), { mode: 0o755 });
     });
   });
 
@@ -105,7 +97,7 @@ describe('commands/hook', () => {
     });
 
     test('非 code-ctx 的 hook 保留不动', async () => {
-      fs.existsSync.mockImplementation((p) => p === hookPath);
+      fs.existsSync.mockImplementation(p => p === hookPath);
       fs.readFileSync.mockReturnValue('# other hook');
 
       await hookCommand(rootDir, 'uninstall');
@@ -114,7 +106,7 @@ describe('commands/hook', () => {
     });
 
     test('有备份时恢复备份并删除备份文件', async () => {
-      fs.existsSync.mockImplementation((p) => p === hookPath || p === backupPath);
+      fs.existsSync.mockImplementation(p => p === hookPath || p === backupPath);
       fs.readFileSync.mockReturnValue('# code-ctx post-commit hook');
 
       await hookCommand(rootDir, 'uninstall');
@@ -124,7 +116,7 @@ describe('commands/hook', () => {
     });
 
     test('无备份时直接删除 hook 文件', async () => {
-      fs.existsSync.mockImplementation((p) => p === hookPath);
+      fs.existsSync.mockImplementation(p => p === hookPath);
       fs.readFileSync.mockReturnValue('# code-ctx post-commit hook');
 
       await hookCommand(rootDir, 'uninstall');
@@ -152,7 +144,7 @@ describe('commands/hook', () => {
     });
 
     test('code-ctx hook 存在时打印已安装', async () => {
-      fs.existsSync.mockImplementation((p) => p === hookPath);
+      fs.existsSync.mockImplementation(p => p === hookPath);
       fs.readFileSync.mockReturnValue('# code-ctx post-commit hook');
 
       await hookCommand(rootDir, 'status');
@@ -161,7 +153,7 @@ describe('commands/hook', () => {
     });
 
     test('非 code-ctx 的 hook 存在时打印来源说明', async () => {
-      fs.existsSync.mockImplementation((p) => p === hookPath);
+      fs.existsSync.mockImplementation(p => p === hookPath);
       fs.readFileSync.mockReturnValue('#!/bin/sh\necho hi');
 
       await hookCommand(rootDir, 'status');

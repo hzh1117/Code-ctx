@@ -141,7 +141,9 @@ function loadProjectConfig(rootDir) {
   }
 
   if (info.hasOtherFormat && !warnedDualConfig.has(rootDir)) {
-    console.warn(`[code-ctx] 同时检测到 ${CONFIG_FILE_JSON} 和 ${CONFIG_FILE_JS}，使用 JSON 并忽略 JS。建议删除 ${CONFIG_FILE_JS}。`);
+    console.warn(
+      `[code-ctx] 同时检测到 ${CONFIG_FILE_JSON} 和 ${CONFIG_FILE_JS}，使用 JSON 并忽略 JS。建议删除 ${CONFIG_FILE_JS}。`
+    );
     warnedDualConfig.add(rootDir);
   }
 
@@ -153,9 +155,7 @@ function loadProjectConfig(rootDir) {
     return cached.value;
   }
 
-  const parsedValue = info.format === 'json'
-    ? loadJsonConfig(info.path)
-    : loadConfigWithVM(info.path);
+  const parsedValue = info.format === 'json' ? loadJsonConfig(info.path) : loadConfigWithVM(info.path);
   const value = normalizeProjectPaths(rootDir, parsedValue, info.path);
 
   const validation = validateProjectConfigDetailed(value);
@@ -182,7 +182,9 @@ function loadConfigWithVM(configPath) {
     }
     return parsed;
   } catch {
-    throw new Error('配置文件解析失败：旧 JS 配置仅允许 module.exports = {...} 静态数据，请运行 code-ctx config migrate');
+    throw new Error(
+      '配置文件解析失败：旧 JS 配置仅允许 module.exports = {...} 静态数据，请运行 code-ctx config migrate'
+    );
   }
 }
 
@@ -190,8 +192,15 @@ function loadConfigWithVM(configPath) {
 // means valid. Intentionally hand-rolled to avoid pulling in ajv: the schema
 // is tiny and validation is only run on load (warn) and on write (strict).
 const ALLOWED_TOP_KEYS = new Set([
-  'projectName', 'outputDir', 'aiMode', 'projects',
-  'excludeDirs', 'gitTrack', 'ai', 'projectLimits', 'plugins'
+  'projectName',
+  'outputDir',
+  'aiMode',
+  'projects',
+  'excludeDirs',
+  'gitTrack',
+  'ai',
+  'projectLimits',
+  'plugins'
 ]);
 
 const ALLOWED_AI_MODES = new Set(['clipboard', 'auto', 'manual']);
@@ -233,14 +242,16 @@ function validateProjectConfigDetailed(config) {
   if (config.gitTrack !== undefined && typeof config.gitTrack !== 'boolean') {
     errors.push('gitTrack 必须是布尔值');
   }
-  if (config.excludeDirs !== undefined && (
-    !Array.isArray(config.excludeDirs) || config.excludeDirs.some(dir => typeof dir !== 'string')
-  )) {
+  if (
+    config.excludeDirs !== undefined &&
+    (!Array.isArray(config.excludeDirs) || config.excludeDirs.some(dir => typeof dir !== 'string'))
+  ) {
     errors.push('excludeDirs 必须是字符串数组');
   }
-  if (config.plugins !== undefined && (
-    !Array.isArray(config.plugins) || config.plugins.some(plugin => typeof plugin !== 'string')
-  )) {
+  if (
+    config.plugins !== undefined &&
+    (!Array.isArray(config.plugins) || config.plugins.some(plugin => typeof plugin !== 'string'))
+  ) {
     errors.push('plugins 必须是字符串数组');
   }
   if (config.projects !== undefined) {
@@ -265,9 +276,10 @@ function validateProjectConfigDetailed(config) {
         if (p.type !== undefined && typeof p.type !== 'string') {
           errors.push(`projects[${i}].type 必须是字符串`);
         }
-        if (p.scanPatterns !== undefined && (
-          !Array.isArray(p.scanPatterns) || p.scanPatterns.some(pattern => typeof pattern !== 'string')
-        )) {
+        if (
+          p.scanPatterns !== undefined &&
+          (!Array.isArray(p.scanPatterns) || p.scanPatterns.some(pattern => typeof pattern !== 'string'))
+        ) {
           errors.push(`projects[${i}].scanPatterns 必须是字符串数组`);
         }
       });
@@ -280,20 +292,27 @@ function validateProjectConfigDetailed(config) {
       errors.push('ai.protocol 必须是 openai|anthropic 之一');
     }
     for (const field of ['timeout', 'maxInputTokens']) {
-      if (config.ai[field] !== undefined && (
-        typeof config.ai[field] !== 'number' || !Number.isFinite(config.ai[field]) || config.ai[field] <= 0
-      )) errors.push(`ai.${field} 必须是正数`);
+      if (
+        config.ai[field] !== undefined &&
+        (typeof config.ai[field] !== 'number' || !Number.isFinite(config.ai[field]) || config.ai[field] <= 0)
+      )
+        errors.push(`ai.${field} 必须是正数`);
     }
   }
-  if (config.projectLimits !== undefined && (typeof config.projectLimits !== 'object' || Array.isArray(config.projectLimits))) {
+  if (
+    config.projectLimits !== undefined &&
+    (typeof config.projectLimits !== 'object' || Array.isArray(config.projectLimits))
+  ) {
     errors.push('projectLimits 必须是对象');
   } else if (config.projectLimits) {
     for (const field of ['maxFiles', 'maxTokens']) {
-      if (config.projectLimits[field] !== undefined && (
-        typeof config.projectLimits[field] !== 'number' ||
-        !Number.isFinite(config.projectLimits[field]) ||
-        config.projectLimits[field] <= 0
-      )) errors.push(`projectLimits.${field} 必须是正数`);
+      if (
+        config.projectLimits[field] !== undefined &&
+        (typeof config.projectLimits[field] !== 'number' ||
+          !Number.isFinite(config.projectLimits[field]) ||
+          config.projectLimits[field] <= 0)
+      )
+        errors.push(`projectLimits.${field} 必须是正数`);
     }
   }
 
@@ -404,19 +423,24 @@ function normalizeProtocol(protocol) {
 // 就采用该 preset 的默认 model（如 kimi 的 kimi-for-coding）。
 function inferPresetFromBaseUrl(baseUrl, protocol) {
   if (!baseUrl) return null;
-  const normalize = u => String(u).replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  const normalize = u =>
+    String(u)
+      .replace(/^https?:\/\//, '')
+      .replace(/\/+$/, '');
   const target = normalize(baseUrl);
   if (!target) return null;
-  return listPresets().find(p => {
-    if (protocol && p.protocol !== protocol) return false;
-    const preset = normalize(p.baseUrl);
-    if (!preset) return false;
-    return target === preset || target.startsWith(preset + '/') || preset.startsWith(target + '/');
-  }) || null;
+  return (
+    listPresets().find(p => {
+      if (protocol && p.protocol !== protocol) return false;
+      const preset = normalize(p.baseUrl);
+      if (!preset) return false;
+      return target === preset || target.startsWith(preset + '/') || preset.startsWith(target + '/');
+    }) || null
+  );
 }
 
 function providerFromLegacy(aiConfig, _protocol) {
-  if (!aiConfig || !aiConfig.baseUrl && !aiConfig.model && !aiConfig.maxTokens) {
+  if (!aiConfig || (!aiConfig.baseUrl && !aiConfig.model && !aiConfig.maxTokens)) {
     return {};
   }
 
@@ -448,15 +472,21 @@ function getAIProviders(projectConfig = {}) {
   const aiConfig = projectConfig.ai || {};
   const protocol = normalizeProtocol(aiConfig.protocol);
 
-  const openai = normalizeProviderConfig({
-    ...(aiConfig.openai || {}),
-    ...(protocol === 'openai' ? providerFromLegacy(aiConfig, protocol) : {})
-  }, 'openai');
+  const openai = normalizeProviderConfig(
+    {
+      ...(aiConfig.openai || {}),
+      ...(protocol === 'openai' ? providerFromLegacy(aiConfig, protocol) : {})
+    },
+    'openai'
+  );
 
-  const anthropic = normalizeProviderConfig({
-    ...(aiConfig.anthropic || {}),
-    ...(protocol === 'anthropic' ? providerFromLegacy(aiConfig, protocol) : {})
-  }, 'anthropic');
+  const anthropic = normalizeProviderConfig(
+    {
+      ...(aiConfig.anthropic || {}),
+      ...(protocol === 'anthropic' ? providerFromLegacy(aiConfig, protocol) : {})
+    },
+    'anthropic'
+  );
 
   return { openai, anthropic };
 }
@@ -506,23 +536,20 @@ function getAIConfig(rootDir) {
   }
 
   const activeProvider = providers[protocol];
-  const apiKey = protocol === 'anthropic'
-    ? (envConfig.ANTHROPIC_AUTH_TOKEN || envConfig.ANTHROPIC_API_KEY || aiConfig.apiKey || '')
-    : (envConfig.OPENAI_API_KEY || aiConfig.apiKey || '');
+  const apiKey =
+    protocol === 'anthropic'
+      ? envConfig.ANTHROPIC_AUTH_TOKEN || envConfig.ANTHROPIC_API_KEY || aiConfig.apiKey || ''
+      : envConfig.OPENAI_API_KEY || aiConfig.apiKey || '';
 
   // 获取 timeout 配置
   const rawTimeout = aiConfig.timeout || envConfig.AI_TIMEOUT;
   const parsedTimeout = rawTimeout != null ? parseInt(rawTimeout, 10) : NaN;
-  const timeout = Number.isFinite(parsedTimeout) && parsedTimeout > 0
-    ? parsedTimeout
-    : AI_CLIENT.DEFAULT_TIMEOUT;
-  const configuredInputTokens = parseInt(
-    aiConfig.maxInputTokens || envConfig.AI_MAX_INPUT_TOKENS,
-    10
-  );
-  const maxInputTokens = Number.isFinite(configuredInputTokens) && configuredInputTokens > 0
-    ? configuredInputTokens
-    : require('./constants').CONTEXT_LIMITS.MAX_INPUT_TOKENS;
+  const timeout = Number.isFinite(parsedTimeout) && parsedTimeout > 0 ? parsedTimeout : AI_CLIENT.DEFAULT_TIMEOUT;
+  const configuredInputTokens = parseInt(aiConfig.maxInputTokens || envConfig.AI_MAX_INPUT_TOKENS, 10);
+  const maxInputTokens =
+    Number.isFinite(configuredInputTokens) && configuredInputTokens > 0
+      ? configuredInputTokens
+      : require('./constants').CONTEXT_LIMITS.MAX_INPUT_TOKENS;
 
   return {
     protocol,
@@ -544,14 +571,8 @@ function getProjectLimits(rootDir) {
   const limits = projectConfig.projectLimits || {};
 
   return {
-    maxFiles: parseInt(
-      limits.maxFiles || envConfig.MAX_FILES_PER_PROJECT || PROJECT_LIMITS.MAX_FILES_PER_PROJECT,
-      10
-    ),
-    maxTokens: parseInt(
-      limits.maxTokens || envConfig.MAX_PROJECT_TOKENS || PROJECT_LIMITS.MAX_PROJECT_TOKENS,
-      10
-    )
+    maxFiles: parseInt(limits.maxFiles || envConfig.MAX_FILES_PER_PROJECT || PROJECT_LIMITS.MAX_FILES_PER_PROJECT, 10),
+    maxTokens: parseInt(limits.maxTokens || envConfig.MAX_PROJECT_TOKENS || PROJECT_LIMITS.MAX_PROJECT_TOKENS, 10)
   };
 }
 
@@ -607,20 +628,32 @@ function saveAIConfig(rootDir, aiConfig) {
   const currentProviders = getAIProviders(projectConfig);
   const protocol = normalizeProtocol(aiConfig.protocol || projectConfig.ai?.protocol);
 
-  const openai = normalizeProviderConfig({
-    ...currentProviders.openai,
-    ...(aiConfig.openai || {})
-  }, 'openai');
+  const openai = normalizeProviderConfig(
+    {
+      ...currentProviders.openai,
+      ...(aiConfig.openai || {})
+    },
+    'openai'
+  );
 
-  const anthropic = normalizeProviderConfig({
-    ...currentProviders.anthropic,
-    ...(aiConfig.anthropic || {})
-  }, 'anthropic');
+  const anthropic = normalizeProviderConfig(
+    {
+      ...currentProviders.anthropic,
+      ...(aiConfig.anthropic || {})
+    },
+    'anthropic'
+  );
 
   const legacyProvider = providerFromLegacy(aiConfig, protocol);
   const providers = {
-    openai: (!aiConfig.openai && protocol === 'openai') ? normalizeProviderConfig({ ...openai, ...legacyProvider }, 'openai') : openai,
-    anthropic: (!aiConfig.anthropic && protocol === 'anthropic') ? normalizeProviderConfig({ ...anthropic, ...legacyProvider }, 'anthropic') : anthropic
+    openai:
+      !aiConfig.openai && protocol === 'openai'
+        ? normalizeProviderConfig({ ...openai, ...legacyProvider }, 'openai')
+        : openai,
+    anthropic:
+      !aiConfig.anthropic && protocol === 'anthropic'
+        ? normalizeProviderConfig({ ...anthropic, ...legacyProvider }, 'anthropic')
+        : anthropic
   };
 
   const nextConfig = {

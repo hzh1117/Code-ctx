@@ -51,10 +51,7 @@ describe('utils/clipboard', () => {
 
     const result = await writeToClipboard(content);
 
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      path.join('/tmp', '.ai-prompt.md'),
-      content
-    );
+    expect(fs.writeFileSync).toHaveBeenCalledWith(path.join('/tmp', '.ai-prompt.md'), content);
     expect(result.success).toBe(false);
     expect(result.error).toContain('不完整');
   });

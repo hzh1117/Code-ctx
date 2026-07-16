@@ -1,11 +1,7 @@
 const fs = require('fs');
 const { getPreset } = require('../ai/presets');
 const { generateWithAI, validateBaseUrl } = require('../ai/client');
-const {
-  saveAIConfig,
-  getAIConfig,
-  _clearCache
-} = require('../utils/config');
+const { saveAIConfig, getAIConfig, _clearCache } = require('../utils/config');
 const { saveEnvValues, ensureEnvIgnored } = require('../utils/env-file');
 
 function validateApiKey(apiKey) {

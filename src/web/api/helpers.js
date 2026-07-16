@@ -32,7 +32,11 @@ function deriveOverall(report, schemaErrors, sensitive) {
   if ((report.issues || []).length > 0 || (sensitive || []).length > 0) {
     return 'HIGH_RISK';
   }
-  if ((report.warnings || []).length > 0 || (schemaErrors || []).length > 0 || (report.quality && report.quality.overall === 'WARN')) {
+  if (
+    (report.warnings || []).length > 0 ||
+    (schemaErrors || []).length > 0 ||
+    (report.quality && report.quality.overall === 'WARN')
+  ) {
     return 'WARN';
   }
   return 'OK';

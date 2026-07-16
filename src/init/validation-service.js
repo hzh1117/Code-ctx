@@ -18,8 +18,9 @@ function createValidationService(dependencies = {}) {
     expectedSections(templateName) {
       const templatePath = pathImpl.join(__dirname, '../../templates', templateName);
       if (!fileSystem.existsSync(templatePath)) return [];
-      return listSections(fileSystem.readFileSync(templatePath, 'utf8'))
-        .filter(section => /^[a-z][a-z0-9-]*$/.test(section));
+      return listSections(fileSystem.readFileSync(templatePath, 'utf8')).filter(section =>
+        /^[a-z][a-z0-9-]*$/.test(section)
+      );
     },
     inspect(outputDir) {
       logger.step('7/7', '敏感信息检查');

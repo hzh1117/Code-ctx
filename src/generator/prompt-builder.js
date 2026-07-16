@@ -51,21 +51,23 @@ function limitText(value, maxChars, label) {
 function formatSourceFiles(sourceFiles) {
   if (!Array.isArray(sourceFiles) || sourceFiles.length === 0) return '';
 
-  return sourceFiles.map(file => {
-    const truncation = file.truncation || {};
-    const metadata = [
-      `path=${JSON.stringify(file.path || '')}`,
-      `language=${JSON.stringify(file.language || 'text')}`,
-      `sha256=${JSON.stringify(file.hash || '')}`,
-      `truncated=${truncation.truncated === true}`,
-      `includedChars=${truncation.includedChars ?? String(file.content || '').length}`,
-      `originalChars=${truncation.originalChars ?? String(file.content || '').length}`
-    ];
-    if (truncation.reason) metadata.push(`reason=${JSON.stringify(truncation.reason)}`);
-    if (file.redactions) metadata.push(`redactions=${file.redactions}`);
+  return sourceFiles
+    .map(file => {
+      const truncation = file.truncation || {};
+      const metadata = [
+        `path=${JSON.stringify(file.path || '')}`,
+        `language=${JSON.stringify(file.language || 'text')}`,
+        `sha256=${JSON.stringify(file.hash || '')}`,
+        `truncated=${truncation.truncated === true}`,
+        `includedChars=${truncation.includedChars ?? String(file.content || '').length}`,
+        `originalChars=${truncation.originalChars ?? String(file.content || '').length}`
+      ];
+      if (truncation.reason) metadata.push(`reason=${JSON.stringify(truncation.reason)}`);
+      if (file.redactions) metadata.push(`redactions=${file.redactions}`);
 
-    return `<source ${metadata.join(' ')}>\n${file.content || ''}\n</source>`;
-  }).join('\n\n');
+      return `<source ${metadata.join(' ')}>\n${file.content || ''}\n</source>`;
+    })
+    .join('\n\n');
 }
 
 function relativeProjectPath(projectPath) {
@@ -124,9 +126,7 @@ function buildUsePrompt({ taskDescription, projectContext, overviewContent, rela
   return parts.join('\n');
 }
 
-const OVERVIEW_SUMMARY_SECTIONS = [
-  'overview', 'modules', 'api', 'data', 'dependencies', 'notes', 'quickstart'
-];
+const OVERVIEW_SUMMARY_SECTIONS = ['overview', 'modules', 'api', 'data', 'dependencies', 'notes', 'quickstart'];
 
 function summarizeProjectDocument(doc) {
   const sections = OVERVIEW_SUMMARY_SECTIONS.map(section => {
@@ -157,16 +157,16 @@ function buildRelationshipEvidence(projects, scanResults) {
             }
           }
           if (pkg.workspaces) {
-            evidence.push(`- [${project.alias}:${source.path}] workspace declaration: ${JSON.stringify(pkg.workspaces)}`);
+            evidence.push(
+              `- [${project.alias}:${source.path}] workspace declaration: ${JSON.stringify(pkg.workspaces)}`
+            );
           }
         } catch {
           // Truncated or non-JSON package evidence is handled by import evidence below.
         }
       }
 
-      const imports = source.content.matchAll(
-        /(?:from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g
-      );
+      const imports = source.content.matchAll(/(?:from\s+|require\s*\(\s*)['"]([^'"]+)['"]/g);
       for (const match of imports) {
         const target = [...aliases].find(alias => alias !== project.alias && match[1].includes(alias));
         if (target) evidence.push(`- [${project.alias}:${source.path}] import "${match[1]}" -> ${target}`);
@@ -183,11 +183,17 @@ function buildOverviewPrompt({ config, generatedDocs, scanResults, language } = 
   const projects = configObj.projects || [];
   const docs = generatedDocs || {};
 
-  const projectSummaries = limitText(projects.map(p => {
-    const doc = docs[p.alias] || '';
-    const summary = summarizeProjectDocument(doc);
-    return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
-  }).join('\n'), CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS, 'project summaries');
+  const projectSummaries = limitText(
+    projects
+      .map(p => {
+        const doc = docs[p.alias] || '';
+        const summary = summarizeProjectDocument(doc);
+        return `### ${p.alias} (${p.label}, ${p.type})\n${summary}\n`;
+      })
+      .join('\n'),
+    CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS,
+    'project summaries'
+  );
 
   const tpl = loadTemplate('scan-prompt-overview.md', language);
   return renderTemplate(tpl, {
@@ -203,9 +209,10 @@ function buildOneShotPrompt({ projects, scanResults, language } = {}) {
   const projectList = projects || [];
   const results = scanResults || {};
 
-  const projectSections = projectList.map(p => {
-    const result = results[p.alias] || {};
-    return `## ${p.alias}
+  const projectSections = projectList
+    .map(p => {
+      const result = results[p.alias] || {};
+      return `## ${p.alias}
 ${labels.projectName}：${p.name}
 ${labels.projectType}：${p.type}
 ${labels.projectPath}：${relativeProjectPath(p.path)}
@@ -221,7 +228,8 @@ ${formatSourceFiles(result.sourceFiles)}
 
 ${labels.adapterHints}：
 ${result.promptHints || ''}`;
-  }).join('\n\n---\n\n');
+    })
+    .join('\n\n---\n\n');
 
   const tpl = loadTemplate('scan-prompt-one-shot.md', language);
   return renderTemplate(tpl, { projectSections });
@@ -239,11 +247,7 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
       const summary = doc.split('\n').slice(0, 15).join('\n');
       otherDocsSection += `\n\n### ${alias}\n${summary}`;
     }
-    otherDocsSection = limitText(
-      otherDocsSection,
-      CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS,
-      'other docs'
-    );
+    otherDocsSection = limitText(otherDocsSection, CONTEXT_LIMITS.MAX_OTHER_DOCS_CHARS, 'other docs');
   }
 
   const tpl = loadTemplate('scan-prompt.md', language);
@@ -254,16 +258,25 @@ function buildSubprojectPrompt({ project, scanResult, otherDocs, language } = {}
     tree: limitText(scanObj.tree, CONTEXT_LIMITS.MAX_TREE_CHARS, 'tree'),
     keyFiles: (scanObj.sourceFiles || []).map(file => file.path).join('\n') || (scanObj.keyFiles || []).join('\n'),
     sourceEvidence: formatSourceFiles(scanObj.sourceFiles),
-    otherDocsSection: [
-      scanObj.promptHints ? `${labels.adapterHints}：\n${scanObj.promptHints}` : '',
-      otherDocsSection
-    ].filter(Boolean).join('\n\n')
+    otherDocsSection: [scanObj.promptHints ? `${labels.adapterHints}：\n${scanObj.promptHints}` : '', otherDocsSection]
+      .filter(Boolean)
+      .join('\n\n')
   });
 }
 
 // 兼容分发层：根据 type 派发到专用函数
 // 新代码请直接调用 buildOverviewPrompt / buildOneShotPrompt / buildSubprojectPrompt
-function buildInitPrompt({ project, scanResult, type, config, generatedDocs, projects, scanResults, otherDocs, language } = {}) {
+function buildInitPrompt({
+  project,
+  scanResult,
+  type,
+  config,
+  generatedDocs,
+  projects,
+  scanResults,
+  otherDocs,
+  language
+} = {}) {
   if (type === 'overview') {
     return buildOverviewPrompt({ config, generatedDocs, scanResults, language });
   }
@@ -281,23 +294,37 @@ function categorizeFiles(keyFiles) {
     repositoryFiles: [],
     configFiles: []
   };
-  
+
   for (const file of keyFiles) {
     const normalizedPath = file.replace(/\\/g, '/').toLowerCase();
-    
+
     if (normalizedPath.includes('/controller/') || normalizedPath.includes('controller.java')) {
       categories.controllerFiles.push(file);
     } else if (normalizedPath.includes('/service/') || normalizedPath.includes('service.java')) {
       categories.serviceFiles.push(file);
-    } else if (normalizedPath.includes('/entity/') || normalizedPath.includes('/model/') || normalizedPath.includes('entity.java')) {
+    } else if (
+      normalizedPath.includes('/entity/') ||
+      normalizedPath.includes('/model/') ||
+      normalizedPath.includes('entity.java')
+    ) {
       categories.entityFiles.push(file);
-    } else if (normalizedPath.includes('/repository/') || normalizedPath.includes('/mapper/') || normalizedPath.includes('repository.java') || normalizedPath.includes('mapper.java')) {
+    } else if (
+      normalizedPath.includes('/repository/') ||
+      normalizedPath.includes('/mapper/') ||
+      normalizedPath.includes('repository.java') ||
+      normalizedPath.includes('mapper.java')
+    ) {
       categories.repositoryFiles.push(file);
-    } else if (normalizedPath.includes('application.yml') || normalizedPath.includes('application.properties') || normalizedPath.includes('pom.xml') || normalizedPath.includes('build.gradle')) {
+    } else if (
+      normalizedPath.includes('application.yml') ||
+      normalizedPath.includes('application.properties') ||
+      normalizedPath.includes('pom.xml') ||
+      normalizedPath.includes('build.gradle')
+    ) {
       categories.configFiles.push(file);
     }
   }
-  
+
   return categories;
 }
 
@@ -306,7 +333,7 @@ function buildApiPrompt({ project, scanResult, language }) {
   const scanObj = scanResult || {};
 
   const displayFiles = (scanObj.sourceFiles || []).map(file => file.path);
-  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : (scanObj.keyFiles || []));
+  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : scanObj.keyFiles || []);
 
   const tpl = loadTemplate('java-api-prompt.md', language);
   return renderTemplate(tpl, {
@@ -323,10 +350,10 @@ function buildApiPrompt({ project, scanResult, language }) {
 function buildDatabasePrompt({ project, scanResult, language }) {
   const projectObj = project || {};
   const scanObj = scanResult || {};
-  
+
   const displayFiles = (scanObj.sourceFiles || []).map(file => file.path);
-  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : (scanObj.keyFiles || []));
-  
+  const categories = categorizeFiles(displayFiles.length > 0 ? displayFiles : scanObj.keyFiles || []);
+
   const tpl = loadTemplate('java-database-prompt.md', language);
   return renderTemplate(tpl, {
     projectName: projectObj.name || '',

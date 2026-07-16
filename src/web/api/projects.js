@@ -4,7 +4,7 @@ const path = require('path');
 const { loadProjectConfig } = require('../../utils/config');
 const { isWithinDir } = require('../../utils/file-reader');
 
-module.exports = function(rootDir) {
+module.exports = function (rootDir) {
   const router = express.Router();
 
   router.get('/', (req, res) => {

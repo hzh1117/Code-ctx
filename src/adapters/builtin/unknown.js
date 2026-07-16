@@ -1,16 +1,27 @@
 const { BaseAdapter } = require('../base');
 
 class UnknownAdapter extends BaseAdapter {
-  get type() { return 'unknown'; }
+  get type() {
+    return 'unknown';
+  }
 
   // Unknown is an explicit detector fallback and must not claim child folders.
-  detect() { return false; }
+  detect() {
+    return false;
+  }
 
   get scanPatterns() {
     return [
-      'package.json', 'pom.xml', 'build.gradle', 'settings.gradle',
-      'go.mod', 'Cargo.toml', 'pyproject.toml', 'requirements*.txt',
-      'Dockerfile', 'Makefile',
+      'package.json',
+      'pom.xml',
+      'build.gradle',
+      'settings.gradle',
+      'go.mod',
+      'Cargo.toml',
+      'pyproject.toml',
+      'requirements*.txt',
+      'Dockerfile',
+      'Makefile',
       '*.{js,jsx,ts,tsx,py,java,go,rs,php,rb,cs,c,cc,cpp}',
       '{src,app,lib,server,cmd,internal,pkg}/**/*.{js,jsx,ts,tsx,vue,svelte,py,java,kt,go,rs,php,rb,cs,c,cc,cpp}'
     ];

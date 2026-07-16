@@ -1,5 +1,7 @@
 const {
-  estimateTokensForContent, evaluatePromptBudget, evaluateContextBudget
+  estimateTokensForContent,
+  evaluatePromptBudget,
+  evaluateContextBudget
 } = require('../../src/utils/token-estimator');
 
 describe('token-estimator', () => {

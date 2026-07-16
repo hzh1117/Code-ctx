@@ -31,12 +31,15 @@ describe('AI request cancellation and deadlines', () => {
     const controller = new AbortController();
 
     try {
-      const request = generateWithAI('test', baseOptions(server, {
-        signal: controller.signal,
-        timeout: 10000,
-        deadlineMs: 5000,
-        maxRetries: 0
-      }));
+      const request = generateWithAI(
+        'test',
+        baseOptions(server, {
+          signal: controller.signal,
+          timeout: 10000,
+          deadlineMs: 5000,
+          maxRetries: 0
+        })
+      );
       setTimeout(() => controller.abort(), 30);
 
       await expect(request).rejects.toMatchObject({ code: 'AI_REQUEST_ABORTED' });
@@ -58,11 +61,16 @@ describe('AI request cancellation and deadlines', () => {
 
     try {
       const startedAt = Date.now();
-      await expect(generateWithAI('test', baseOptions(server, {
-        signal: controller.signal,
-        timeout: 1000,
-        deadlineMs: 5000
-      }))).rejects.toMatchObject({ code: 'AI_REQUEST_ABORTED' });
+      await expect(
+        generateWithAI(
+          'test',
+          baseOptions(server, {
+            signal: controller.signal,
+            timeout: 1000,
+            deadlineMs: 5000
+          })
+        )
+      ).rejects.toMatchObject({ code: 'AI_REQUEST_ABORTED' });
 
       expect(requestCount).toBe(1);
       expect(Date.now() - startedAt).toBeLessThan(1000);
@@ -77,11 +85,16 @@ describe('AI request cancellation and deadlines', () => {
 
     try {
       const startedAt = Date.now();
-      await expect(generateWithAI('test', baseOptions(server, {
-        timeout: 10000,
-        deadlineMs: 60,
-        maxRetries: 0
-      }))).rejects.toMatchObject({ code: 'AI_OPERATION_DEADLINE' });
+      await expect(
+        generateWithAI(
+          'test',
+          baseOptions(server, {
+            timeout: 10000,
+            deadlineMs: 60,
+            maxRetries: 0
+          })
+        )
+      ).rejects.toMatchObject({ code: 'AI_OPERATION_DEADLINE' });
       expect(Date.now() - startedAt).toBeLessThan(1000);
     } finally {
       await close(server);
@@ -93,11 +106,16 @@ describe('AI request cancellation and deadlines', () => {
     await listen(server);
 
     try {
-      await expect(generateWithAI('test', baseOptions(server, {
-        timeout: 30,
-        deadlineMs: 1000,
-        maxRetries: 0
-      }))).rejects.toMatchObject({ code: 'AI_REQUEST_TIMEOUT' });
+      await expect(
+        generateWithAI(
+          'test',
+          baseOptions(server, {
+            timeout: 30,
+            deadlineMs: 1000,
+            maxRetries: 0
+          })
+        )
+      ).rejects.toMatchObject({ code: 'AI_REQUEST_TIMEOUT' });
     } finally {
       await close(server);
     }
@@ -109,11 +127,14 @@ describe('AI request cancellation and deadlines', () => {
     const controller = new AbortController();
 
     try {
-      const stream = generateWithAIStream('test', baseOptions(server, {
-        signal: controller.signal,
-        timeout: 10000,
-        deadlineMs: 5000
-      }));
+      const stream = generateWithAIStream(
+        'test',
+        baseOptions(server, {
+          signal: controller.signal,
+          timeout: 10000,
+          deadlineMs: 5000
+        })
+      );
       const error = new Promise((resolve, reject) => {
         stream.once('error', resolve);
         stream.once('done', () => reject(new Error('stream unexpectedly completed')));

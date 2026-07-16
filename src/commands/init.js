@@ -18,10 +18,12 @@ function createInitServices(dependencies = {}) {
     discovery: dependencies.discoveryService || createDiscoveryService(shared),
     snapshot: dependencies.snapshotService || createSnapshotService(shared),
     planning: dependencies.planningService || createPlanningService(shared),
-    generation: dependencies.generationService || createGenerationService({
-      ...shared,
-      validator
-    }),
+    generation:
+      dependencies.generationService ||
+      createGenerationService({
+        ...shared,
+        validator
+      }),
     validation: validator,
     commit: dependencies.commitService || createCommitService(shared)
   };
@@ -34,9 +36,7 @@ function createInitCommand(dependencies = {}) {
     services.logger.setVerbose(options.verbose);
 
     const projects = services.discovery.discover(rootDir, options);
-    const runtimeContext = services.discovery.getRuntimeContext
-      ? services.discovery.getRuntimeContext()
-      : null;
+    const runtimeContext = services.discovery.getRuntimeContext ? services.discovery.getRuntimeContext() : null;
     const snapshot = await services.snapshot.capture(rootDir, projects, {
       ...options,
       registry: runtimeContext?.registry

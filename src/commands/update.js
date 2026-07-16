@@ -16,9 +16,7 @@ const {
   getUntrackedFiles,
   getLastScanCommit
 } = require('../utils/git-utils');
-const {
-  findRelatedDoc, groupChangesByProject, resolveProjectForFile
-} = require('../core/doc-resolver');
+const { findRelatedDoc, groupChangesByProject, resolveProjectForFile } = require('../core/doc-resolver');
 const { initPlugins } = require('../plugins/loader');
 const { addTask } = require('../utils/task-history');
 const { createIgnoreEngine } = require('../utils/ignore-engine');
@@ -109,9 +107,10 @@ function detectFromGit(rootDir, ignoreEngine) {
   const processedChanges = lastScan.processedChanges || {};
   const untracked = filterIgnored(getUntrackedFiles(rootDir), ignoreEngine);
   const untrackedSet = new Set(untracked);
-  const candidates = filterIgnored([
-    ...new Set([...diffFiles, ...untracked, ...Object.keys(processedChanges)])
-  ], ignoreEngine);
+  const candidates = filterIgnored(
+    [...new Set([...diffFiles, ...untracked, ...Object.keys(processedChanges)])],
+    ignoreEngine
+  );
   const changedFiles = candidates.filter(file => {
     const processed = processedChanges[file];
     if (!processed) return true;
@@ -126,7 +125,7 @@ function detectFromGit(rootDir, ignoreEngine) {
   const changes = changedFiles.map(file => ({
     path: file,
     project: getProjectFromPath(file),
-    status: untrackedSet.has(file) ? 'added' : (fs.existsSync(path.join(rootDir, file)) ? 'modified' : 'deleted')
+    status: untrackedSet.has(file) ? 'added' : fs.existsSync(path.join(rootDir, file)) ? 'modified' : 'deleted'
   }));
 
   return {
@@ -280,20 +279,25 @@ function getSectionKey(docName, sectionName) {
 }
 
 function buildChangeSetId(changes) {
-  const normalized = changes.map(change => ({
-    path: change.path,
-    project: change.project,
-    status: change.status,
-    oldHash: change.oldHash || null,
-    newHash: change.newHash || null,
-    evidenceHash: change.evidenceHash || crypto.createHash('sha256').update(change.evidence || '').digest('hex')
-  })).sort((a, b) => a.path.localeCompare(b.path) || a.status.localeCompare(b.status));
+  const normalized = changes
+    .map(change => ({
+      path: change.path,
+      project: change.project,
+      status: change.status,
+      oldHash: change.oldHash || null,
+      newHash: change.newHash || null,
+      evidenceHash:
+        change.evidenceHash ||
+        crypto
+          .createHash('sha256')
+          .update(change.evidence || '')
+          .digest('hex')
+    }))
+    .sort((a, b) => a.path.localeCompare(b.path) || a.status.localeCompare(b.status));
   return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
-function prepareUpdateState(
-  rootDir, changeSetId, changes, sectionUpdates, detectionMethod, confirmations = []
-) {
+function prepareUpdateState(rootDir, changeSetId, changes, sectionUpdates, detectionMethod, confirmations = []) {
   const previous = loadUpdateState(rootDir);
   const canResume = previous?.changeSetId === changeSetId;
   const sections = {};
@@ -344,9 +348,7 @@ function attachChangeEvidence(rootDir, changes, options = {}) {
     let rawEvidence = '';
 
     if (change.status === 'deleted') {
-      rawEvidence = options.gitBaseRef
-        ? (getFileDiff(rootDir, options.gitBaseRef, change.path) || '')
-        : '';
+      rawEvidence = options.gitBaseRef ? getFileDiff(rootDir, options.gitBaseRef, change.path) || '' : '';
       evidenceType = rawEvidence ? 'patch' : 'deletion';
       if (!rawEvidence) rawEvidence = 'File deleted from the current project.';
     } else if (options.gitBaseRef && change.status !== 'added') {
@@ -361,9 +363,7 @@ function attachChangeEvidence(rootDir, changes, options = {}) {
 
     const safeEvidence = filterSensitive(rawEvidence).content;
     const includedChars = Math.min(safeEvidence.length, maxFileChars);
-    const status = change.status === 'modified' && rawEvidence.includes('new file mode')
-      ? 'added'
-      : change.status;
+    const status = change.status === 'modified' && rawEvidence.includes('new file mode') ? 'added' : change.status;
     return {
       ...change,
       status,
@@ -418,10 +418,9 @@ function buildEvidenceChunks(changes, options = {}) {
 
 function renderEvidenceChunks(bundle) {
   const total = bundle.chunks.length;
-  const rendered = bundle.chunks.map((chunk, index) => [
-    `--- change-evidence chunk ${index + 1}/${total} ---`,
-    chunk
-  ].join('\n'));
+  const rendered = bundle.chunks.map((chunk, index) =>
+    [`--- change-evidence chunk ${index + 1}/${total} ---`, chunk].join('\n')
+  );
   if (bundle.truncated) {
     rendered.push(`[change evidence truncated: included ${bundle.includedChars}/${bundle.originalChars} chars]`);
   }
@@ -440,7 +439,11 @@ function inferSectionsForChange(change) {
   const sections = new Set();
   let recognized = false;
 
-  if (/^(package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pom\.xml|build\.gradle|go\.mod|cargo\.toml|pyproject\.toml|requirements.*\.txt)$/.test(basename)) {
+  if (
+    /^(package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|pom\.xml|build\.gradle|go\.mod|cargo\.toml|pyproject\.toml|requirements.*\.txt)$/.test(
+      basename
+    )
+  ) {
     sections.add('dependencies');
     recognized = true;
   }
@@ -449,9 +452,11 @@ function inferSectionsForChange(change) {
     sections.add('notes');
     recognized = true;
   }
-  if (/(^|\/)(api|routes?|controllers?|handlers?|middleware)(\/|\.|$)/.test(normalized) ||
-      /(?:router|app|server)\.(get|post|put|patch|delete)\s*\(/.test(evidence) ||
-      /^(app|server|main)\.[cm]?[jt]s$/.test(basename)) {
+  if (
+    /(^|\/)(api|routes?|controllers?|handlers?|middleware)(\/|\.|$)/.test(normalized) ||
+    /(?:router|app|server)\.(get|post|put|patch|delete)\s*\(/.test(evidence) ||
+    /^(app|server|main)\.[cm]?[jt]s$/.test(basename)
+  ) {
     sections.add('api');
     sections.add('modules');
     recognized = true;
@@ -461,8 +466,10 @@ function inferSectionsForChange(change) {
     sections.add('modules');
     recognized = true;
   }
-  if (/(^|\/)(components?|pages?|views?|hooks?|services?|modules?|utils?|lib|src)(\/|\.|$)/.test(normalized) &&
-      /\.(js|jsx|ts|tsx|vue|svelte|py|java|kt|go|rs|php|rb|cs|c|cc|cpp)$/.test(normalized)) {
+  if (
+    /(^|\/)(components?|pages?|views?|hooks?|services?|modules?|utils?|lib|src)(\/|\.|$)/.test(normalized) &&
+    /\.(js|jsx|ts|tsx|vue|svelte|py|java|kt|go|rs|php|rb|cs|c|cc|cpp)$/.test(normalized)
+  ) {
     sections.add('modules');
     recognized = true;
   }
@@ -590,10 +597,7 @@ function buildConfirmationPrompt(confirmations, changes, evidenceOptions) {
     if (confirmation.projectId) parts.push(`项目: ${confirmation.projectId}`);
     if (confirmation.docName) parts.push(`文档: ${confirmation.docName}`);
     parts.push(`原因: ${confirmation.reason}`);
-    const evidence = buildEvidenceChunks(
-      selectChanges(changes, confirmation.files),
-      evidenceOptions
-    );
+    const evidence = buildEvidenceChunks(selectChanges(changes, confirmation.files), evidenceOptions);
     parts.push('变化证据：', renderEvidenceChunks(evidence));
   }
   return parts.join('\n');
@@ -714,18 +718,20 @@ async function executeUpdates(rootDir, sectionUpdates, aiConfig) {
 
     // Concurrent AI calls within this doc — each section catches its own error
     // so Promise.all never rejects and partial failures don't abort the others.
-    const sectionOutcomes = await Promise.all(updates.map(async (update) => {
-      console.log(`  调用 AI 更新 ${docName} > ${update.sectionName}...`);
-      try {
-        const newContent = await generateWithAI(update.prompt, aiConfig);
-        const safeContent = filterSensitive(newContent).content;
-        return { sectionName: update.sectionName, status: 'success', newContent: safeContent };
-      } catch (err) {
-        if (isAICancellationError(err)) throw err;
-        console.error(`  ✗ ${docName} > ${update.sectionName} 更新失败: ${err.message}`);
-        return { sectionName: update.sectionName, status: 'failed', reason: err.message };
-      }
-    }));
+    const sectionOutcomes = await Promise.all(
+      updates.map(async update => {
+        console.log(`  调用 AI 更新 ${docName} > ${update.sectionName}...`);
+        try {
+          const newContent = await generateWithAI(update.prompt, aiConfig);
+          const safeContent = filterSensitive(newContent).content;
+          return { sectionName: update.sectionName, status: 'success', newContent: safeContent };
+        } catch (err) {
+          if (isAICancellationError(err)) throw err;
+          console.error(`  ✗ ${docName} > ${update.sectionName} 更新失败: ${err.message}`);
+          return { sectionName: update.sectionName, status: 'failed', reason: err.message };
+        }
+      })
+    );
 
     const sectionResults = [];
     for (const outcome of sectionOutcomes) {
@@ -791,9 +797,7 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
   }
 
   const storedState = loadUpdateState(rootDir);
-  const state = storedState?.changeSetId === transaction.changeSetId
-    ? storedState
-    : transaction.pendingState;
+  const state = storedState?.changeSetId === transaction.changeSetId ? storedState : transaction.pendingState;
   const pendingUpdates = updateResult.sectionUpdates.filter(update => {
     const key = getSectionKey(update.docName, update.sectionName);
     return state.sections[key]?.status !== 'success';
@@ -806,7 +810,7 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
     state.sections[key] = {
       ...state.sections[key],
       status: result.status === 'success' ? 'success' : 'failed',
-      error: result.status === 'success' ? null : (result.reason || result.status)
+      error: result.status === 'success' ? null : result.reason || result.status
     };
   }
   state.updatedAt = new Date().toISOString();
@@ -824,8 +828,7 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
   }
 
   const sectionStates = Object.values(state.sections);
-  const allSectionsSucceeded = sectionStates.length > 0 &&
-    sectionStates.every(section => section.status === 'success');
+  const allSectionsSucceeded = sectionStates.length > 0 && sectionStates.every(section => section.status === 'success');
   saveUpdateState(rootDir, state);
 
   if (!allSectionsSucceeded) {
@@ -852,13 +855,7 @@ async function executeUpdateTransaction(rootDir, updateResult, aiConfig) {
     };
   }
 
-  saveLastScan(
-    rootDir,
-    lastScanPath,
-    freshDetection.changedFiles,
-    freshDetection.useGit,
-    freshDetection.hashScanState
-  );
+  saveLastScan(rootDir, lastScanPath, freshDetection.changedFiles, freshDetection.useGit, freshDetection.hashScanState);
   removeUpdateState(rootDir);
   return { ...execution, committed: true, pendingState: null };
 }
@@ -870,8 +867,10 @@ async function updateCommand(rootDir, options = {}) {
   initPlugins(rootDir);
   const lastScanPath = path.join(rootDir, 'ai-docs', STATE_FILES.LAST_SCAN);
 
-  const { changedFiles, changes, detectionMethod, useGit, hashScanState, gitBaseRef } =
-    await detectChangedFiles(rootDir, lastScanPath);
+  const { changedFiles, changes, detectionMethod, useGit, hashScanState, gitBaseRef } = await detectChangedFiles(
+    rootDir,
+    lastScanPath
+  );
 
   const evidenceOptions = {
     maxFileChars: options.maxEvidenceFileChars,
@@ -883,21 +882,15 @@ async function updateCommand(rootDir, options = {}) {
     gitBaseRef
   });
   const evidenceChunks = buildEvidenceChunks(changesWithEvidence, evidenceOptions);
-  const impactPlan = buildSectionUpdatePrompts(
-    rootDir,
-    changedFiles,
-    changesWithEvidence,
-    evidenceOptions
-  );
+  const impactPlan = buildSectionUpdatePrompts(rootDir, changedFiles, changesWithEvidence, evidenceOptions);
   let sectionUpdates = impactPlan.sectionUpdates;
   const confirmationRequired = impactPlan.confirmations;
 
-  const updatePrompt = sectionUpdates.length > 0
-    ? buildCombinedSectionPrompt(sectionUpdates)
-    : null;
-  const confirmationPrompt = confirmationRequired.length > 0
-    ? buildConfirmationPrompt(confirmationRequired, changesWithEvidence, evidenceOptions)
-    : null;
+  const updatePrompt = sectionUpdates.length > 0 ? buildCombinedSectionPrompt(sectionUpdates) : null;
+  const confirmationPrompt =
+    confirmationRequired.length > 0
+      ? buildConfirmationPrompt(confirmationRequired, changesWithEvidence, evidenceOptions)
+      : null;
   const promptParts = [updatePrompt, confirmationPrompt].filter(Boolean);
   const prompt = promptParts.length > 0 ? promptParts.join('\n\n') : null;
   if (changedFiles.length > 0 && (typeof prompt !== 'string' || prompt.trim() === '')) {

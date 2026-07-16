@@ -5,14 +5,14 @@ const { getScenarios } = require('../template/engine');
 // Fallback used only when the scenarios JSON is unavailable or no scenario
 // has a `keywords` field. New deployments should rely on the JSON (P19).
 const FALLBACK_KEYWORDS = {
-  'A': ['小程序', 'miniapp', 'uni-app', '前端', '页面', 'C端', '用户端'],
-  'B': ['商户', '管理后台', 'admin', '后台', '管理端'],
-  'C': ['平台', '管控', '运营'],
-  'D': ['数据库', '表结构', 'schema', '迁移'],
-  'E': ['优化', '重构', '修改', '调整', '改进'],
-  'F': ['bug', '错误', '问题', '修复', '排查', '异常'],
-  'G': ['后端', '接口', 'API', '服务端'],
-  'H': ['跨端', '多端', '联动', '全栈']
+  A: ['小程序', 'miniapp', 'uni-app', '前端', '页面', 'C端', '用户端'],
+  B: ['商户', '管理后台', 'admin', '后台', '管理端'],
+  C: ['平台', '管控', '运营'],
+  D: ['数据库', '表结构', 'schema', '迁移'],
+  E: ['优化', '重构', '修改', '调整', '改进'],
+  F: ['bug', '错误', '问题', '修复', '排查', '异常'],
+  G: ['后端', '接口', 'API', '服务端'],
+  H: ['跨端', '多端', '联动', '全栈']
 };
 
 const HIGH_CONFIDENCE = 100;
@@ -85,9 +85,7 @@ function matchScenario(taskDescription, language) {
 }
 
 function buildScenarioMatchPrompt(taskDescription, scenarios) {
-  const scenarioList = scenarios.map(s =>
-    `- ${s.id}: ${s.name} — ${s.description}`
-  ).join('\n');
+  const scenarioList = scenarios.map(s => `- ${s.id}: ${s.name} — ${s.description}`).join('\n');
 
   return `你是一个开发任务分类器。根据用户的任务描述，从以下场景中选择最匹配的一个。
 

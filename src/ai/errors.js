@@ -1,6 +1,5 @@
 function createAIError(code, message) {
-  const error = new Error(message);
-  error.code = code;
+  const error = Object.assign(new Error(message), { code });
   return error;
 }
 

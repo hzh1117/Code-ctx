@@ -2,14 +2,13 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class NodeBackendAdapter extends BaseAdapter {
-  get type() { return 'node-backend'; }
+  get type() {
+    return 'node-backend';
+  }
 
   detect(pkg) {
     const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-    return !!(
-      deps.express || deps.koa || deps.fastify || deps.restify ||
-      deps['@hapi/hapi'] || deps['@nestjs/core']
-    );
+    return !!(deps.express || deps.koa || deps.fastify || deps.restify || deps['@hapi/hapi'] || deps['@nestjs/core']);
   }
 
   get scanPatterns() {
@@ -22,13 +21,13 @@ class NodeBackendAdapter extends BaseAdapter {
   get priorityKeywords() {
     return {
       'app.js': 1,
-      'routes': 2,
-      'controllers': 3,
-      'middleware': 4,
-      'service': 5,
-      'model': 6,
-      'config': 7,
-      'util': 8
+      routes: 2,
+      controllers: 3,
+      middleware: 4,
+      service: 5,
+      model: 6,
+      config: 7,
+      util: 8
     };
   }
 
@@ -37,10 +36,7 @@ class NodeBackendAdapter extends BaseAdapter {
   }
 
   extractKeyFiles(dir) {
-    return [
-      path.join(dir, 'app.js'),
-      path.join(dir, 'package.json')
-    ];
+    return [path.join(dir, 'app.js'), path.join(dir, 'package.json')];
   }
 }
 

@@ -273,22 +273,28 @@ describe('useCommand', () => {
     test('selects data sections for a database scenario', async () => {
       const aiDocsDir = path.join(fixturesDir, 'ai-docs');
       const longContent = 'x'.repeat(9000);
-      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), [
-        '<!-- section:overview -->',
-        'System overview',
-        '<!-- /section:overview -->',
-        '<!-- section:architecture -->',
-        longContent,
-        '<!-- /section:architecture -->'
-      ].join('\n'));
-      fs.writeFileSync(path.join(aiDocsDir, 'api.md'), [
-        '<!-- section:data -->',
-        'User table migration evidence',
-        '<!-- /section:data -->',
-        '<!-- section:api -->',
-        longContent,
-        '<!-- /section:api -->'
-      ].join('\n'));
+      fs.writeFileSync(
+        path.join(aiDocsDir, 'OVERVIEW.md'),
+        [
+          '<!-- section:overview -->',
+          'System overview',
+          '<!-- /section:overview -->',
+          '<!-- section:architecture -->',
+          longContent,
+          '<!-- /section:architecture -->'
+        ].join('\n')
+      );
+      fs.writeFileSync(
+        path.join(aiDocsDir, 'api.md'),
+        [
+          '<!-- section:data -->',
+          'User table migration evidence',
+          '<!-- /section:data -->',
+          '<!-- section:api -->',
+          longContent,
+          '<!-- /section:api -->'
+        ].join('\n')
+      );
 
       const result = await useCommand({
         scenario: 'D',
@@ -304,14 +310,17 @@ describe('useCommand', () => {
 
     test('keeps English labels after compacting an oversized prompt', async () => {
       const aiDocsDir = path.join(fixturesDir, 'ai-docs');
-      fs.writeFileSync(path.join(aiDocsDir, 'OVERVIEW.md'), [
-        '<!-- section:overview -->',
-        'English overview',
-        '<!-- /section:overview -->',
-        '<!-- section:architecture -->',
-        'x'.repeat(10000),
-        '<!-- /section:architecture -->'
-      ].join('\n'));
+      fs.writeFileSync(
+        path.join(aiDocsDir, 'OVERVIEW.md'),
+        [
+          '<!-- section:overview -->',
+          'English overview',
+          '<!-- /section:overview -->',
+          '<!-- section:architecture -->',
+          'x'.repeat(10000),
+          '<!-- /section:architecture -->'
+        ].join('\n')
+      );
 
       const result = await useCommand({
         scenario: 'F',

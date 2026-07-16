@@ -22,7 +22,7 @@ function sanitizeConfig(input) {
   return sanitized;
 }
 
-module.exports = function(rootDir) {
+module.exports = function (rootDir) {
   const router = express.Router();
 
   router.get('/', (req, res) => {

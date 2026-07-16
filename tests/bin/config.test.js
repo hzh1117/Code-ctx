@@ -21,10 +21,13 @@ describe('config validate CLI', () => {
   });
 
   test('reports a valid configuration', async () => {
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'valid',
-      projects: [{ alias: 'app', path: '.', type: 'unknown' }]
-    }));
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'valid',
+        projects: [{ alias: 'app', path: '.', type: 'unknown' }]
+      })
+    );
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const command = require('../../bin/commands/config');
 
@@ -35,10 +38,13 @@ describe('config validate CLI', () => {
   });
 
   test('sets a non-zero exit code for blocking errors', async () => {
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 42,
-      projects: 'invalid'
-    }));
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 42,
+        projects: 'invalid'
+      })
+    );
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     const command = require('../../bin/commands/config');
 
@@ -49,21 +55,21 @@ describe('config validate CLI', () => {
   });
 
   test('migrates a static JS config and retains a backup', async () => {
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.js'), [
-      'module.exports = {',
-      "  projectName: 'legacy',",
-      "  projects: [{ alias: 'app', path: '.', type: 'unknown' }]",
-      '};'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.js'),
+      [
+        'module.exports = {',
+        "  projectName: 'legacy',",
+        "  projects: [{ alias: 'app', path: '.', type: 'unknown' }]",
+        '};'
+      ].join('\n')
+    );
     const log = jest.spyOn(console, 'log').mockImplementation(() => {});
     const command = require('../../bin/commands/config');
 
     await command.parseAsync(['node', 'config', 'migrate', rootDir]);
 
-    const migrated = JSON.parse(fs.readFileSync(
-      path.join(rootDir, 'code-ctx.config.json'),
-      'utf8'
-    ));
+    const migrated = JSON.parse(fs.readFileSync(path.join(rootDir, 'code-ctx.config.json'), 'utf8'));
     expect(migrated.projectName).toBe('legacy');
     expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.js'))).toBe(false);
     expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.js.bak'))).toBe(true);
@@ -92,16 +98,21 @@ describe('config validate CLI', () => {
     const command = require('../../bin/commands/config');
 
     await command.parseAsync([
-      'node', 'config', 'setup', rootDir,
-      '--provider', 'openai',
-      '--base-url', 'https://api.openai.com/v1',
-      '--model', 'gpt-5.5',
+      'node',
+      'config',
+      'setup',
+      rootDir,
+      '--provider',
+      'openai',
+      '--base-url',
+      'https://api.openai.com/v1',
+      '--model',
+      'gpt-5.5',
       '--no-test'
     ]);
 
     expect(process.exitCode).toBeUndefined();
     expect(fs.existsSync(path.join(rootDir, 'code-ctx.config.json'))).toBe(true);
-    expect(fs.readFileSync(path.join(rootDir, '.env'), 'utf8'))
-      .toContain('OPENAI_API_KEY=test-secret-key');
+    expect(fs.readFileSync(path.join(rootDir, '.env'), 'utf8')).toContain('OPENAI_API_KEY=test-secret-key');
   });
 });

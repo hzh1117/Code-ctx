@@ -26,13 +26,13 @@ describe('config', () => {
     fs.rmSync(testDir, { recursive: true, force: true });
     _clearCache();
   });
-  
+
   test('should load env config', () => {
     fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=test-key');
     const config = loadEnvConfig(testDir);
     expect(config.OPENAI_API_KEY).toBe('test-key');
   });
-  
+
   test('should get AI config with defaults', () => {
     const config = getAIConfig(testDir);
     // Protocol may be overridden by tool-level config
@@ -42,10 +42,7 @@ describe('config', () => {
   });
 
   test('should allow a separate input token budget', () => {
-    fs.writeFileSync(path.join(testDir, '.env'), [
-      'OPENAI_API_KEY=test-key',
-      'AI_MAX_INPUT_TOKENS=32000'
-    ].join('\n'));
+    fs.writeFileSync(path.join(testDir, '.env'), ['OPENAI_API_KEY=test-key', 'AI_MAX_INPUT_TOKENS=32000'].join('\n'));
 
     const config = getAIConfig(testDir);
 
@@ -56,10 +53,7 @@ describe('config', () => {
   test('should use Kimi Code defaults when ANTHROPIC_BASE_URL points to Kimi', () => {
     fs.writeFileSync(
       path.join(testDir, '.env'),
-      [
-        'ANTHROPIC_BASE_URL=https://api.kimi.com/coding/',
-        'ANTHROPIC_API_KEY=test-key'
-      ].join('\n')
+      ['ANTHROPIC_BASE_URL=https://api.kimi.com/coding/', 'ANTHROPIC_API_KEY=test-key'].join('\n')
     );
 
     const config = getAIConfig(testDir);
@@ -86,12 +80,15 @@ describe('config', () => {
 
   test('preset 推断同样适用 DeepSeek（openai 兼容）默认 model', () => {
     fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=test-key');
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      ai: {
-        protocol: 'openai',
-        openai: { baseUrl: 'https://api.deepseek.com' }
-      }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        ai: {
+          protocol: 'openai',
+          openai: { baseUrl: 'https://api.deepseek.com' }
+        }
+      })
+    );
 
     const config = getAIConfig(testDir);
 
@@ -101,25 +98,28 @@ describe('config', () => {
   });
 
   test('should select OpenAI provider config and key from grouped config', () => {
-    fs.writeFileSync(path.join(testDir, '.env'), [
-      'OPENAI_API_KEY=openai-key',
-      'ANTHROPIC_API_KEY=anthropic-key'
-    ].join('\n'));
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = ${JSON.stringify({
-      ai: {
-        protocol: 'openai',
-        openai: {
-          baseUrl: 'https://api.deepseek.com',
-          model: 'deepseek-chat',
-          maxTokens: 2048
-        },
-        anthropic: {
-          baseUrl: 'https://api.anthropic.com',
-          model: 'claude-sonnet-4-5-20250929',
-          maxTokens: 4096
+    fs.writeFileSync(
+      path.join(testDir, '.env'),
+      ['OPENAI_API_KEY=openai-key', 'ANTHROPIC_API_KEY=anthropic-key'].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = ${JSON.stringify({
+        ai: {
+          protocol: 'openai',
+          openai: {
+            baseUrl: 'https://api.deepseek.com',
+            model: 'deepseek-chat',
+            maxTokens: 2048
+          },
+          anthropic: {
+            baseUrl: 'https://api.anthropic.com',
+            model: 'claude-sonnet-4-5-20250929',
+            maxTokens: 4096
+          }
         }
-      }
-    })};`);
+      })};`
+    );
 
     const config = getAIConfig(testDir);
 
@@ -131,25 +131,28 @@ describe('config', () => {
   });
 
   test('should select Anthropic provider config and key from grouped config', () => {
-    fs.writeFileSync(path.join(testDir, '.env'), [
-      'OPENAI_API_KEY=openai-key',
-      'ANTHROPIC_API_KEY=anthropic-key'
-    ].join('\n'));
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = ${JSON.stringify({
-      ai: {
-        protocol: 'anthropic',
-        openai: {
-          baseUrl: 'https://api.deepseek.com',
-          model: 'deepseek-chat',
-          maxTokens: 2048
-        },
-        anthropic: {
-          baseUrl: 'https://api.anthropic.com',
-          model: 'claude-sonnet-4-5-20250929',
-          maxTokens: 4096
+    fs.writeFileSync(
+      path.join(testDir, '.env'),
+      ['OPENAI_API_KEY=openai-key', 'ANTHROPIC_API_KEY=anthropic-key'].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = ${JSON.stringify({
+        ai: {
+          protocol: 'anthropic',
+          openai: {
+            baseUrl: 'https://api.deepseek.com',
+            model: 'deepseek-chat',
+            maxTokens: 2048
+          },
+          anthropic: {
+            baseUrl: 'https://api.anthropic.com',
+            model: 'claude-sonnet-4-5-20250929',
+            maxTokens: 4096
+          }
         }
-      }
-    })};`);
+      })};`
+    );
 
     const config = getAIConfig(testDir);
 
@@ -161,22 +164,25 @@ describe('config', () => {
   });
 
   test('should save grouped AI config without dropping the other provider', () => {
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = ${JSON.stringify({
-      projectName: 'demo',
-      ai: {
-        protocol: 'openai',
-        openai: {
-          baseUrl: 'https://api.deepseek.com',
-          model: 'deepseek-chat',
-          maxTokens: 2048
-        },
-        anthropic: {
-          baseUrl: 'https://api.anthropic.com',
-          model: 'claude-sonnet-4-5-20250929',
-          maxTokens: 4096
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = ${JSON.stringify({
+        projectName: 'demo',
+        ai: {
+          protocol: 'openai',
+          openai: {
+            baseUrl: 'https://api.deepseek.com',
+            model: 'deepseek-chat',
+            maxTokens: 2048
+          },
+          anthropic: {
+            baseUrl: 'https://api.anthropic.com',
+            model: 'claude-sonnet-4-5-20250929',
+            maxTokens: 4096
+          }
         }
-      }
-    })};`);
+      })};`
+    );
 
     const saved = saveAIConfig(testDir, {
       protocol: 'anthropic',
@@ -209,7 +215,10 @@ describe('config', () => {
 
   test('loadConfigWithVM: malicious config cannot require child_process', () => {
     const configPath = path.join(testDir, 'code-ctx.config.js');
-    fs.writeFileSync(configPath, `const cp = require('child_process'); module.exports = { cmd: cp.execSync('whoami').toString() };`);
+    fs.writeFileSync(
+      configPath,
+      `const cp = require('child_process'); module.exports = { cmd: cp.execSync('whoami').toString() };`
+    );
     expect(() => loadConfigWithVM(configPath)).toThrow();
   });
 
@@ -343,22 +352,27 @@ describe('config', () => {
 
     test('validateProjectConfig: validates project entries', () => {
       const errors = validateProjectConfig({
-        projects: [{ /* missing alias */ }, { alias: 'ok' }, { alias: 'bad', path: 1 }]
+        projects: [{/* missing alias */}, { alias: 'ok' }, { alias: 'bad', path: 1 }]
       });
       expect(errors.some(e => e.includes('projects[0].alias'))).toBe(true);
       expect(errors.some(e => e.includes('projects[2].path'))).toBe(true);
     });
 
     test('classifies unknown fields as migration warnings', () => {
-      expect(validateProjectConfigDetailed({ projectName: 'x', futureField: true }))
-        .toEqual({ errors: [], warnings: ['未知字段: futureField'] });
+      expect(validateProjectConfigDetailed({ projectName: 'x', futureField: true })).toEqual({
+        errors: [],
+        warnings: ['未知字段: futureField']
+      });
     });
 
     test('loadProjectConfig blocks invalid schema types', () => {
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projectName: 123,
-        projects: 'invalid'
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projectName: 123,
+          projects: 'invalid'
+        })
+      );
       expect(() => loadProjectConfig(testDir)).toThrow(/schema 校验失败.*projectName/);
     });
 
@@ -372,12 +386,16 @@ describe('config', () => {
     });
 
     test('validateProjectConfig: accepts string scan pattern overrides', () => {
-      expect(validateProjectConfig({
-        projects: [{ alias: 'custom', path: '.', scanPatterns: ['custom/**/*.foo'] }]
-      })).toEqual([]);
-      expect(validateProjectConfig({
-        projects: [{ alias: 'custom', path: '.', scanPatterns: [123] }]
-      })).toEqual(expect.arrayContaining([expect.stringContaining('scanPatterns')]));
+      expect(
+        validateProjectConfig({
+          projects: [{ alias: 'custom', path: '.', scanPatterns: ['custom/**/*.foo'] }]
+        })
+      ).toEqual([]);
+      expect(
+        validateProjectConfig({
+          projects: [{ alias: 'custom', path: '.', scanPatterns: [123] }]
+        })
+      ).toEqual(expect.arrayContaining([expect.stringContaining('scanPatterns')]));
     });
 
     test('saveProjectConfig: defaults to JSON when nothing exists', () => {
@@ -396,8 +414,7 @@ describe('config', () => {
 
     test('saveProjectConfig: rejects JS output format', () => {
       fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projectName: 'old' };`);
-      expect(() => saveProjectConfig(testDir, { projectName: 'new' }, { format: 'js' }))
-        .toThrow(/不再支持写入 JS/);
+      expect(() => saveProjectConfig(testDir, { projectName: 'new' }, { format: 'js' })).toThrow(/不再支持写入 JS/);
     });
 
     test('saveProjectConfig: writes a .bak alongside existing file', () => {
@@ -422,9 +439,12 @@ describe('config', () => {
     test('loadProjectConfig: migrates legacy absolute paths within the repository', () => {
       const childDir = path.join(testDir, 'app');
       fs.mkdirSync(childDir, { recursive: true });
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projects: [{ alias: 'app', path: childDir, type: 'react' }]
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projects: [{ alias: 'app', path: childDir, type: 'react' }]
+        })
+      );
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const config = loadProjectConfig(testDir);
@@ -439,18 +459,24 @@ describe('config', () => {
       ['legacy absolute path', path.resolve(testDir, '..', 'outside')],
       ['relative traversal', '../outside']
     ])('loadProjectConfig: rejects out-of-root %s', (_label, projectPath) => {
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projects: [{ alias: 'outside', path: projectPath, type: 'unknown' }]
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projects: [{ alias: 'outside', path: projectPath, type: 'unknown' }]
+        })
+      );
 
       expect(() => loadProjectConfig(testDir)).toThrow(/越界/);
     });
 
     test('saveAIConfig: writes back to JSON when JSON is the active format', () => {
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projectName: 'json-app',
-        ai: { protocol: 'openai' }
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projectName: 'json-app',
+          ai: { protocol: 'openai' }
+        })
+      );
       saveAIConfig(testDir, { protocol: 'anthropic' });
       const parsed = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
       expect(parsed.ai.protocol).toBe('anthropic');
@@ -459,9 +485,12 @@ describe('config', () => {
 
     test('getAIConfig: reads protocol from JSON config', () => {
       fs.writeFileSync(path.join(testDir, '.env'), 'ANTHROPIC_API_KEY=k');
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        ai: { protocol: 'anthropic' }
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          ai: { protocol: 'anthropic' }
+        })
+      );
       const cfg = getAIConfig(testDir);
       expect(cfg.protocol).toBe('anthropic');
       expect(cfg.apiKey).toBe('k');

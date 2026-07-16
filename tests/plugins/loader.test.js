@@ -10,10 +10,13 @@ const { filterSensitive, scanDirectory } = require('../../src/utils/sensitive-fi
 const { getScenarios } = require('../../src/template/engine');
 
 function writeConfig(dir, plugins) {
-  fs.writeFileSync(path.join(dir, 'code-ctx.config.json'), JSON.stringify({
-    projectName: 'plugin-test',
-    plugins
-  }));
+  fs.writeFileSync(
+    path.join(dir, 'code-ctx.config.json'),
+    JSON.stringify({
+      projectName: 'plugin-test',
+      plugins
+    })
+  );
 }
 
 function writePlugin(dir, name, body) {
@@ -57,7 +60,10 @@ describe('plugin loader', () => {
   });
 
   test('loads adapter into the root-scoped registry', () => {
-    const pluginPath = writePlugin(testDir, 'p.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'p.js',
+      `
       const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
       class CustomAdapter extends BaseAdapter {
         get type() { return 'custom-stack'; }
@@ -65,19 +71,22 @@ describe('plugin loader', () => {
         get scanPatterns() { return ['custom/**/*.ts']; }
       }
       module.exports = { name: 'p', adapters: [CustomAdapter] };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
 
     const context = initPlugins(testDir);
 
     expect(context.registry.types).toContain('custom-stack');
-    expect(context.registry.detect({ dependencies: { 'custom-stack': '1.0.0' } }, []))
-      .toBe('custom-stack');
+    expect(context.registry.detect({ dependencies: { 'custom-stack': '1.0.0' } }, [])).toBe('custom-stack');
     expect(defaultRegistry.types).not.toContain('custom-stack');
   });
 
   test('merges scenarios; plugin id can override a builtin', () => {
-    const pluginPath = writePlugin(testDir, 'p.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'p.js',
+      `
       module.exports = {
         name: 'p',
         scenarios: [
@@ -85,7 +94,8 @@ describe('plugin loader', () => {
           { id: 'A', name: 'OverrideA', description: 'overridden', keywords: ['a-override'], template: 't' }
         ]
       };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     initPlugins(testDir);
 
@@ -95,12 +105,16 @@ describe('plugin loader', () => {
   });
 
   test('filterSensitive picks up plugin patterns', () => {
-    const pluginPath = writePlugin(testDir, 'p.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'p.js',
+      `
       module.exports = {
         name: 'p',
         sensitivePatterns: [{ pattern: /myorg-secret-[A-Z]+/g, replacement: '[FILTERED:myorg]' }]
       };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     initPlugins(testDir);
 
@@ -109,12 +123,16 @@ describe('plugin loader', () => {
   });
 
   test('scanDirectory picks up plugin detection patterns', () => {
-    const pluginPath = writePlugin(testDir, 'p.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'p.js',
+      `
       module.exports = {
         name: 'p',
         sensitiveDetectionPatterns: [{ regex: /myorg-secret/i, name: 'myorg_secret' }]
       };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     initPlugins(testDir);
 
@@ -143,9 +161,13 @@ describe('plugin loader', () => {
   });
 
   test('invalid adapter shape is rejected as an error', () => {
-    const pluginPath = writePlugin(testDir, 'bad.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'bad.js',
+      `
       module.exports = { name: 'bad', adapters: [{ notAnAdapter: true }] };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
@@ -158,7 +180,10 @@ describe('plugin loader', () => {
   });
 
   test('validates all plugin adapters before registering any of them', () => {
-    const pluginPath = writePlugin(testDir, 'partially-bad.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'partially-bad.js',
+      `
       const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
       class ValidAdapter extends BaseAdapter {
         get type() { return 'must-not-leak'; }
@@ -168,7 +193,8 @@ describe('plugin loader', () => {
         name: 'partially-bad',
         adapters: [ValidAdapter, { type: 'duck', detect() { return true; } }]
       };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
@@ -184,20 +210,28 @@ describe('plugin loader', () => {
   test('keeps immutable plugin contributions and registries isolated by root', () => {
     const secondRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-plugin-second-'));
     try {
-      const firstPlugin = writePlugin(testDir, 'first.js', `
+      const firstPlugin = writePlugin(
+        testDir,
+        'first.js',
+        `
         const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
         module.exports = { name: 'first', adapters: [class extends BaseAdapter {
           get type() { return 'first-only'; }
           detect() { return false; }
         }] };
-      `);
-      const secondPlugin = writePlugin(secondRoot, 'second.js', `
+      `
+      );
+      const secondPlugin = writePlugin(
+        secondRoot,
+        'second.js',
+        `
         const { BaseAdapter } = require('${path.resolve(__dirname, '../../src/plugins/loader.js').replace(/\\/g, '/')}');
         module.exports = { name: 'second', adapters: [class extends BaseAdapter {
           get type() { return 'second-only'; }
           detect() { return false; }
         }] };
-      `);
+      `
+      );
       writeConfig(testDir, [firstPlugin]);
       writeConfig(secondRoot, [secondPlugin]);
 
@@ -218,21 +252,29 @@ describe('plugin loader', () => {
   });
 
   test('plugin exporting a factory function is invoked', () => {
-    const pluginPath = writePlugin(testDir, 'factory.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'factory.js',
+      `
       module.exports = () => ({
         name: 'factory',
         scenarios: [{ id: 'F', name: 'FromFactory' }]
       });
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     initPlugins(testDir);
     expect(getScenarios().find(s => s.id === 'F')).toMatchObject({ name: 'FromFactory' });
   });
 
   test('re-init with same signature is a no-op', () => {
-    const pluginPath = writePlugin(testDir, 'p.js', `
+    const pluginPath = writePlugin(
+      testDir,
+      'p.js',
+      `
       module.exports = { name: 'p', scenarios: [{ id: 'Q', name: 'Q1' }] };
-    `);
+    `
+    );
     writeConfig(testDir, [pluginPath]);
     initPlugins(testDir);
     const first = getState();
@@ -259,9 +301,13 @@ describe('plugin loader', () => {
 
     test('non-TTY unknown plugin is rejected and recorded in state.errors', () => {
       // jest runs without a TTY, so `process.stdin.isTTY` is undefined here.
-      const pluginPath = writePlugin(testDir, 'unknown.js', `
+      const pluginPath = writePlugin(
+        testDir,
+        'unknown.js',
+        `
         module.exports = { name: 'unknown', scenarios: [{ id: 'X', name: 'X' }] };
-      `);
+      `
+      );
       writeConfig(testDir, [pluginPath]);
       initPlugins(testDir);
       const errors = getState().errors;
@@ -272,9 +318,13 @@ describe('plugin loader', () => {
     });
 
     test('CODE_CTX_PLUGINS_ALLOW=spec allows that spec', () => {
-      const pluginPath = writePlugin(testDir, 'envok.js', `
+      const pluginPath = writePlugin(
+        testDir,
+        'envok.js',
+        `
         module.exports = { name: 'envok', scenarios: [{ id: 'E', name: 'Env' }] };
-      `);
+      `
+      );
       writeConfig(testDir, [pluginPath]);
       process.env.CODE_CTX_PLUGINS_ALLOW = pluginPath;
       initPlugins(testDir);
@@ -283,9 +333,13 @@ describe('plugin loader', () => {
     });
 
     test('persistent allowlist file admits the plugin', () => {
-      const pluginPath = writePlugin(testDir, 'persisted.js', `
+      const pluginPath = writePlugin(
+        testDir,
+        'persisted.js',
+        `
         module.exports = { name: 'persisted', scenarios: [{ id: 'P', name: 'Persist' }] };
-      `);
+      `
+      );
       writeConfig(testDir, [pluginPath]);
 
       // Point the user allowlist at a temp path so we don't touch the real
@@ -308,9 +362,13 @@ describe('plugin loader', () => {
     });
 
     test('CODE_CTX_PLUGINS_ALLOW_ALL=1 bypasses the gate', () => {
-      const pluginPath = writePlugin(testDir, 'bypass.js', `
+      const pluginPath = writePlugin(
+        testDir,
+        'bypass.js',
+        `
         module.exports = { name: 'bypass', scenarios: [{ id: 'B', name: 'Bypass' }] };
-      `);
+      `
+      );
       writeConfig(testDir, [pluginPath]);
       process.env.CODE_CTX_PLUGINS_ALLOW_ALL = '1';
       initPlugins(testDir);

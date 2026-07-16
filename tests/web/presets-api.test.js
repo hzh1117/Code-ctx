@@ -23,7 +23,7 @@ describe('GET /api/ai/presets', () => {
     });
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(() => {
       _clearCache();
       _resetPluginState();

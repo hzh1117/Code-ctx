@@ -189,13 +189,19 @@ describe('Security: save-key validation', () => {
   });
 
   test('rejects API key containing newline', async () => {
-    const res = await requestJson(server, '/api/ai/save-key', { method: 'POST', body: { apiKey: 'sk-valid\ninjected' } });
+    const res = await requestJson(server, '/api/ai/save-key', {
+      method: 'POST',
+      body: { apiKey: 'sk-valid\ninjected' }
+    });
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
 
   test('rejects API key containing carriage return', async () => {
-    const res = await requestJson(server, '/api/ai/save-key', { method: 'POST', body: { apiKey: 'sk-valid\rinjected' } });
+    const res = await requestJson(server, '/api/ai/save-key', {
+      method: 'POST',
+      body: { apiKey: 'sk-valid\rinjected' }
+    });
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
   });
@@ -206,7 +212,10 @@ describe('Security: save-key validation', () => {
   });
 
   test('accepts valid API key', async () => {
-    const res = await requestJson(server, '/api/ai/save-key', { method: 'POST', body: { apiKey: 'sk-test-valid-key-1234' } });
+    const res = await requestJson(server, '/api/ai/save-key', {
+      method: 'POST',
+      body: { apiKey: 'sk-test-valid-key-1234' }
+    });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });

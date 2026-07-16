@@ -11,18 +11,18 @@ function readFileUTF8(filePath) {
   }
 
   const buffer = fs.readFileSync(filePath);
-  
+
   if (isUTF8(buffer)) {
     return buffer.toString('utf8');
   }
-  
+
   for (const encoding of CJK_ENCODINGS) {
     const decoded = iconv.decode(buffer, encoding);
     if (!hasReplacementChars(decoded)) {
       return decoded;
     }
   }
-  
+
   const detected = chardet.detect(buffer);
   return iconv.decode(buffer, detected || 'UTF-8');
 }

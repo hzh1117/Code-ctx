@@ -2,7 +2,9 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class Vue2AdminAdapter extends BaseAdapter {
-  get type() { return 'vue2-admin'; }
+  get type() {
+    return 'vue2-admin';
+  }
 
   detect(pkg) {
     return !!(pkg.dependencies?.vue && pkg.dependencies?.['element-ui']);
@@ -17,9 +19,9 @@ class Vue2AdminAdapter extends BaseAdapter {
       'main.js': 1,
       'router/index': 2,
       '/api/': 3,
-      'views': 4,
-      'components': 5,
-      'store': 6,
+      views: 4,
+      components: 5,
+      store: 6,
       'vue.config': 7,
       '.env': 8
     };

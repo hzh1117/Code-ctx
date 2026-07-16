@@ -6,13 +6,18 @@ const { DETECTION_PATTERNS } = require('./sensitive-filter');
 const { loadProjectConfig } = require('./config');
 const { STATE_FILES } = require('./constants');
 const { getLatestMtime } = require('./mtime-utils');
-const {
-  loadProjectManifest, verifyOverviewFacts, verifyProjectFacts
-} = require('./fact-verifier');
+const { loadProjectManifest, verifyOverviewFacts, verifyProjectFacts } = require('./fact-verifier');
 
 // Per-doc expectations. Overview and per-project use different templates.
 const EXPECTED_PROJECT_SECTIONS = ['overview', 'structure', 'modules', 'api', 'data', 'dependencies', 'notes'];
-const EXPECTED_OVERVIEW_SECTIONS = ['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'];
+const EXPECTED_OVERVIEW_SECTIONS = [
+  'overview',
+  'subprojects',
+  'tech-stack',
+  'architecture',
+  'dependencies',
+  'quickstart'
+];
 
 const MIN_CONTENT_LINES = 5;
 const SPARSE_CONTENT_LINES = 12;
@@ -45,9 +50,7 @@ function scoreCompleteness(presentSections, expectedSections) {
   return { score, present, missing };
 }
 
-function scoreOneDoc({
-  filePath, docName, expectedSections, projectDir, freshnessDeadline, factualConfidence
-}) {
+function scoreOneDoc({ filePath, docName, expectedSections, projectDir, freshnessDeadline, factualConfidence }) {
   if (!fs.existsSync(filePath)) {
     return {
       name: docName,
@@ -77,7 +80,11 @@ function scoreOneDoc({
 
   const sensitiveFields = detectSensitive(content);
   if (sensitiveFields.length > 0) {
-    risks.push({ type: 'sensitive', message: `${docName} 可能包含敏感字段: ${sensitiveFields.join(', ')}`, fields: sensitiveFields });
+    risks.push({
+      type: 'sensitive',
+      message: `${docName} 可能包含敏感字段: ${sensitiveFields.join(', ')}`,
+      fields: sensitiveFields
+    });
   }
 
   let stale = false;
@@ -96,7 +103,7 @@ function scoreOneDoc({
   // calculation reflects them even if completeness/freshness are perfect.
   const hardRisk = risks.some(r => r.type === 'sensitive' || r.type === 'too-short');
   const formatScore = hardRisk
-    ? Math.min(49, Math.round((completeness.score * 0.6 + freshnessScore * 0.4)))
+    ? Math.min(49, Math.round(completeness.score * 0.6 + freshnessScore * 0.4))
     : Math.round(completeness.score * 0.6 + freshnessScore * 0.4);
   const facts = factualConfidence || {
     status: 'unverified',
@@ -176,31 +183,36 @@ function scoreDocs(rootDir, options = {}) {
   // Per-project docs
   for (const project of projects) {
     const filePath = path.join(aiDocsDir, `${project.alias}.md`);
-    const projectDir = project.path && isWithinDir(path.resolve(rootDir, project.path), rootDir)
-      ? path.resolve(rootDir, project.path)
-      : null;
+    const projectDir =
+      project.path && isWithinDir(path.resolve(rootDir, project.path), rootDir)
+        ? path.resolve(rootDir, project.path)
+        : null;
     const content = fs.existsSync(filePath) ? readFileUTF8(filePath) : '';
-    result.perDoc.push(scoreOneDoc({
-      filePath,
-      docName: `${project.alias}.md`,
-      expectedSections: EXPECTED_PROJECT_SECTIONS,
-      projectDir,
-      freshnessDeadline,
-      factualConfidence: verifyProjectFacts(rootDir, content, project, manifest)
-    }));
+    result.perDoc.push(
+      scoreOneDoc({
+        filePath,
+        docName: `${project.alias}.md`,
+        expectedSections: EXPECTED_PROJECT_SECTIONS,
+        projectDir,
+        freshnessDeadline,
+        factualConfidence: verifyProjectFacts(rootDir, content, project, manifest)
+      })
+    );
   }
 
   // OVERVIEW.md
   const overviewPath = path.join(aiDocsDir, 'OVERVIEW.md');
   const overviewContent = fs.existsSync(overviewPath) ? readFileUTF8(overviewPath) : '';
-  result.perDoc.push(scoreOneDoc({
-    filePath: overviewPath,
-    docName: 'OVERVIEW.md',
-    expectedSections: EXPECTED_OVERVIEW_SECTIONS,
-    projectDir: null,
-    freshnessDeadline,
-    factualConfidence: verifyOverviewFacts(overviewContent, manifest)
-  }));
+  result.perDoc.push(
+    scoreOneDoc({
+      filePath: overviewPath,
+      docName: 'OVERVIEW.md',
+      expectedSections: EXPECTED_OVERVIEW_SECTIONS,
+      projectDir: null,
+      freshnessDeadline,
+      factualConfidence: verifyOverviewFacts(overviewContent, manifest)
+    })
+  );
 
   if (result.perDoc.length === 0) {
     return result;
@@ -237,7 +249,11 @@ function scoreDocs(rootDir, options = {}) {
 
   if (anySensitive || anyMissing || anyInvalidFacts) {
     result.overall = 'HIGH_RISK';
-  } else if (anyUnverifiedFacts || result.score < 80 || result.perDoc.some(d => d.level === 'WARN' || d.freshness?.stale)) {
+  } else if (
+    anyUnverifiedFacts ||
+    result.score < 80 ||
+    result.perDoc.some(d => d.level === 'WARN' || d.freshness?.stale)
+  ) {
     result.overall = 'WARN';
   } else {
     result.overall = 'OK';

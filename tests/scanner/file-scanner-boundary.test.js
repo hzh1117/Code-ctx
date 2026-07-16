@@ -64,9 +64,11 @@ describe('scanProject — 限流分支', () => {
       const result = scanProject(dir, 'react', { maxFiles: 100, maxTokens: 100 });
       expect(result.keyFiles.some(file => file.endsWith('Small.jsx'))).toBe(true);
       expect(result.keyFiles.some(file => file.endsWith('App.jsx'))).toBe(false);
-      expect(result.skippedFiles).toEqual(expect.arrayContaining([
-        expect.objectContaining({ path: expect.stringContaining('App.jsx'), reason: 'token-budget' })
-      ]));
+      expect(result.skippedFiles).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: expect.stringContaining('App.jsx'), reason: 'token-budget' })
+        ])
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -114,7 +116,7 @@ describe('scanProject — 限流分支', () => {
       fs.writeFileSync(path.join(dir, 'src/components/Keep.jsx'), 'export default () => null;');
 
       // glob 已经收集到 Ghost.jsx，但 limitByTokens 时 existsSync 返回 false
-      const spy = jest.spyOn(fs, 'existsSync').mockImplementation((p) => {
+      const spy = jest.spyOn(fs, 'existsSync').mockImplementation(p => {
         if (p === target) return false;
         return realExists(p);
       });
@@ -197,7 +199,9 @@ describe('scanProjectAsync budgets', () => {
       fs.writeFileSync(path.join(dir, 'src', 'large.js'), 'x'.repeat(10000));
       fs.writeFileSync(path.join(dir, 'src', 'small.js'), 'export const small = true;');
       let eventLoopAdvanced = false;
-      setImmediate(() => { eventLoopAdvanced = true; });
+      setImmediate(() => {
+        eventLoopAdvanced = true;
+      });
 
       const result = await scanProjectAsync(dir, 'generic-js-ts', {
         maxScanBytes: 100,
@@ -207,9 +211,9 @@ describe('scanProjectAsync budgets', () => {
 
       expect(eventLoopAdvanced).toBe(true);
       expect(result.scanBudget.sampledBytes).toBeLessThanOrEqual(100);
-      expect(result.scanBudget.skipped).toEqual(expect.arrayContaining([
-        expect.objectContaining({ reason: 'byte-budget' })
-      ]));
+      expect(result.scanBudget.skipped).toEqual(
+        expect.arrayContaining([expect.objectContaining({ reason: 'byte-budget' })])
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

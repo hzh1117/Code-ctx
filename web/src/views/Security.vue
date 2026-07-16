@@ -30,8 +30,8 @@
           <span :class="['quality-badge', levelClass(report.overall)]">{{ levelLabel(report.overall) }}</span>
           <span class="overview-text">整体安全/健康状态</span>
           <span class="overview-meta">
-            issues {{ report.issues.length }} · warnings {{ report.warnings.length }} ·
-            sensitive {{ report.sensitive.length }} · schema {{ report.schemaErrors.length }}
+            issues {{ report.issues.length }} · warnings {{ report.warnings.length }} · sensitive
+            {{ report.sensitive.length }} · schema {{ report.schemaErrors.length }}
           </span>
         </div>
       </div>
@@ -39,7 +39,7 @@
       <div class="card section-card" v-if="report.issues.length">
         <h2 class="card-title">问题（需修复）</h2>
         <ul class="finding-list">
-          <li v-for="(it, idx) in report.issues" :key="'i'+idx" class="finding finding-bad">
+          <li v-for="(it, idx) in report.issues" :key="'i' + idx" class="finding finding-bad">
             <span class="finding-type">{{ it.type || 'issue' }}</span>
             <span class="finding-msg">{{ it.message }}</span>
           </li>
@@ -49,7 +49,7 @@
       <div class="card section-card" v-if="report.warnings.length">
         <h2 class="card-title">警告</h2>
         <ul class="finding-list">
-          <li v-for="(it, idx) in report.warnings" :key="'w'+idx" class="finding finding-warn">
+          <li v-for="(it, idx) in report.warnings" :key="'w' + idx" class="finding finding-warn">
             <span class="finding-type">{{ it.type || 'warning' }}</span>
             <span class="finding-msg">{{ it.message }}</span>
           </li>
@@ -59,7 +59,7 @@
       <div class="card section-card" v-if="report.sensitive.length">
         <h2 class="card-title">敏感信息扫描</h2>
         <ul class="finding-list">
-          <li v-for="(s, idx) in report.sensitive" :key="'s'+idx" class="finding finding-bad">
+          <li v-for="(s, idx) in report.sensitive" :key="'s' + idx" class="finding finding-bad">
             <span class="finding-type">{{ s.field }}</span>
             <span class="finding-msg">{{ s.file }}</span>
           </li>
@@ -69,13 +69,14 @@
 
       <div class="card section-card" v-if="report.docQuality">
         <h2 class="card-title">文档质量明细</h2>
-        <div class="overview-row" style="margin-bottom: 8px;">
-          <span :class="['quality-badge', levelClass(report.docQuality.overall)]">{{ levelLabel(report.docQuality.overall) }}</span>
+        <div class="overview-row" style="margin-bottom: 8px">
+          <span :class="['quality-badge', levelClass(report.docQuality.overall)]">{{
+            levelLabel(report.docQuality.overall)
+          }}</span>
           <span class="overview-text">综合分 {{ report.docQuality.score }}</span>
           <span class="overview-meta">
-            完整度 {{ report.docQuality.summary?.completeness ?? 0 }} ·
-            新鲜度 {{ report.docQuality.summary?.freshness ?? 0 }} ·
-            风险 {{ report.docQuality.summary?.risk ?? 100 }}
+            完整度 {{ report.docQuality.summary?.completeness ?? 0 }} · 新鲜度
+            {{ report.docQuality.summary?.freshness ?? 0 }} · 风险 {{ report.docQuality.summary?.risk ?? 100 }}
           </span>
         </div>
         <table class="finding-table" v-if="report.docQuality.perDoc?.length">
@@ -91,7 +92,9 @@
           <tbody>
             <tr v-for="d in report.docQuality.perDoc" :key="d.name">
               <td class="mono">{{ d.name }}</td>
-              <td><span :class="['quality-tag', levelClass(d.level)]">{{ d.level }}</span></td>
+              <td>
+                <span :class="['quality-tag', levelClass(d.level)]">{{ d.level }}</span>
+              </td>
               <td class="mono-dim">{{ d.score }}</td>
               <td class="mono-dim">{{ (d.completeness?.missing || []).join(', ') || '-' }}</td>
               <td class="mono-dim">{{ (d.risks || []).map(r => r.type).join(', ') || '-' }}</td>
@@ -103,7 +106,7 @@
       <div class="card section-card" v-if="report.schemaErrors.length">
         <h2 class="card-title">配置 Schema 警告</h2>
         <ul class="finding-list">
-          <li v-for="(e, idx) in report.schemaErrors" :key="'sc'+idx" class="finding finding-warn">
+          <li v-for="(e, idx) in report.schemaErrors" :key="'sc' + idx" class="finding finding-warn">
             <span class="finding-msg">{{ e }}</span>
           </li>
         </ul>
@@ -112,7 +115,7 @@
       <div class="card section-card" v-if="report.plugins?.errors?.length">
         <h2 class="card-title">插件加载错误</h2>
         <ul class="finding-list">
-          <li v-for="(e, idx) in report.plugins.errors" :key="'pe'+idx" class="finding finding-warn">
+          <li v-for="(e, idx) in report.plugins.errors" :key="'pe' + idx" class="finding finding-warn">
             <span class="finding-type">{{ e.plugin }}</span>
             <span class="finding-msg">{{ e.error }}</span>
           </li>
@@ -122,7 +125,7 @@
       <div class="card section-card" v-if="report.plugins?.loaded?.length">
         <h2 class="card-title">已加载插件</h2>
         <ul class="finding-list">
-          <li v-for="(p, idx) in report.plugins.loaded" :key="'pl'+idx" class="finding finding-ok">
+          <li v-for="(p, idx) in report.plugins.loaded" :key="'pl' + idx" class="finding finding-ok">
             <span class="finding-type">{{ p.name }}</span>
             <span class="finding-msg">adapters: {{ p.adapterCount }} · scenarios: {{ p.scenarioCount }}</span>
           </li>
@@ -151,11 +154,13 @@ export default {
     isAllClear() {
       const r = this.report;
       if (!r) return false;
-      return r.issues.length === 0
-        && r.warnings.length === 0
-        && r.sensitive.length === 0
-        && r.schemaErrors.length === 0
-        && (!r.plugins?.errors || r.plugins.errors.length === 0);
+      return (
+        r.issues.length === 0 &&
+        r.warnings.length === 0 &&
+        r.sensitive.length === 0 &&
+        r.schemaErrors.length === 0 &&
+        (!r.plugins?.errors || r.plugins.errors.length === 0)
+      );
     }
   },
   async mounted() {
@@ -237,7 +242,9 @@ export default {
   align-items: center;
   flex-wrap: wrap;
 }
-.finding:first-child { border-top: none; }
+.finding:first-child {
+  border-top: none;
+}
 .finding-type {
   font-family: var(--font-mono);
   font-size: 11px;

@@ -1,7 +1,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const clipboardy = require('clipboardy');
+const clipboardyModule = require('clipboardy');
+const clipboardy = /** @type {typeof import('clipboardy').default} */ (clipboardyModule.default || clipboardyModule);
 
 async function writeToClipboard(content) {
   try {

@@ -9,7 +9,7 @@ describe('web scenarios edit api', () => {
   let originalContent;
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     originalContent = fs.readFileSync(scenariosPath, 'utf8');
     clearCache();
@@ -17,7 +17,7 @@ describe('web scenarios edit api', () => {
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(() => {
       fs.writeFileSync(scenariosPath, originalContent);
       clearCache();

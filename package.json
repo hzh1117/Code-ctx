@@ -24,8 +24,11 @@
   "scripts": {
     "test": "jest",
     "coverage": "jest --coverage --runInBand",
+    "format": "prettier --write .eslintrc.json .prettierrc.json package.json tsconfig.check.json TYPE_CHECKING.md \"src/**/*.js\" \"bin/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"web/src/**/*.{js,vue}\"",
+    "format:check": "prettier --check .eslintrc.json .prettierrc.json package.json tsconfig.check.json TYPE_CHECKING.md \"src/**/*.js\" \"bin/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"web/src/**/*.{js,vue}\"",
     "lint": "eslint src/ bin/ web/src/ --ext .js,.vue",
-    "check": "npm run lint && npm test -- --runInBand && npm run build:web",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test -- --runInBand && npm run coverage && npm run build:web && npm run pack:smoke",
     "build:web": "cd web && npm run build",
     "pack:smoke": "node scripts/package-smoke.js",
     "dashboard": "node bin/cli.js dashboard",
@@ -69,9 +72,12 @@
     "json5": "^2.2.3"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "eslint": "^8.0.0",
     "eslint-plugin-vue": "^9.33.0",
-    "jest": "^29.0.0"
+    "jest": "^29.0.0",
+    "prettier": "^3.9.5",
+    "typescript": "^5.9.3"
   },
   "jest": {
     "coveragePathIgnorePatterns": [
@@ -79,6 +85,32 @@
       "/web/dist/",
       "/tests/fixtures/",
       "/tests/helpers/"
-    ]
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 85,
+        "branches": 72,
+        "functions": 88,
+        "lines": 86
+      },
+      "./src/ai/privacy-gateway.js": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 100,
+        "lines": 90
+      },
+      "./src/init/progress-reporter.js": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 100,
+        "lines": 90
+      },
+      "./src/utils/sensitive-filter.js": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 100,
+        "lines": 90
+      }
+    }
   }
 }

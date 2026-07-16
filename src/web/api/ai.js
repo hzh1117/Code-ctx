@@ -120,7 +120,7 @@ function isEnvInGitignore(rootDir) {
   }
 }
 
-module.exports = function(rootDir) {
+module.exports = function (rootDir) {
   const router = express.Router();
   const sensitiveAiRateLimit = createRateLimiter();
 
@@ -177,21 +177,21 @@ module.exports = function(rootDir) {
   router.post('/test', sensitiveAiRateLimit, async (req, res) => {
     try {
       const config = getAIConfig(rootDir);
-      
+
       if (!config.apiKey) {
-        return res.json({ 
-          success: false, 
-          error: '未配置 API Key，请在 .env 文件中配置 OPENAI_API_KEY 或 ANTHROPIC_API_KEY' 
+        return res.json({
+          success: false,
+          error: '未配置 API Key，请在 .env 文件中配置 OPENAI_API_KEY 或 ANTHROPIC_API_KEY'
         });
       }
-      
+
       if (!config.baseUrl) {
-        return res.json({ 
-          success: false, 
-          error: '未配置 API 地址，请在 code-ctx.config.js 中配置 ai.baseUrl' 
+        return res.json({
+          success: false,
+          error: '未配置 API 地址，请在 code-ctx.config.js 中配置 ai.baseUrl'
         });
       }
-      
+
       const result = await generateWithAI('回复"连接成功"', {
         ...config,
         maxTokens: 100
@@ -248,7 +248,7 @@ module.exports = function(rootDir) {
       if (fs.existsSync(envPath)) {
         envContent = fs.readFileSync(envPath, 'utf8');
       }
-      
+
       if (normalizedProtocol === 'anthropic') {
         envContent = updateEnvValue(envContent, 'ANTHROPIC_API_KEY', apiKey);
         if (baseUrl) {
@@ -260,12 +260,12 @@ module.exports = function(rootDir) {
           envContent = updateEnvValue(envContent, 'OPENAI_BASE_URL', baseUrl);
         }
       }
-      
+
       if (model) {
         const modelKey = normalizedProtocol === 'anthropic' ? 'ANTHROPIC_MODEL' : 'OPENAI_MODEL';
         envContent = updateEnvValue(envContent, modelKey, model);
       }
-      
+
       fs.writeFileSync(envPath, envContent, { mode: 0o600 });
       res.json({ success: true });
     } catch (err) {

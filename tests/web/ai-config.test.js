@@ -7,21 +7,24 @@ describe('web ai config api', () => {
   const testDir = path.join(__dirname, '../fixtures/web-ai-config');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = {
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = {
   ai: { protocol: 'anthropic' }
-};\n`);
+};\n`
+    );
 
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });

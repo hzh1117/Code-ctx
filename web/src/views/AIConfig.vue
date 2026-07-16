@@ -15,7 +15,10 @@
     <div v-else class="ai-content">
       <div class="status-bar">
         <div class="status-segments">
-          <div class="status-seg" :class="{ active: !testResult, success: testResult?.success, fail: testResult && !testResult.success }">
+          <div
+            class="status-seg"
+            :class="{ active: !testResult, success: testResult?.success, fail: testResult && !testResult.success }"
+          >
             <span class="seg-dot"></span>
             <span class="seg-label">{{ testResult ? (testResult.success ? 'connected' : 'failed') : 'untested' }}</span>
           </div>
@@ -40,25 +43,29 @@
             class="btn btn-secondary btn-sm preset-btn"
             @click="applyPreset(p)"
             :title="p.description"
-          >{{ p.name }}</button>
+          >
+            {{ p.name }}
+          </button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
             协议配置
           </h2>
           <div class="protocol-tabs">
-            <button
-              :class="['tab-btn', { active: activeTab === 'openai' }]"
-              @click="activeTab = 'openai'"
-            >OpenAI 兼容</button>
-            <button
-              :class="['tab-btn', { active: activeTab === 'anthropic' }]"
-              @click="activeTab = 'anthropic'"
-            >Anthropic</button>
+            <button :class="['tab-btn', { active: activeTab === 'openai' }]" @click="activeTab = 'openai'">
+              OpenAI 兼容
+            </button>
+            <button :class="['tab-btn', { active: activeTab === 'anthropic' }]" @click="activeTab = 'anthropic'">
+              Anthropic
+            </button>
           </div>
         </div>
 
@@ -83,7 +90,12 @@
           <div class="input-group">
             <label class="input-label">api_key</label>
             <div class="input-with-action">
-              <input :type="showOpenAIKey ? 'text' : 'password'" v-model="apiKeys.openai" class="input" :placeholder="keyPlaceholders.openai" />
+              <input
+                :type="showOpenAIKey ? 'text' : 'password'"
+                v-model="apiKeys.openai"
+                class="input"
+                :placeholder="keyPlaceholders.openai"
+              />
               <button class="btn btn-secondary btn-sm" @click="showOpenAIKey = !showOpenAIKey">
                 {{ showOpenAIKey ? '隐藏' : '显示' }}
               </button>
@@ -108,12 +120,22 @@
           </div>
           <div class="input-group">
             <label class="input-label">max_tokens</label>
-            <input v-model.number="config.providers.anthropic.maxTokens" type="number" class="input" placeholder="4096" />
+            <input
+              v-model.number="config.providers.anthropic.maxTokens"
+              type="number"
+              class="input"
+              placeholder="4096"
+            />
           </div>
           <div class="input-group">
             <label class="input-label">api_key</label>
             <div class="input-with-action">
-              <input :type="showAnthropicKey ? 'text' : 'password'" v-model="apiKeys.anthropic" class="input" :placeholder="keyPlaceholders.anthropic" />
+              <input
+                :type="showAnthropicKey ? 'text' : 'password'"
+                v-model="apiKeys.anthropic"
+                class="input"
+                :placeholder="keyPlaceholders.anthropic"
+              />
               <button class="btn btn-secondary btn-sm" @click="showAnthropicKey = !showAnthropicKey">
                 {{ showAnthropicKey ? '隐藏' : '显示' }}
               </button>
@@ -121,7 +143,11 @@
             <span class="input-hint">保存到 .env 的 ANTHROPIC_API_KEY</span>
           </div>
           <div class="form-actions">
-            <button class="btn btn-secondary" @click="setProtocol('anthropic')" :disabled="config.protocol === 'anthropic'">
+            <button
+              class="btn btn-secondary"
+              @click="setProtocol('anthropic')"
+              :disabled="config.protocol === 'anthropic'"
+            >
               {{ config.protocol === 'anthropic' ? '已启用' : '设为启用' }}
             </button>
           </div>
@@ -235,7 +261,10 @@ export default {
       try {
         const res = await axios.post('/api/ai/test');
         this.testResult = res.data;
-        this.showToast(res.data.success ? '连接成功' : '连接失败: ' + res.data.error, res.data.success ? 'success' : 'error');
+        this.showToast(
+          res.data.success ? '连接成功' : '连接失败: ' + res.data.error,
+          res.data.success ? 'success' : 'error'
+        );
       } catch (err) {
         this.testResult = { success: false, error: err.message };
         this.showToast('测试失败: ' + err.message, 'error');
@@ -269,7 +298,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };

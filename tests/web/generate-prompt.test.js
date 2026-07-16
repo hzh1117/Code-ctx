@@ -8,7 +8,7 @@ describe('web generate-prompt api', () => {
   const testDir = path.join(__dirname, '../fixtures/generate-prompt-web');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -21,7 +21,7 @@ describe('web generate-prompt api', () => {
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -47,10 +47,12 @@ describe('web generate-prompt api', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.scenario).toBe('B');
     expect(res.body.prompt).toBe(expected.prompt);
-    expect(res.body.tokenBudget).toEqual(expect.objectContaining({
-      estimate: expect.any(Number),
-      input: expect.any(Object)
-    }));
+    expect(res.body.tokenBudget).toEqual(
+      expect.objectContaining({
+        estimate: expect.any(Number),
+        input: expect.any(Object)
+      })
+    );
     expect(res.body.loadedDocs).toEqual(expect.arrayContaining(['OVERVIEW.md', 'mer.md']));
   });
 });

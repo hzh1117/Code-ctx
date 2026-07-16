@@ -70,10 +70,7 @@ describe('commands/watch', () => {
     watchCommand('/project', { debounce: 100 });
 
     const watchedDirs = fs.watch.mock.calls.map(call => call[0]);
-    expect(watchedDirs).toEqual(expect.arrayContaining([
-      path.join('/project', 'src'),
-      path.join('/project', 'tests')
-    ]));
+    expect(watchedDirs).toEqual(expect.arrayContaining([path.join('/project', 'src'), path.join('/project', 'tests')]));
     expect(watchedDirs).not.toContain(path.join('/project', 'node_modules'));
     expect(watchedDirs).not.toContain(path.join('/project', '.git'));
     expect(watchedDirs).not.toContain(path.join('/project', '.hidden'));

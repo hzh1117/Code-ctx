@@ -10,11 +10,14 @@
   },
   "extends": ["eslint:recommended"],
   "rules": {
-    "no-unused-vars": ["warn", {
-      "argsIgnorePattern": "^_",
-      "varsIgnorePattern": "^_",
-      "caughtErrorsIgnorePattern": "^_"
-    }],
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ],
     "no-empty": ["warn", { "allowEmptyCatch": true }],
     "no-constant-condition": ["error", { "checkLoops": false }],
     "no-prototype-builtins": "off",
@@ -47,12 +50,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "node_modules/",
-    "coverage/",
-    "web/dist/",
-    "web/node_modules/",
-    "templates/",
-    "ai-docs/"
-  ]
+  "ignorePatterns": ["node_modules/", "coverage/", "web/dist/", "web/node_modules/", "templates/", "ai-docs/"]
 }

@@ -14,10 +14,7 @@ function dependencyEvidence(scanResult) {
     if (base === 'package.json' && !source.truncation?.truncated) {
       try {
         const pkg = JSON.parse(source.content);
-        const dependencies = [
-          ...Object.keys(pkg.dependencies || {}),
-          ...Object.keys(pkg.devDependencies || {})
-        ].sort();
+        const dependencies = [...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})].sort();
         evidence.push({ path: source.path, dependencies });
         continue;
       } catch {
@@ -48,9 +45,7 @@ function buildProjectDoc(project, scanResult, sourcePath) {
     type: project.type
   });
   const evidenceLines = evidence.map(item => {
-    const dependencies = item.dependencies.length > 0
-      ? `; dependencies: ${item.dependencies.join(', ')}`
-      : '';
+    const dependencies = item.dependencies.length > 0 ? `; dependencies: ${item.dependencies.join(', ')}` : '';
     return `\`${item.path}\`${dependencies}`;
   });
   const keyFileLines = sourceFiles.map(source => {
@@ -62,12 +57,15 @@ function buildProjectDoc(project, scanResult, sourcePath) {
     `# ${project.name}`,
     `<!-- code-ctx-project: ${metadata} -->`,
     '',
-    section('overview', [
-      `- Project ID: \`${project.alias}\``,
-      `- Source path: \`${sourcePath}\``,
-      `- Detected type: \`${project.type}\``,
-      '- Generation mode: deterministic scan (AI disabled)'
-    ].join('\n')),
+    section(
+      'overview',
+      [
+        `- Project ID: \`${project.alias}\``,
+        `- Source path: \`${sourcePath}\``,
+        `- Detected type: \`${project.type}\``,
+        '- Generation mode: deterministic scan (AI disabled)'
+      ].join('\n')
+    ),
     '',
     section('structure', ['```text', scanResult?.tree?.trimEnd() || '(empty)', '```'].join('\n')),
     '',
@@ -77,10 +75,13 @@ function buildProjectDoc(project, scanResult, sourcePath) {
     '',
     section('data', '- Not inferred in deterministic mode; inspect the cited source files.'),
     '',
-    section('dependencies', [
-      `- Detected stack: \`${project.type}\``,
-      listOrFallback(evidenceLines, 'No dependency manifest matched the scan patterns.')
-    ].join('\n')),
+    section(
+      'dependencies',
+      [
+        `- Detected stack: \`${project.type}\``,
+        listOrFallback(evidenceLines, 'No dependency manifest matched the scan patterns.')
+      ].join('\n')
+    ),
     '',
     section('notes', '- This document contains scan evidence only and makes no AI-generated factual claims.'),
     ''
@@ -88,12 +89,10 @@ function buildProjectDoc(project, scanResult, sourcePath) {
 }
 
 function buildOverview(projectEntries) {
-  const projectLines = projectEntries.map(entry =>
-    `- \`${entry.id}\` (${entry.type}) - source \`${entry.sourcePath}\`, document \`${entry.document}\``
+  const projectLines = projectEntries.map(
+    entry => `- \`${entry.id}\` (${entry.type}) - source \`${entry.sourcePath}\`, document \`${entry.document}\``
   );
-  const stackLines = [...new Set(projectEntries.map(entry => entry.type))]
-    .sort()
-    .map(type => `- \`${type}\``);
+  const stackLines = [...new Set(projectEntries.map(entry => entry.type))].sort().map(type => `- \`${type}\``);
 
   return [
     '# Project Overview',
@@ -132,19 +131,19 @@ function writeProjectManifest(rootDir, projects, scanResults, outputDir, mode = 
       const previous = previousById.get(project.alias) || {};
       const keyFiles = scanResult
         ? (scanResult.sourceFiles || []).map(source => ({
-          path: source.path,
-          language: source.language,
-          hash: source.hash,
-          truncated: !!source.truncation?.truncated
-        }))
-        : (previous.keyFiles || []);
+            path: source.path,
+            language: source.language,
+            hash: source.hash,
+            truncated: !!source.truncation?.truncated
+          }))
+        : previous.keyFiles || [];
       return {
         id: project.alias,
         label: project.name,
         type: project.type,
         sourcePath: portableRelative(rootDir, project.path),
         document: `${project.alias}.md`,
-        techEvidence: scanResult ? dependencyEvidence(scanResult) : (previous.techEvidence || []),
+        techEvidence: scanResult ? dependencyEvidence(scanResult) : previous.techEvidence || [],
         tree: scanResult?.tree || previous.tree || '',
         keyFiles
       };
@@ -188,13 +187,7 @@ function generateDeterministicDocs(rootDir, projects, scanResults, outputDir) {
   fs.writeFileSync(path.join(outputDir, 'OVERVIEW.md'), overview);
   generatedDocs.OVERVIEW = overview;
 
-  const manifest = writeProjectManifest(
-    rootDir,
-    projects,
-    scanResults,
-    outputDir,
-    'deterministic'
-  );
+  const manifest = writeProjectManifest(rootDir, projects, scanResults, outputDir, 'deterministic');
 
   return { generatedDocs, manifest };
 }

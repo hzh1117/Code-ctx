@@ -9,23 +9,26 @@ describe('save-key .gitignore warning', () => {
   let server;
   let warnSpy;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'test',
-      ai: { protocol: 'openai', openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.5' } }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'test',
+        ai: { protocol: 'openai', openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-5.5' } }
+      })
+    );
     _clearCache();
     warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     warnSpy.mockRestore();
     _clearCache();
     server.close(() => {
@@ -39,9 +42,7 @@ describe('save-key .gitignore warning', () => {
       method: 'POST',
       body: { apiKey: 'sk-test1234567890abcdef', protocol: 'openai' }
     });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('.gitignore')
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('.gitignore'));
   });
 
   test('does not warn when .env is in .gitignore', async () => {
@@ -50,9 +51,7 @@ describe('save-key .gitignore warning', () => {
       method: 'POST',
       body: { apiKey: 'sk-test1234567890abcdef', protocol: 'openai' }
     });
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('.gitignore')
-    );
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('.gitignore'));
   });
 
   test('does not warn when .env* wildcard is in .gitignore', async () => {
@@ -61,8 +60,6 @@ describe('save-key .gitignore warning', () => {
       method: 'POST',
       body: { apiKey: 'sk-test1234567890abcdef', protocol: 'openai' }
     });
-    expect(warnSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('.gitignore')
-    );
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('.gitignore'));
   });
 });

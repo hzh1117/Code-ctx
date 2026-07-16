@@ -64,14 +64,7 @@ describe('init pipeline', () => {
 
     const result = await command('/repo', { verbose: true });
 
-    expect(calls).toEqual([
-      'discovery',
-      'snapshot',
-      'planning',
-      'generation',
-      'validation',
-      'commit'
-    ]);
+    expect(calls).toEqual(['discovery', 'snapshot', 'planning', 'generation', 'validation', 'commit']);
     expect(logger.setVerbose).toHaveBeenCalledWith(true);
     expect(result).toEqual(expect.objectContaining({ success: true, status: 'completed' }));
   });
@@ -97,13 +90,15 @@ describe('init pipeline', () => {
       }
     });
 
-    expect(services).toEqual(expect.objectContaining({
-      discovery: expect.any(Object),
-      snapshot: expect.any(Object),
-      planning: expect.any(Object),
-      generation: expect.any(Object),
-      validation: expect.any(Object),
-      commit: expect.any(Object)
-    }));
+    expect(services).toEqual(
+      expect.objectContaining({
+        discovery: expect.any(Object),
+        snapshot: expect.any(Object),
+        planning: expect.any(Object),
+        generation: expect.any(Object),
+        validation: expect.any(Object),
+        commit: expect.any(Object)
+      })
+    );
   });
 });

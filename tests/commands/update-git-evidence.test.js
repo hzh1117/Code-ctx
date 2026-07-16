@@ -25,18 +25,22 @@ describe('updateCommand git evidence', () => {
     fs.mkdirSync(path.join(rootDir, 'src'), { recursive: true });
     fs.mkdirSync(path.join(rootDir, 'ai-docs'), { recursive: true });
     fs.writeFileSync(path.join(rootDir, 'src/app.js'), 'const route = "/old";\n');
-    fs.writeFileSync(path.join(rootDir, 'ai-docs/web.md'), [
-      '# src application',
-      '<!-- section:api -->',
-      'old route docs',
-      '<!-- /section:api -->'
-    ].join('\n'));
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './src', type: 'generic-js-ts' }]
-    }));
-    fs.writeFileSync(path.join(rootDir, 'ai-docs/project-manifest.json'), JSON.stringify({
-      projects: [{ id: 'web', sourcePath: './src', document: 'web.md' }]
-    }));
+    fs.writeFileSync(
+      path.join(rootDir, 'ai-docs/web.md'),
+      ['# src application', '<!-- section:api -->', 'old route docs', '<!-- /section:api -->'].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './src', type: 'generic-js-ts' }]
+      })
+    );
+    fs.writeFileSync(
+      path.join(rootDir, 'ai-docs/project-manifest.json'),
+      JSON.stringify({
+        projects: [{ id: 'web', sourcePath: './src', document: 'web.md' }]
+      })
+    );
     _clearCache();
     fs.writeFileSync(path.join(rootDir, '.gitignore'), 'ai-docs/.last-scan.json\n');
 
@@ -47,10 +51,13 @@ describe('updateCommand git evidence', () => {
     git(rootDir, 'commit', '-m', 'baseline');
 
     const baseline = git(rootDir, 'rev-parse', 'HEAD');
-    fs.writeFileSync(path.join(rootDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      lastCommitHash: baseline,
-      files: {}
-    }));
+    fs.writeFileSync(
+      path.join(rootDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        lastCommitHash: baseline,
+        files: {}
+      })
+    );
   });
 
   afterEach(() => {
@@ -65,10 +72,12 @@ describe('updateCommand git evidence', () => {
     const appChange = result.changes.find(change => change.path === 'src/app.js');
 
     expect(result.detectionMethod).toBe('git-diff');
-    expect(appChange).toEqual(expect.objectContaining({
-      status: 'modified',
-      evidenceType: 'patch'
-    }));
+    expect(appChange).toEqual(
+      expect.objectContaining({
+        status: 'modified',
+        evidenceType: 'patch'
+      })
+    );
     expect(appChange.evidence).toContain('diff --git a/src/app.js b/src/app.js');
     expect(appChange.evidence).toContain('-const route = "/old";');
     expect(appChange.evidence).toContain('+const route = "/new";');
@@ -90,8 +99,10 @@ describe('updateCommand git evidence', () => {
     fs.writeFileSync(sourcePath, 'const route = "/old";\n');
     const reverted = await updateCommand(rootDir, { dryRun: true });
     expect(reverted.changedFiles).toContain('src/app.js');
-    expect(reverted.changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'src/app.js', status: 'modified', evidenceType: 'source' })
-    ]));
+    expect(reverted.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'src/app.js', status: 'modified', evidenceType: 'source' })
+      ])
+    );
   });
 });

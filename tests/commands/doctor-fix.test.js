@@ -27,7 +27,8 @@ const { doctorFix } = require('../../src/commands/doctor');
 const aiClient = require('../../src/ai/client');
 const configUtils = require('../../src/utils/config');
 
-const MOCK_AI_OUTPUT = '# Auto Doc\n\n## 概述\n这是 doctor --fix 单元测试中由 mock AI 生成的占位文本。\n\n## 模块\n占位模块说明。';
+const MOCK_AI_OUTPUT =
+  '# Auto Doc\n\n## 概述\n这是 doctor --fix 单元测试中由 mock AI 生成的占位文本。\n\n## 模块\n占位模块说明。';
 
 function configWithKey() {
   return {
@@ -95,10 +96,7 @@ describe('doctorFix --fix 分支', () => {
   });
 
   test('无 API Key 时输出提示并退出，不调用 AI', async () => {
-    fs.writeFileSync(
-      path.join(testDir, 'code-ctx.config.json'),
-      JSON.stringify({ projects: [] })
-    );
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({ projects: [] }));
     // 让 getAIConfig 返回空 apiKey，覆盖 doctorFix 的 apiKey 缺失分支
     configUtils.getAIConfig.mockReturnValue({ ...configWithKey(), apiKey: '' });
 
@@ -190,10 +188,7 @@ describe('doctorFix --fix 分支', () => {
   });
 
   test('ai-docs 目录不存在时自动创建', async () => {
-    fs.writeFileSync(
-      path.join(testDir, 'code-ctx.config.json'),
-      JSON.stringify({ projects: [] })
-    );
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({ projects: [] }));
 
     expect(fs.existsSync(path.join(testDir, 'ai-docs'))).toBe(false);
     await doctorFix(testDir);

@@ -19,16 +19,22 @@ const { _clearCache } = require('../../src/utils/config');
 
 describe('updateCommand', () => {
   const testDir = path.join(__dirname, '../fixtures/update-test');
-  
+
   beforeEach(() => {
     fs.mkdirSync(testDir, { recursive: true });
     fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
-    }));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/project-manifest.json'), JSON.stringify({
-      projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/project-manifest.json'),
+      JSON.stringify({
+        projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
+      })
+    );
     _clearCache();
   });
 
@@ -40,13 +46,16 @@ describe('updateCommand', () => {
   test('should detect changed files', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     const relativePath = path.relative(testDir, path.join(testDir, 'src/index.js'));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [relativePath]: 'abc123' }
-    }));
-    
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [relativePath]: 'abc123' }
+      })
+    );
+
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'new content');
-    
+
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles.length).toBeGreaterThan(0);
   });
@@ -57,12 +66,15 @@ describe('updateCommand', () => {
     fs.writeFileSync(filePath, 'content');
     const hash = require('crypto').createHash('md5').update('content').digest('hex');
     const relativePath = path.relative(testDir, filePath);
-    
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [relativePath]: hash }
-    }));
-    
+
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [relativePath]: hash }
+      })
+    );
+
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.detectionMethod).toBe('hash');
     expect(result.changedFiles.length).toBe(0);
@@ -71,9 +83,9 @@ describe('updateCommand', () => {
   test('should record pending detection without advancing scan baseline', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
-    
+
     await updateCommand(testDir, { dryRun: false, prepareApply: true });
-    
+
     const lastScanPath = path.join(testDir, 'ai-docs/.last-scan.json');
     const updateStatePath = path.join(testDir, 'ai-docs/.update-state.json');
     expect(fs.existsSync(lastScanPath)).toBe(false);
@@ -94,8 +106,9 @@ describe('updateCommand', () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
 
-    await expect(updateCommand(testDir, { dryRun: true, prepareApply: true }))
-      .rejects.toThrow('dry-run 与 apply 不能同时使用');
+    await expect(updateCommand(testDir, { dryRun: true, prepareApply: true })).rejects.toThrow(
+      'dry-run 与 apply 不能同时使用'
+    );
 
     expect(generateWithAI).not.toHaveBeenCalled();
     expect(fs.readdirSync(path.join(testDir, 'ai-docs'))).toEqual(['project-manifest.json']);
@@ -104,7 +117,7 @@ describe('updateCommand', () => {
   test('should handle first run when .last-scan does not exist', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
-    
+
     const result = await updateCommand(testDir, { dryRun: true });
     const relativePath = path.relative(testDir, path.join(testDir, 'src/index.js')).replace(/\\/g, '/');
     expect(result.changedFiles.map(f => f.replace(/\\/g, '/'))).toContain(relativePath);
@@ -133,13 +146,15 @@ describe('updateCommand', () => {
     expect(typeof result.prompt).toBe('string');
     expect(result.prompt.trim().length).toBeGreaterThan(0);
     expect(result.prompt).toContain('console.log("hello")');
-    expect(result.changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        path: expect.stringMatching(/src[\\/]app\.js/),
-        status: 'added',
-        evidenceType: 'source'
-      })
-    ]));
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringMatching(/src[\\/]app\.js/),
+          status: 'added',
+          evidenceType: 'source'
+        })
+      ])
+    );
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.last-scan.json'))).toBe(false);
     expect(fs.existsSync(path.join(testDir, 'ai-docs/.update-state.json'))).toBe(false);
 
@@ -147,10 +162,13 @@ describe('updateCommand', () => {
   });
 
   test('hash mode respects configured excludeDirs and .gitignore', async () => {
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }],
-      excludeDirs: ['vendor-cache']
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }],
+        excludeDirs: ['vendor-cache']
+      })
+    );
     fs.writeFileSync(path.join(testDir, '.gitignore'), 'src/generated/\n');
     fs.mkdirSync(path.join(testDir, 'src', 'generated'), { recursive: true });
     fs.mkdirSync(path.join(testDir, 'src', 'vendor-cache'), { recursive: true });
@@ -170,15 +188,18 @@ describe('updateCommand', () => {
   test('default mode returns one executable merged prompt without state commits', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/app.js'), 'export const feature = true;');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:overview -->',
-      'old overview',
-      '<!-- /section:overview -->',
-      '<!-- section:modules -->',
-      'old modules',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      [
+        '# src project',
+        '<!-- section:overview -->',
+        'old overview',
+        '<!-- /section:overview -->',
+        '<!-- section:modules -->',
+        'old modules',
+        '<!-- /section:modules -->'
+      ].join('\n')
+    );
 
     const result = await updateCommand(testDir);
 
@@ -197,18 +218,22 @@ describe('updateCommand', () => {
       path.join(testDir, 'src/app.js'),
       'const apiKey = "secret-value";\nrouter.get("/health", health);'
     );
-    fs.writeFileSync(path.join(testDir, 'ai-docs', 'src.md'), [
-      '# src project',
-      '<!-- section:api -->',
-      'old api docs',
-      '<!-- /section:api -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs', 'src.md'),
+      ['# src project', '<!-- section:api -->', 'old api docs', '<!-- /section:api -->'].join('\n')
+    );
 
     const result = await updateCommand(testDir, { dryRun: true });
 
-    expect(result.changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: expect.stringMatching(/src[\\/]app\.js/), status: 'added', evidenceType: 'source' })
-    ]));
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: expect.stringMatching(/src[\\/]app\.js/),
+          status: 'added',
+          evidenceType: 'source'
+        })
+      ])
+    );
     expect(result.sectionUpdates[0].prompt).toContain('router.get("/health", health);');
     expect(result.sectionUpdates[0].prompt).toContain('[FILTERED]');
     expect(result.sectionUpdates[0].prompt).not.toContain('secret-value');
@@ -221,18 +246,38 @@ describe('updateCommand', () => {
     fs.writeFileSync(sourcePath, oldSource);
     const relativePath = path.relative(testDir, sourcePath);
     const oldHash = require('crypto').createHash('md5').update(oldSource).digest('hex');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      files: { [relativePath]: oldHash }
-    }));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '<!-- section:overview -->', 'overview', '<!-- /section:overview -->',
-      '<!-- section:structure -->', 'structure', '<!-- /section:structure -->',
-      '<!-- section:modules -->', 'modules', '<!-- /section:modules -->',
-      '<!-- section:api -->', 'api', '<!-- /section:api -->',
-      '<!-- section:data -->', 'data', '<!-- /section:data -->',
-      '<!-- section:dependencies -->', 'dependencies', '<!-- /section:dependencies -->',
-      '<!-- section:notes -->', 'notes', '<!-- /section:notes -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        files: { [relativePath]: oldHash }
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      [
+        '<!-- section:overview -->',
+        'overview',
+        '<!-- /section:overview -->',
+        '<!-- section:structure -->',
+        'structure',
+        '<!-- /section:structure -->',
+        '<!-- section:modules -->',
+        'modules',
+        '<!-- /section:modules -->',
+        '<!-- section:api -->',
+        'api',
+        '<!-- /section:api -->',
+        '<!-- section:data -->',
+        'data',
+        '<!-- /section:data -->',
+        '<!-- section:dependencies -->',
+        'dependencies',
+        '<!-- /section:dependencies -->',
+        '<!-- section:notes -->',
+        'notes',
+        '<!-- /section:notes -->'
+      ].join('\n')
+    );
     fs.writeFileSync(sourcePath, 'router.post("/users", createUser);');
 
     const result = await updateCommand(testDir, { dryRun: true });
@@ -247,10 +292,17 @@ describe('updateCommand', () => {
   test('unknown files require confirmation and prevent baseline commit', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src', 'domain.foo'), 'opaque domain format');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '<!-- section:structure -->', 'old structure', '<!-- /section:structure -->',
-      '<!-- section:modules -->', 'old modules', '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      [
+        '<!-- section:structure -->',
+        'old structure',
+        '<!-- /section:structure -->',
+        '<!-- section:modules -->',
+        'old modules',
+        '<!-- /section:modules -->'
+      ].join('\n')
+    );
     generateWithAI.mockResolvedValueOnce('new structure');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
@@ -267,29 +319,32 @@ describe('updateCommand', () => {
 
   test('hash mode emits explicit deletion evidence', async () => {
     const deletedPath = path.join('src', 'removed.js');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
-    }));
-    fs.writeFileSync(path.join(testDir, 'ai-docs', 'src.md'), [
-      '# src project',
-      '<!-- section:modules -->',
-      'removed.js module',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs', 'src.md'),
+      ['# src project', '<!-- section:modules -->', 'removed.js module', '<!-- /section:modules -->'].join('\n')
+    );
 
     const result = await updateCommand(testDir, { dryRun: true });
 
     expect(result.changedFiles).toContain(deletedPath);
-    expect(result.changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        path: deletedPath,
-        project: 'src',
-        status: 'deleted',
-        oldHash: 'old-hash',
-        evidenceType: 'deletion'
-      })
-    ]));
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: deletedPath,
+          project: 'src',
+          status: 'deleted',
+          oldHash: 'old-hash',
+          evidenceType: 'deletion'
+        })
+      ])
+    );
     expect(result.sectionUpdates[0].prompt).toContain('status="deleted"');
     expect(result.sectionUpdates[0].prompt).toContain('project="src"');
     expect(result.sectionUpdates[0].prompt).toContain('File deleted from the current project.');
@@ -297,16 +352,17 @@ describe('updateCommand', () => {
 
   test('hash deletion is removed from committed baseline after docs succeed', async () => {
     const deletedPath = path.join('src', 'removed.js');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
-    }));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:modules -->',
-      'removed.js module',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [deletedPath]: { mtimeMs: 1, hash: 'old-hash' } }
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      ['# src project', '<!-- section:modules -->', 'removed.js module', '<!-- /section:modules -->'].join('\n')
+    );
     generateWithAI.mockResolvedValueOnce('module removed');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
@@ -327,10 +383,13 @@ describe('updateCommand', () => {
     const relativePath = path.relative(testDir, filePath);
 
     // Legacy format: value is the raw hash string, not { mtimeMs, hash }
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [relativePath]: hash }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [relativePath]: hash }
+      })
+    );
 
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles.length).toBe(0);
@@ -339,12 +398,10 @@ describe('updateCommand', () => {
   test('hash mode persists new {mtimeMs, hash} format only after successful docs', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:modules -->',
-      'old',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      ['# src project', '<!-- section:modules -->', 'old', '<!-- /section:modules -->'].join('\n')
+    );
     generateWithAI.mockResolvedValueOnce('new modules');
 
     const detection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
@@ -352,9 +409,7 @@ describe('updateCommand', () => {
     const transaction = await executeUpdateTransaction(testDir, detection, { apiKey: 'test-key' });
     expect(transaction.committed).toBe(true);
 
-    const lastScan = JSON.parse(
-      fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8')
-    );
+    const lastScan = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), 'utf8'));
     const entries = Object.values(lastScan.files);
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
@@ -377,57 +432,64 @@ describe('updateCommand', () => {
     const stat = fs.statSync(filePath);
     const rel = path.relative(testDir, filePath);
     const staleHash = require('crypto').createHash('md5').update('different').digest('hex');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: new Date().toISOString(),
-      files: { [rel]: { mtimeMs: stat.mtimeMs, hash: staleHash } }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        files: { [rel]: { mtimeMs: stat.mtimeMs, hash: staleHash } }
+      })
+    );
 
     const result = await updateCommand(testDir, { dryRun: true });
     expect(result.changedFiles.length).toBe(0);
   });
 
   describe('buildEvidenceChunks', () => {
-  test('chunks evidence deterministically within total and chunk budgets', () => {
-    const changes = [{
-      path: 'src/large.js',
-      status: 'modified',
-      evidenceType: 'source',
-      evidence: 'x'.repeat(200),
-      truncation: { truncated: false }
-    }, {
-      path: 'src/first.js',
-      status: 'added',
-      evidenceType: 'source',
-      evidence: 'first',
-      truncation: { truncated: false }
-    }];
+    test('chunks evidence deterministically within total and chunk budgets', () => {
+      const changes = [
+        {
+          path: 'src/large.js',
+          status: 'modified',
+          evidenceType: 'source',
+          evidence: 'x'.repeat(200),
+          truncation: { truncated: false }
+        },
+        {
+          path: 'src/first.js',
+          status: 'added',
+          evidenceType: 'source',
+          evidence: 'first',
+          truncation: { truncated: false }
+        }
+      ];
 
-    const first = buildEvidenceChunks(changes, { maxTotalChars: 90, maxChunkChars: 32 });
-    const second = buildEvidenceChunks(changes.slice().reverse(), { maxTotalChars: 90, maxChunkChars: 32 });
+      const first = buildEvidenceChunks(changes, { maxTotalChars: 90, maxChunkChars: 32 });
+      const second = buildEvidenceChunks(changes.slice().reverse(), { maxTotalChars: 90, maxChunkChars: 32 });
 
-    expect(first).toEqual(second);
-    expect(first.truncated).toBe(true);
-    expect(first.includedChars).toBe(90);
-    expect(first.chunks.length).toBe(3);
-    expect(first.chunks.every(chunk => chunk.length <= 32)).toBe(true);
-  });
+      expect(first).toEqual(second);
+      expect(first.truncated).toBe(true);
+      expect(first.includedChars).toBe(90);
+      expect(first.chunks.length).toBe(3);
+      expect(first.chunks.every(chunk => chunk.length <= 32)).toBe(true);
+    });
   });
 
   test('partial failure preserves per-section retry state and commits after retry', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/app.js'), 'content');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:api -->',
-      'old api',
-      '<!-- /section:api -->',
-      '<!-- section:modules -->',
-      'old modules',
-      '<!-- /section:modules -->'
-    ].join('\n'));
-    generateWithAI
-      .mockResolvedValueOnce('new api')
-      .mockRejectedValueOnce(new Error('temporary failure'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      [
+        '# src project',
+        '<!-- section:api -->',
+        'old api',
+        '<!-- /section:api -->',
+        '<!-- section:modules -->',
+        'old modules',
+        '<!-- /section:modules -->'
+      ].join('\n')
+    );
+    generateWithAI.mockResolvedValueOnce('new api').mockRejectedValueOnce(new Error('temporary failure'));
 
     const firstDetection = await updateCommand(testDir, { dryRun: false, prepareApply: true });
     const firstExecution = await executeUpdateTransaction(testDir, firstDetection, { apiKey: 'test-key' });
@@ -454,12 +516,9 @@ describe('updateCommand', () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'src/index.js'), 'content');
     const docPath = path.join(testDir, 'ai-docs/src.md');
-    const original = [
-      '# src project',
-      '<!-- section:modules -->',
-      'old modules',
-      '<!-- /section:modules -->'
-    ].join('\n');
+    const original = ['# src project', '<!-- section:modules -->', 'old modules', '<!-- /section:modules -->'].join(
+      '\n'
+    );
     fs.writeFileSync(docPath, original);
     generateWithAI.mockResolvedValueOnce('new modules');
 
@@ -484,12 +543,10 @@ describe('updateCommand', () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
     const sourcePath = path.join(testDir, 'src/index.js');
     fs.writeFileSync(sourcePath, 'version one');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:modules -->',
-      'old modules',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/src.md'),
+      ['# src project', '<!-- section:modules -->', 'old modules', '<!-- /section:modules -->'].join('\n')
+    );
     generateWithAI.mockImplementationOnce(async () => {
       fs.writeFileSync(sourcePath, 'version two');
       return 'new modules';
@@ -519,16 +576,12 @@ describe('applySectionUpdates', () => {
 
   test('replaces single section', () => {
     const docPath = path.join(testDir, 'doc.md');
-    fs.writeFileSync(docPath, [
-      '# Title',
-      '<!-- section:overview -->',
-      '旧概述',
-      '<!-- /section:overview -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      docPath,
+      ['# Title', '<!-- section:overview -->', '旧概述', '<!-- /section:overview -->'].join('\n')
+    );
 
-    applySectionUpdates(docPath, [
-      { sectionName: 'overview', newContent: '新概述' }
-    ]);
+    applySectionUpdates(docPath, [{ sectionName: 'overview', newContent: '新概述' }]);
 
     const result = fs.readFileSync(docPath, 'utf8');
     expect(result).toContain('新概述');
@@ -538,14 +591,12 @@ describe('applySectionUpdates', () => {
 
   test('replaces multiple sections in same file', () => {
     const docPath = path.join(testDir, 'doc.md');
-    fs.writeFileSync(docPath, [
-      '<!-- section:a -->',
-      '旧A',
-      '<!-- /section:a -->',
-      '<!-- section:b -->',
-      '旧B',
-      '<!-- /section:b -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      docPath,
+      ['<!-- section:a -->', '旧A', '<!-- /section:a -->', '<!-- section:b -->', '旧B', '<!-- /section:b -->'].join(
+        '\n'
+      )
+    );
 
     applySectionUpdates(docPath, [
       { sectionName: 'a', newContent: '新A' },
@@ -559,17 +610,9 @@ describe('applySectionUpdates', () => {
 
   test('preserves content outside updated sections', () => {
     const docPath = path.join(testDir, 'doc.md');
-    fs.writeFileSync(docPath, [
-      '# 标题',
-      '<!-- section:s -->',
-      '旧',
-      '<!-- /section:s -->',
-      '尾部'
-    ].join('\n'));
+    fs.writeFileSync(docPath, ['# 标题', '<!-- section:s -->', '旧', '<!-- /section:s -->', '尾部'].join('\n'));
 
-    applySectionUpdates(docPath, [
-      { sectionName: 's', newContent: '新' }
-    ]);
+    applySectionUpdates(docPath, [{ sectionName: 's', newContent: '新' }]);
 
     const result = fs.readFileSync(docPath, 'utf8');
     expect(result).toContain('# 标题');
@@ -591,18 +634,18 @@ describe('executeUpdates', () => {
 
   test('succeeds and writes back updated sections', async () => {
     const docPath = path.join(testDir, 'ai-docs', 'web.md');
-    fs.writeFileSync(docPath, [
-      '# Web',
-      '<!-- section:overview -->',
-      '旧概述',
-      '<!-- /section:overview -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      docPath,
+      ['# Web', '<!-- section:overview -->', '旧概述', '<!-- /section:overview -->'].join('\n')
+    );
 
     generateWithAI.mockResolvedValue('新概述内容');
 
-    const result = await executeUpdates(testDir, [
-      { docName: 'web.md', sectionName: 'overview', prompt: 'update overview' }
-    ], {});
+    const result = await executeUpdates(
+      testDir,
+      [{ docName: 'web.md', sectionName: 'overview', prompt: 'update overview' }],
+      {}
+    );
 
     expect(result.success).toBe(1);
     expect(result.failed).toBe(0);
@@ -612,23 +655,23 @@ describe('executeUpdates', () => {
 
   test('partial failure does not corrupt successful sections', async () => {
     const docPath = path.join(testDir, 'ai-docs', 'web.md');
-    fs.writeFileSync(docPath, [
-      '<!-- section:a -->',
-      '旧A',
-      '<!-- /section:a -->',
-      '<!-- section:b -->',
-      '旧B',
-      '<!-- /section:b -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      docPath,
+      ['<!-- section:a -->', '旧A', '<!-- /section:a -->', '<!-- section:b -->', '旧B', '<!-- /section:b -->'].join(
+        '\n'
+      )
+    );
 
-    generateWithAI
-      .mockResolvedValueOnce('新A')
-      .mockRejectedValueOnce(new Error('AI failed'));
+    generateWithAI.mockResolvedValueOnce('新A').mockRejectedValueOnce(new Error('AI failed'));
 
-    const result = await executeUpdates(testDir, [
-      { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
-      { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
-    ], {});
+    const result = await executeUpdates(
+      testDir,
+      [
+        { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
+        { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
+      ],
+      {}
+    );
 
     expect(result.success).toBe(1);
     expect(result.failed).toBe(1);
@@ -637,9 +680,7 @@ describe('executeUpdates', () => {
   });
 
   test('skips non-existent doc', async () => {
-    const result = await executeUpdates(testDir, [
-      { docName: 'missing.md', sectionName: 's', prompt: 'update' }
-    ], {});
+    const result = await executeUpdates(testDir, [{ docName: 'missing.md', sectionName: 's', prompt: 'update' }], {});
 
     expect(result.skipped).toBe(1);
     expect(result.success).toBe(0);
@@ -647,9 +688,11 @@ describe('executeUpdates', () => {
 
   test('skips path traversal docName', async () => {
     fs.writeFileSync(path.join(testDir, 'outside.md'), 'outside');
-    const result = await executeUpdates(testDir, [
-      { docName: '../outside.md', sectionName: 's', prompt: 'update' }
-    ], {});
+    const result = await executeUpdates(
+      testDir,
+      [{ docName: '../outside.md', sectionName: 's', prompt: 'update' }],
+      {}
+    );
 
     expect(result.skipped).toBe(1);
     expect(result.results[0].reason).toContain('非法');
@@ -662,9 +705,7 @@ describe('executeUpdates', () => {
 
     generateWithAI.mockResolvedValue('新');
 
-    await executeUpdates(testDir, [
-      { docName: 'web.md', sectionName: 's', prompt: 'update' }
-    ], {});
+    await executeUpdates(testDir, [{ docName: 'web.md', sectionName: 's', prompt: 'update' }], {});
 
     const backupPath = docPath + '.bak';
     expect(fs.existsSync(backupPath)).toBe(true);
@@ -682,33 +723,37 @@ describe('executeUpdates', () => {
 
     let result;
     try {
-      result = await executeUpdates(testDir, [
-        { docName: 'web.md', sectionName: 's', prompt: 'update' }
-      ], {});
+      result = await executeUpdates(testDir, [{ docName: 'web.md', sectionName: 's', prompt: 'update' }], {});
     } finally {
       renameSpy.mockRestore();
     }
 
-    expect(result).toEqual(expect.objectContaining({
-      success: 0,
-      failed: 1,
-      writeFailed: 1,
-      restoreFailed: 0
-    }));
-    expect(result.results[0]).toEqual(expect.objectContaining({
-      sectionName: 's',
-      status: 'failed',
-      reason: expect.stringContaining('rename failed')
-    }));
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: 0,
+        failed: 1,
+        writeFailed: 1,
+        restoreFailed: 0
+      })
+    );
+    expect(result.results[0]).toEqual(
+      expect.objectContaining({
+        sectionName: 's',
+        status: 'failed',
+        reason: expect.stringContaining('rename failed')
+      })
+    );
     expect(fs.readFileSync(docPath, 'utf8')).toBe(original);
   });
 
   test('restore failure is reflected in every affected section result', async () => {
     const docPath = path.join(testDir, 'ai-docs', 'web.md');
-    fs.writeFileSync(docPath, [
-      '<!-- section:a -->', '旧A', '<!-- /section:a -->',
-      '<!-- section:b -->', '旧B', '<!-- /section:b -->'
-    ].join('\n'));
+    fs.writeFileSync(
+      docPath,
+      ['<!-- section:a -->', '旧A', '<!-- /section:a -->', '<!-- section:b -->', '旧B', '<!-- /section:b -->'].join(
+        '\n'
+      )
+    );
     generateWithAI.mockResolvedValue('新');
     const renameSpy = jest.spyOn(fs, 'renameSync').mockImplementation(() => {
       throw new Error('rename failed');
@@ -723,10 +768,14 @@ describe('executeUpdates', () => {
 
     let result;
     try {
-      result = await executeUpdates(testDir, [
-        { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
-        { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
-      ], {});
+      result = await executeUpdates(
+        testDir,
+        [
+          { docName: 'web.md', sectionName: 'a', prompt: 'update a' },
+          { docName: 'web.md', sectionName: 'b', prompt: 'update b' }
+        ],
+        {}
+      );
     } finally {
       copySpy.mockRestore();
       renameSpy.mockRestore();

@@ -34,7 +34,10 @@
             </h2>
             <div class="detail-actions">
               <button v-if="!editing" class="btn btn-secondary btn-sm" @click="copyTemplate">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
                 复制
               </button>
               <button v-if="!editing" class="btn btn-secondary btn-sm" @click="startEdit">编辑</button>
@@ -59,7 +62,7 @@
           <span class="term-prompt">$</span>
           <span class="term-cmd">ls templates/scenarios/</span>
         </div>
-        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted);">
+        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted)">
           请确认 templates 目录下存在场景文件
         </div>
         <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
@@ -135,7 +138,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };
@@ -170,7 +175,9 @@ export default {
   font-family: var(--font-sans);
   cursor: pointer;
   text-align: left;
-  transition: background 80ms, color 80ms;
+  transition:
+    background 80ms,
+    color 80ms;
   position: relative;
 }
 

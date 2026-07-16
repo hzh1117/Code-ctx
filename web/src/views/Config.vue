@@ -6,7 +6,11 @@
         <p class="page-desc">管理项目配置和输出设置</p>
       </div>
       <button class="btn btn-primary" @click="save" :disabled="saving">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+          <polyline points="17 21 17 13 7 13 7 21" />
+          <polyline points="7 3 7 8 15 8" />
+        </svg>
         {{ saving ? '保存中...' : '保存配置' }}
       </button>
     </header>
@@ -20,7 +24,10 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
             基本信息
           </h2>
         </div>
@@ -56,24 +63,25 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
             子项目列表
           </h2>
           <div class="header-actions">
             <span class="badge badge-success">{{ config.projects?.length || 0 }}</span>
             <button class="btn btn-secondary btn-sm" @click="openProjectForm()">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
               添加子项目
             </button>
           </div>
         </div>
 
         <div v-if="config.projects?.length" class="projects-grid">
-          <div
-            v-for="(project, index) in config.projects"
-            :key="index"
-            class="project-item"
-          >
+          <div v-for="(project, index) in config.projects" :key="index" class="project-item">
             <div class="project-item-head">
               <span class="mono-accent">{{ project.alias }}</span>
               <span class="badge badge-neutral">{{ project.type }}</span>
@@ -89,7 +97,7 @@
         <div v-else class="empty-terminal">
           <div class="term-border-top">┌─ 未检测到子项目 ───────────────────────────┐</div>
           <div class="term-line"><span class="term-prompt">$</span> <span class="term-cmd">code-ctx init</span></div>
-          <div class="term-line" style="padding-left: 2rem; color: var(--text-muted);">扫描项目结构以添加子项目</div>
+          <div class="term-line" style="padding-left: 2rem; color: var(--text-muted)">扫描项目结构以添加子项目</div>
           <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
         </div>
       </div>
@@ -97,7 +105,10 @@
       <div class="card">
         <div class="card-header">
           <h2 class="card-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
             排除目录
           </h2>
           <span class="badge badge-success">{{ config.excludeDirs?.length || 0 }}</span>
@@ -116,7 +127,7 @@
               @keyup.enter="addDir"
               class="input"
               placeholder="输入目录名称，回车添加"
-              style="flex:1"
+              style="flex: 1"
             />
             <button class="btn btn-secondary btn-sm" @click="addDir" :disabled="!newDir">添加</button>
           </div>
@@ -221,7 +232,12 @@ export default {
         show: true,
         index,
         form: project
-          ? { alias: project.alias || '', path: project.path || '', type: project.type || '', label: project.label || '' }
+          ? {
+              alias: project.alias || '',
+              path: project.path || '',
+              type: project.type || '',
+              label: project.label || ''
+            }
           : { alias: '', path: '', type: '', label: '' }
       };
     },
@@ -255,7 +271,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };

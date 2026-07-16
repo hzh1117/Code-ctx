@@ -1,9 +1,5 @@
 const path = require('path');
-const {
-  getConfigFile,
-  loadProjectConfig,
-  saveProjectConfig
-} = require('../utils/config');
+const { getConfigFile, loadProjectConfig, saveProjectConfig } = require('../utils/config');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { evaluateContextBudget } = require('../utils/token-estimator');
 const { TOKEN_THRESHOLDS } = require('../utils/constants');
@@ -45,14 +41,15 @@ function createPlanningService(dependencies = {}) {
   }
 
   function mergeConfig(rootDir, detected, existing) {
-    const detectedByPath = new Map(detected.projects.map(project => [
-      pathImpl.resolve(rootDir, project.path),
-      project
-    ]));
+    const detectedByPath = new Map(
+      detected.projects.map(project => [pathImpl.resolve(rootDir, project.path), project])
+    );
     const existingProjects = projectArray(existing.projects);
-    const existingByPath = new Map(existingProjects
-      .filter(project => typeof project.path === 'string')
-      .map(project => [pathImpl.resolve(rootDir, project.path), project]));
+    const existingByPath = new Map(
+      existingProjects
+        .filter(project => typeof project.path === 'string')
+        .map(project => [pathImpl.resolve(rootDir, project.path), project])
+    );
     const conflicts = [];
 
     const projects = detected.projects.map(project => {
@@ -76,9 +73,9 @@ function createPlanningService(dependencies = {}) {
       report: {
         source: 'merged',
         detected: detected.projects.length,
-        matched: detected.projects.length - projects.filter(project =>
-          !existingByPath.has(pathImpl.resolve(rootDir, project.path))
-        ).length,
+        matched:
+          detected.projects.length -
+          projects.filter(project => !existingByPath.has(pathImpl.resolve(rootDir, project.path))).length,
         retained: retained.map(project => project.alias),
         conflicts
       }
@@ -92,7 +89,10 @@ function createPlanningService(dependencies = {}) {
       const info = inspectConfig(rootDir);
       const merged = info.exists
         ? mergeConfig(rootDir, detectedConfig, loadConfig(rootDir))
-        : { config: detectedConfig, report: { source: 'detected', detected: projects.length, matched: 0, retained: [], conflicts: [] } };
+        : {
+            config: detectedConfig,
+            report: { source: 'detected', detected: projects.length, matched: 0, retained: [], conflicts: [] }
+          };
       const config = merged.config;
 
       if (info.exists && !options.force) {
@@ -114,28 +114,33 @@ function createPlanningService(dependencies = {}) {
             maxInputTokens: aiConfig.maxInputTokens,
             maxOutputTokens: aiConfig.maxTokens
           };
-          const oneShot = evaluateBudget(buildPrompt({
-            projects,
-            scanResults,
-            type: 'one-shot'
-          }), budgetOptions);
-          const batches = projects.map(project => evaluateBudget(buildPrompt({
-            project,
-            scanResult: scanResults[project.alias]
-          }), budgetOptions));
+          const oneShot = evaluateBudget(
+            buildPrompt({
+              projects,
+              scanResults,
+              type: 'one-shot'
+            }),
+            budgetOptions
+          );
+          const batches = projects.map(project =>
+            evaluateBudget(
+              buildPrompt({
+                project,
+                scanResult: scanResults[project.alias]
+              }),
+              budgetOptions
+            )
+          );
           const largestBatchInput = Math.max(0, ...batches.map(budget => budget.input.estimate));
           logger.log(
             `Prompt 预算: one-shot ~${oneShot.input.estimate} input tokens；` +
-            `batch 最大 ~${largestBatchInput}；output 上限 ${aiConfig.maxTokens}`
+              `batch 最大 ~${largestBatchInput}；output 上限 ${aiConfig.maxTokens}`
           );
 
           let strategy = 'BATCH_MINIMAL';
           if (oneShot.status !== 'over' && oneShot.input.estimate < TOKEN_THRESHOLDS.ONE_SHOT) {
             strategy = 'ONE_SHOT';
-          } else if (
-            batches.every(budget => budget.status !== 'over') &&
-            largestBatchInput <= TOKEN_THRESHOLDS.BATCH
-          ) {
+          } else if (batches.every(budget => budget.status !== 'over') && largestBatchInput <= TOKEN_THRESHOLDS.BATCH) {
             strategy = 'BATCH_WITH_CONTEXT';
           }
           logger.log(`策略: ${strategy}`);

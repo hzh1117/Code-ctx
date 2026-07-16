@@ -19,12 +19,18 @@ describe('detectProjects', () => {
   test('should detect uni-app project', () => {
     const projectDir = path.join(testDir, 'my-app');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'uni-app': '^2.0.0' }
-    }));
-    fs.writeFileSync(path.join(projectDir, 'manifest.json'), JSON.stringify({
-      'mp-weixin': {}
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { 'uni-app': '^2.0.0' }
+      })
+    );
+    fs.writeFileSync(
+      path.join(projectDir, 'manifest.json'),
+      JSON.stringify({
+        'mp-weixin': {}
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects).toHaveLength(1);
@@ -34,9 +40,12 @@ describe('detectProjects', () => {
   test('should detect Vue2 admin project', () => {
     const projectDir = path.join(testDir, 'admin');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^2.0.0', 'element-ui': '^2.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^2.0.0', 'element-ui': '^2.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'vue2-admin')).toBe(true);
@@ -45,9 +54,12 @@ describe('detectProjects', () => {
   test('should detect Vue3 admin project', () => {
     const projectDir = path.join(testDir, 'vue3-admin');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^3.0.0', 'element-plus': '^2.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'vue3-admin')).toBe(true);
@@ -56,9 +68,12 @@ describe('detectProjects', () => {
   test('should detect Vue3 without requiring a UI component library', () => {
     const projectDir = path.join(testDir, 'plain-vue3');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { vue: '^3.5.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^3.5.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.find(p => p.name === 'plain-vue3')?.type).toBe('vue3-admin');
@@ -67,9 +82,12 @@ describe('detectProjects', () => {
   test('should detect React project', () => {
     const projectDir = path.join(testDir, 'react-app');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0', 'react-dom': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0', 'react-dom': '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'react')).toBe(true);
@@ -87,9 +105,12 @@ describe('detectProjects', () => {
   test('should detect Node backend (express)', () => {
     const projectDir = path.join(testDir, 'node-api');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'express': '^4.18.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^4.18.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'node-backend')).toBe(true);
@@ -98,10 +119,13 @@ describe('detectProjects', () => {
   test('should detect Fastify TypeScript backend', () => {
     const projectDir = path.join(testDir, 'fastify-api');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { fastify: '^5.0.0' },
-      devDependencies: { typescript: '^5.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { fastify: '^5.0.0' },
+        devDependencies: { typescript: '^5.0.0' }
+      })
+    );
     fs.writeFileSync(path.join(projectDir, 'server.ts'), 'export {}');
 
     const projects = detectProjects(testDir);
@@ -121,9 +145,12 @@ describe('detectProjects', () => {
   test('uses generic backend detection for non-framework server packages', () => {
     const projectDir = path.join(testDir, 'realtime-service');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'socket.io': '^4.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { 'socket.io': '^4.0.0' }
+      })
+    );
     fs.writeFileSync(path.join(projectDir, 'server.js'), 'module.exports = {};');
 
     const projects = detectProjects(testDir);
@@ -151,9 +178,12 @@ describe('detectProjects', () => {
   test('should not detect multiple types for same directory', () => {
     const projectDir = path.join(testDir, 'multi-check');
     fs.mkdirSync(projectDir, { recursive: true });
-    fs.writeFileSync(path.join(projectDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(projectDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^3.0.0', 'element-plus': '^2.0.0' }
+      })
+    );
     fs.writeFileSync(path.join(projectDir, 'manifest.json'), JSON.stringify({}));
 
     const projects = detectProjects(testDir);
@@ -177,9 +207,12 @@ describe('detectProjects — monorepo deep scan', () => {
     // Simulate: packages/app-web/package.json with vue
     const pkgDir = path.join(testDir, 'packages', 'app-web');
     fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^3.0.0', 'element-plus': '^2.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.length).toBeGreaterThanOrEqual(1);
@@ -189,9 +222,12 @@ describe('detectProjects — monorepo deep scan', () => {
   test('detects projects in apps/ subdirectory', () => {
     const appDir = path.join(testDir, 'apps', 'web');
     fs.mkdirSync(appDir, { recursive: true });
-    fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(appDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     expect(projects.some(p => p.type === 'react')).toBe(true);
@@ -200,9 +236,12 @@ describe('detectProjects — monorepo deep scan', () => {
   test('generates hierarchical alias for nested projects', () => {
     const pkgDir = path.join(testDir, 'packages', 'my-app');
     fs.mkdirSync(pkgDir, { recursive: true });
-    fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(pkgDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     const found = projects.find(p => p.type === 'react');
@@ -214,9 +253,12 @@ describe('detectProjects — monorepo deep scan', () => {
   test('skips node_modules in nested directories', () => {
     const nmDir = path.join(testDir, 'packages', 'app', 'node_modules', 'fake-pkg');
     fs.mkdirSync(nmDir, { recursive: true });
-    fs.writeFileSync(path.join(nmDir, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(nmDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     // node_modules should be skipped
@@ -227,9 +269,12 @@ describe('detectProjects — monorepo deep scan', () => {
     // Create a deeply nested project: a/b/c/d/app
     const deepDir = path.join(testDir, 'a', 'b', 'c', 'd', 'app');
     fs.mkdirSync(deepDir, { recursive: true });
-    fs.writeFileSync(path.join(deepDir, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(deepDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     // With default depth (3), this should NOT be found (depth 4)
     const projectsDefault = detectProjects(testDir);
@@ -246,12 +291,18 @@ describe('detectProjects — monorepo deep scan', () => {
     const dir2 = path.join(testDir, 'apps', 'app');
     fs.mkdirSync(dir1, { recursive: true });
     fs.mkdirSync(dir2, { recursive: true });
-    fs.writeFileSync(path.join(dir1, 'package.json'), JSON.stringify({
-      dependencies: { 'vue': '^3.0.0', 'element-plus': '^2.0.0' }
-    }));
-    fs.writeFileSync(path.join(dir2, 'package.json'), JSON.stringify({
-      dependencies: { 'react': '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(dir1, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^3.0.0', 'element-plus': '^2.0.0' }
+      })
+    );
+    fs.writeFileSync(
+      path.join(dir2, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
     const aliases = projects.map(p => p.alias);
@@ -260,21 +311,29 @@ describe('detectProjects — monorepo deep scan', () => {
   });
 
   test('detects the repository root and monorepo children together', () => {
-    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-      dependencies: { express: '^5.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^5.0.0' }
+      })
+    );
     const childDir = path.join(testDir, 'packages', 'web');
     fs.mkdirSync(childDir, { recursive: true });
-    fs.writeFileSync(path.join(childDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(childDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const projects = detectProjects(testDir);
 
-    expect(projects).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: path.resolve(testDir), type: 'node-backend' }),
-      expect.objectContaining({ path: path.resolve(childDir), type: 'react' })
-    ]));
+    expect(projects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: path.resolve(testDir), type: 'node-backend' }),
+        expect.objectContaining({ path: path.resolve(childDir), type: 'react' })
+      ])
+    );
   });
 
   test('falls back to a scannable unknown root instead of returning no projects', () => {
@@ -283,10 +342,12 @@ describe('detectProjects — monorepo deep scan', () => {
     const projects = detectProjects(testDir);
 
     expect(projects).toHaveLength(1);
-    expect(projects[0]).toEqual(expect.objectContaining({
-      alias: expect.any(String),
-      path: path.resolve(testDir),
-      type: 'unknown'
-    }));
+    expect(projects[0]).toEqual(
+      expect.objectContaining({
+        alias: expect.any(String),
+        path: path.resolve(testDir),
+        type: 'unknown'
+      })
+    );
   });
 });

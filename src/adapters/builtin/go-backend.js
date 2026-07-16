@@ -2,33 +2,28 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class GoBackendAdapter extends BaseAdapter {
-  get type() { return 'go-backend'; }
+  get type() {
+    return 'go-backend';
+  }
 
   detect(pkg, files) {
     return files.includes('go.mod');
   }
 
   get scanPatterns() {
-    return [
-      '**/handler/*.go',
-      '**/service/*.go',
-      '**/model/*.go',
-      '**/middleware/*.go',
-      'main.go',
-      'go.mod'
-    ];
+    return ['**/handler/*.go', '**/service/*.go', '**/model/*.go', '**/middleware/*.go', 'main.go', 'go.mod'];
   }
 
   get priorityKeywords() {
     return {
       'main.go': 1,
       'go.mod': 2,
-      'handler': 3,
-      'middleware': 4,
-      'service': 5,
-      'model': 6,
-      'config': 7,
-      'util': 8
+      handler: 3,
+      middleware: 4,
+      service: 5,
+      model: 6,
+      config: 7,
+      util: 8
     };
   }
 
@@ -37,11 +32,7 @@ class GoBackendAdapter extends BaseAdapter {
   }
 
   extractKeyFiles(dir) {
-    return [
-      path.join(dir, 'main.go'),
-      path.join(dir, 'go.mod'),
-      path.join(dir, 'go.sum')
-    ];
+    return [path.join(dir, 'main.go'), path.join(dir, 'go.mod'), path.join(dir, 'go.sum')];
   }
 }
 

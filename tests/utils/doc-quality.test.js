@@ -43,11 +43,18 @@ describe('doc-quality', () => {
   });
 
   test('complete docs without a manifest remain unverified', () => {
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'react' }]
+      })
+    );
     writeDoc(aiDocs, 'web.md', fullDoc(EXPECTED_PROJECT_SECTIONS));
-    writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'])
+    );
 
     const result = scoreDocs(root);
     expect(result.overall).toBe('WARN');
@@ -65,25 +72,30 @@ describe('doc-quality', () => {
       'function listUsers() {}'
     ].join('\n');
     fs.writeFileSync(path.join(projectDir, 'index.js'), source);
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'node-backend' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'node-backend' }]
+      })
+    );
     const hash = crypto.createHash('sha256').update(source).digest('hex');
-    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
-      version: 1,
-      projects: [{
-        id: 'web',
-        sourcePath: './web',
-        document: 'web.md',
-        keyFiles: [{ path: 'index.js', hash }]
-      }]
-    }));
-    const projectDoc = fullDoc(EXPECTED_PROJECT_SECTIONS) + [
-      '',
-      `Source: \`index.js\` sha256:${hash}`,
-      'Symbol: `index.js#listUsers`',
-      'Route: GET /users'
-    ].join('\n');
+    fs.writeFileSync(
+      path.join(aiDocs, 'project-manifest.json'),
+      JSON.stringify({
+        version: 1,
+        projects: [
+          {
+            id: 'web',
+            sourcePath: './web',
+            document: 'web.md',
+            keyFiles: [{ path: 'index.js', hash }]
+          }
+        ]
+      })
+    );
+    const projectDoc =
+      fullDoc(EXPECTED_PROJECT_SECTIONS) +
+      ['', `Source: \`index.js\` sha256:${hash}`, 'Symbol: `index.js#listUsers`', 'Route: GET /users'].join('\n');
     writeDoc(aiDocs, 'web.md', projectDoc);
     writeDoc(
       aiDocs,
@@ -105,15 +117,25 @@ describe('doc-quality', () => {
     const projectDir = path.join(root, 'web');
     fs.mkdirSync(projectDir);
     fs.writeFileSync(path.join(projectDir, 'index.js'), 'current source');
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'generic-js-ts' }]
-    }));
-    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
-      projects: [{
-        id: 'web', sourcePath: './web', document: 'web.md',
-        keyFiles: [{ path: 'index.js', hash: 'stale-hash' }]
-      }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'generic-js-ts' }]
+      })
+    );
+    fs.writeFileSync(
+      path.join(aiDocs, 'project-manifest.json'),
+      JSON.stringify({
+        projects: [
+          {
+            id: 'web',
+            sourcePath: './web',
+            document: 'web.md',
+            keyFiles: [{ path: 'index.js', hash: 'stale-hash' }]
+          }
+        ]
+      })
+    );
     writeDoc(aiDocs, 'web.md', fullDoc(EXPECTED_PROJECT_SECTIONS) + '\n`index.js` stale-hash\n');
     writeDoc(
       aiDocs,
@@ -128,19 +150,24 @@ describe('doc-quality', () => {
     expect(result.overall).toBe('HIGH_RISK');
     expect(web.formatHealth.score).toBeGreaterThanOrEqual(80);
     expect(web.factualConfidence.metrics.referenceResolution).toBe(0);
-    expect(web.risks).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'source-reference-invalid' })
-    ]));
+    expect(web.risks).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'source-reference-invalid' })]));
   });
 
   test('marks doc as HIGH_RISK when sensitive info present', () => {
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'react' }]
+      })
+    );
     // Use a long fake key that the detector flags
     const sensitive = fullDoc(EXPECTED_PROJECT_SECTIONS) + '\napi_key = "abcdef1234567890abcdef"';
     writeDoc(aiDocs, 'web.md', sensitive);
-    writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'])
+    );
 
     const result = scoreDocs(root);
     expect(result.overall).toBe('HIGH_RISK');
@@ -149,11 +176,18 @@ describe('doc-quality', () => {
   });
 
   test('marks doc as HIGH_RISK when missing', () => {
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'react' }]
+      })
+    );
     // Note: only OVERVIEW.md, no web.md
-    writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'])
+    );
 
     const result = scoreDocs(root);
     expect(result.overall).toBe('HIGH_RISK');
@@ -163,13 +197,20 @@ describe('doc-quality', () => {
   });
 
   test('WARN when sections are partially missing but no sensitive/missing', () => {
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'react' }]
+      })
+    );
     // Only half the sections
     const partial = ['overview', 'structure', 'modules'];
     writeDoc(aiDocs, 'web.md', fullDoc(partial));
-    writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'])
+    );
 
     const result = scoreDocs(root);
     expect(['WARN', 'HIGH_RISK']).toContain(result.overall);
@@ -182,12 +223,19 @@ describe('doc-quality', () => {
     fs.mkdirSync(projectDir);
     fs.writeFileSync(path.join(projectDir, 'index.js'), '// 1');
 
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './web', type: 'react' }]
+      })
+    );
 
     const docPath = writeDoc(aiDocs, 'web.md', fullDoc(EXPECTED_PROJECT_SECTIONS));
-    writeDoc(aiDocs, 'OVERVIEW.md', fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart']));
+    writeDoc(
+      aiDocs,
+      'OVERVIEW.md',
+      fullDoc(['overview', 'subprojects', 'tech-stack', 'architecture', 'dependencies', 'quickstart'])
+    );
 
     // Backdate doc, bump project file forward
     const past = new Date(Date.now() - 7 * 24 * 3600 * 1000);

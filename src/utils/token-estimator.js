@@ -95,9 +95,7 @@ function evaluateContextBudget(prompt, options = {}) {
   const maxInputTokens = Number.isFinite(options.maxInputTokens)
     ? Number(options.maxInputTokens)
     : CONTEXT_LIMITS.MAX_INPUT_TOKENS;
-  const maxOutputTokens = Number.isFinite(options.maxOutputTokens)
-    ? Number(options.maxOutputTokens)
-    : null;
+  const maxOutputTokens = Number.isFinite(options.maxOutputTokens) ? Number(options.maxOutputTokens) : null;
   const safetyMargin = Number.isFinite(options.safetyMargin)
     ? Number(options.safetyMargin)
     : CONTEXT_LIMITS.SAFETY_MARGIN;

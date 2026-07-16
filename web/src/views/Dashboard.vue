@@ -6,7 +6,12 @@
         <p class="page-desc">项目文档状态与常用操作</p>
       </div>
       <button class="btn btn-secondary" @click="loadStatus" :disabled="loading">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10" />
+          <polyline points="1 20 1 14 7 14" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+        </svg>
         刷新
       </button>
     </header>
@@ -44,14 +49,20 @@
         <div class="card action-card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
               快捷操作
             </h2>
           </div>
           <div class="quick-actions">
             <button class="quick-action" @click="$router.push('/config')">
               <span class="quick-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
               </span>
               <span>
                 <strong>初始化</strong>
@@ -60,7 +71,12 @@
             </button>
             <button class="quick-action" @click="triggerUpdate" :disabled="updating">
               <span class="quick-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10" />
+                  <polyline points="1 20 1 14 7 14" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+                  <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+                </svg>
               </span>
               <span>
                 <strong>{{ updating ? '更新中...' : '更新文档' }}</strong>
@@ -69,7 +85,9 @@
             </button>
             <button class="quick-action" @click="$router.push('/ai-generate')">
               <span class="quick-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
               </span>
               <span>
                 <strong>生成 Prompt</strong>
@@ -82,7 +100,10 @@
         <div class="card history-card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 5-6"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18" />
+                <path d="M7 14l3-3 3 2 5-6" />
+              </svg>
               最近任务
             </h2>
             <span class="badge badge-neutral">{{ recentHistory.length }}</span>
@@ -105,7 +126,9 @@
 
           <div v-else class="empty-terminal">
             <div class="term-border-top">┌─ 暂无任务历史 ─────────────────────────────┐</div>
-            <div class="term-line"><span class="term-prompt">$</span> <span class="term-cmd">code-ctx use "你的任务"</span></div>
+            <div class="term-line">
+              <span class="term-prompt">$</span> <span class="term-cmd">code-ctx use "你的任务"</span>
+            </div>
             <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
           </div>
         </div>
@@ -185,7 +208,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };

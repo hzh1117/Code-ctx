@@ -27,23 +27,27 @@ function getProjectMappings(rootDir) {
 
   const manifestById = new Map(manifest.projects.map(project => [project.id, project]));
   const aiDocsDir = path.resolve(rootDir, 'ai-docs');
-  return config.projects.flatMap(project => {
-    const entry = manifestById.get(project.alias);
-    if (!entry || !project.path || !entry.sourcePath || !entry.document) return [];
-    const configRoot = path.resolve(rootDir, project.path);
-    const manifestRoot = path.resolve(rootDir, entry.sourcePath);
-    if (configRoot !== manifestRoot || !isWithinDir(configRoot, rootDir)) return [];
-    if (path.basename(entry.document) !== entry.document || !entry.document.endsWith('.md')) return [];
-    const docPath = path.resolve(aiDocsDir, entry.document);
-    if (!isWithinDir(docPath, aiDocsDir) || !fs.existsSync(docPath)) return [];
-    return [{
-      id: project.alias,
-      projectRoot: configRoot,
-      sourcePath: entry.sourcePath,
-      docName: entry.document,
-      docPath
-    }];
-  }).sort((a, b) => b.projectRoot.length - a.projectRoot.length);
+  return config.projects
+    .flatMap(project => {
+      const entry = manifestById.get(project.alias);
+      if (!entry || !project.path || !entry.sourcePath || !entry.document) return [];
+      const configRoot = path.resolve(rootDir, project.path);
+      const manifestRoot = path.resolve(rootDir, entry.sourcePath);
+      if (configRoot !== manifestRoot || !isWithinDir(configRoot, rootDir)) return [];
+      if (path.basename(entry.document) !== entry.document || !entry.document.endsWith('.md')) return [];
+      const docPath = path.resolve(aiDocsDir, entry.document);
+      if (!isWithinDir(docPath, aiDocsDir) || !fs.existsSync(docPath)) return [];
+      return [
+        {
+          id: project.alias,
+          projectRoot: configRoot,
+          sourcePath: entry.sourcePath,
+          docName: entry.document,
+          docPath
+        }
+      ];
+    })
+    .sort((a, b) => b.projectRoot.length - a.projectRoot.length);
 }
 
 function resolveProjectForFile(rootDir, changedFile) {
@@ -51,9 +55,7 @@ function resolveProjectForFile(rootDir, changedFile) {
   if (!isWithinDir(absoluteFile, rootDir) || isWithinDir(absoluteFile, path.join(rootDir, 'ai-docs'))) {
     return null;
   }
-  return getProjectMappings(rootDir).find(mapping =>
-    isWithinDir(absoluteFile, mapping.projectRoot)
-  ) || null;
+  return getProjectMappings(rootDir).find(mapping => isWithinDir(absoluteFile, mapping.projectRoot)) || null;
 }
 
 function findRelatedDoc(rootDir, changedFile) {

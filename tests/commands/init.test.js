@@ -60,8 +60,10 @@ describe('initCommand', () => {
 
   test('should keep existing JS config and not create JSON', async () => {
     fs.writeFileSync(path.join(testDir, 'package.json'), '{}');
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'),
-      `module.exports = { projectName: 'legacy', projects: [] };\n`);
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = { projectName: 'legacy', projects: [] };\n`
+    );
     _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
@@ -73,9 +75,12 @@ describe('initCommand', () => {
   test('should detect sub-projects', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(subDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
@@ -84,18 +89,23 @@ describe('initCommand', () => {
   });
 
   test('should initialize a single project from the repository root', async () => {
-    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-      dependencies: { express: '^5.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^5.0.0' }
+      })
+    );
     fs.writeFileSync(path.join(testDir, 'app.js'), 'module.exports = {};');
 
     const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
     expect(result.projects).toHaveLength(1);
-    expect(result.projects[0]).toEqual(expect.objectContaining({
-      path: path.resolve(testDir),
-      type: 'node-backend'
-    }));
+    expect(result.projects[0]).toEqual(
+      expect.objectContaining({
+        path: path.resolve(testDir),
+        type: 'node-backend'
+      })
+    );
     expect(result.success).toBe(true);
   });
 
@@ -110,9 +120,12 @@ describe('initCommand', () => {
 
   test('skip-ai writes deterministic documents and a consumable manifest', async () => {
     fs.mkdirSync(path.join(testDir, 'src'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-      dependencies: { express: '^5.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^5.0.0' }
+      })
+    );
     fs.writeFileSync(path.join(testDir, 'app.js'), 'module.exports = {};');
 
     const first = await initCommand(testDir, { skipPrompt: true, skipAi: true });
@@ -129,12 +142,14 @@ describe('initCommand', () => {
     expect(firstDoc).toContain('sha256:');
     expect(fs.readFileSync(overviewPath, 'utf8')).toContain(`\`${alias}\``);
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    expect(manifest.projects[0]).toEqual(expect.objectContaining({
-      id: alias,
-      sourcePath: '.',
-      document: `${alias}.md`,
-      keyFiles: expect.any(Array)
-    }));
+    expect(manifest.projects[0]).toEqual(
+      expect.objectContaining({
+        id: alias,
+        sourcePath: '.',
+        document: `${alias}.md`,
+        keyFiles: expect.any(Array)
+      })
+    );
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
     expect(fs.readFileSync(docPath, 'utf8')).toBe(firstDoc);
@@ -144,34 +159,39 @@ describe('initCommand', () => {
     fs.mkdirSync(path.join(testDir, 'custom'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({ name: 'custom' }));
     fs.writeFileSync(path.join(testDir, 'custom', 'entry.foo'), 'domain source');
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'custom',
-      projects: [{
-        alias: 'init-test',
-        path: '.',
-        type: 'generic-js-ts',
-        scanPatterns: ['custom/**/*.foo']
-      }]
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'custom',
+        projects: [
+          {
+            alias: 'init-test',
+            path: '.',
+            type: 'generic-js-ts',
+            scanPatterns: ['custom/**/*.foo']
+          }
+        ]
+      })
+    );
     _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
-    const manifest = JSON.parse(fs.readFileSync(
-      path.join(testDir, 'ai-docs', 'project-manifest.json'),
-      'utf8'
-    ));
-    expect(manifest.projects[0].keyFiles).toEqual(expect.arrayContaining([
-      expect.objectContaining({ path: 'custom/entry.foo' })
-    ]));
+    const manifest = JSON.parse(fs.readFileSync(path.join(testDir, 'ai-docs', 'project-manifest.json'), 'utf8'));
+    expect(manifest.projects[0].keyFiles).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'custom/entry.foo' })])
+    );
   });
 
   test('should persist detected project paths relative to the repository', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(subDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
     _clearCache();
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
@@ -194,42 +214,56 @@ describe('initCommand', () => {
   });
 
   test('returns merged disk configuration and an audit report', async () => {
-    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-      dependencies: { express: '^5.0.0' }
-    }));
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'custom-name',
-      outputDir: './custom-docs',
-      projects: [{
-        alias: 'init-test',
-        path: '.',
-        type: 'generic-js-ts',
-        label: 'Configured Label',
-        scanPatterns: ['**/*.js']
-      }],
-      excludeDirs: ['generated']
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^5.0.0' }
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'custom-name',
+        outputDir: './custom-docs',
+        projects: [
+          {
+            alias: 'init-test',
+            path: '.',
+            type: 'generic-js-ts',
+            label: 'Configured Label',
+            scanPatterns: ['**/*.js']
+          }
+        ],
+        excludeDirs: ['generated']
+      })
+    );
     _clearCache();
 
     const result = await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
-    expect(result.config).toEqual(expect.objectContaining({
-      projectName: 'custom-name',
-      outputDir: './custom-docs',
-      excludeDirs: ['generated']
-    }));
-    expect(result.config.projects[0]).toEqual(expect.objectContaining({
-      label: 'Configured Label',
-      scanPatterns: ['**/*.js']
-    }));
-    expect(result.configMerge).toEqual(expect.objectContaining({
-      source: 'merged',
-      matched: 1,
-      retained: []
-    }));
-    expect(result.configMerge.conflicts).toEqual(expect.arrayContaining([
-      expect.objectContaining({ field: 'label', kept: 'Configured Label' })
-    ]));
+    expect(result.config).toEqual(
+      expect.objectContaining({
+        projectName: 'custom-name',
+        outputDir: './custom-docs',
+        excludeDirs: ['generated']
+      })
+    );
+    expect(result.config.projects[0]).toEqual(
+      expect.objectContaining({
+        label: 'Configured Label',
+        scanPatterns: ['**/*.js']
+      })
+    );
+    expect(result.configMerge).toEqual(
+      expect.objectContaining({
+        source: 'merged',
+        matched: 1,
+        retained: []
+      })
+    );
+    expect(result.configMerge.conflicts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'label', kept: 'Configured Label' })])
+    );
   });
 });
 
@@ -252,9 +286,12 @@ describe('initCommand enhanced features', () => {
   test('should write .init-state.json after init', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(subDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 
@@ -268,9 +305,12 @@ describe('initCommand enhanced features', () => {
   test('should skip completed projects on re-run', async () => {
     const subDir = path.join(testDir, 'my-app');
     fs.mkdirSync(subDir, { recursive: true });
-    fs.writeFileSync(path.join(subDir, 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(subDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
 
     await initCommand(testDir, { skipPrompt: true, skipAi: true });
 

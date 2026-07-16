@@ -12,7 +12,9 @@
         <div class="card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
               生成配置
             </h2>
           </div>
@@ -34,7 +36,9 @@
             </div>
             <button class="btn btn-primary btn-generate" @click="generate" :disabled="generating || !taskDescription">
               <span v-if="generating" class="btn-spinner"></span>
-              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
               {{ generating ? '生成中...' : '生成 Prompt' }}
             </button>
           </div>
@@ -43,11 +47,17 @@
         <div v-if="generatedPrompt" class="card prompt-card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
               Generated Prompt
             </h2>
             <button class="btn btn-secondary btn-sm" @click="copyPrompt">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
               复制
             </button>
           </div>
@@ -65,22 +75,36 @@
         <div class="card output-card">
           <div class="card-header">
             <h2 class="card-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
               AI 响应
             </h2>
             <div class="response-meta">
               <span v-if="aiResponse" class="badge badge-success">done</span>
               <span v-if="responseError" class="badge badge-danger">error</span>
               <button class="btn btn-secondary btn-sm" @click="copyPrompt" :disabled="!generatedPrompt">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
                 复制 Prompt
               </button>
               <button class="btn btn-secondary btn-sm" @click="exportPrompt" :disabled="!generatedPrompt">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
                 导出 .md
               </button>
               <button class="btn btn-secondary btn-sm" @click="copyResponse" :disabled="!aiResponse">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
                 复制响应
               </button>
             </div>
@@ -95,9 +119,7 @@
           </div>
 
           <div v-else-if="generating" class="response-loading">
-            <div class="loading-dots">
-              <span></span><span></span><span></span>
-            </div>
+            <div class="loading-dots"><span></span><span></span><span></span></div>
             <span class="mono-dim">processing...</span>
           </div>
 
@@ -155,21 +177,31 @@ export default {
         this.scenarios = res.data;
       } catch (err) {
         this.scenarios = [
-          { id: 'A', name: '新增功能' }, { id: 'B', name: '后台功能' },
-          { id: 'C', name: '平台功能' }, { id: 'D', name: '数据模型' },
-          { id: 'E', name: '修改功能' }, { id: 'F', name: '排查 Bug' },
-          { id: 'G', name: '后端改动' }, { id: 'H', name: '跨端功能' }
+          { id: 'A', name: '新增功能' },
+          { id: 'B', name: '后台功能' },
+          { id: 'C', name: '平台功能' },
+          { id: 'D', name: '数据模型' },
+          { id: 'E', name: '修改功能' },
+          { id: 'F', name: '排查 Bug' },
+          { id: 'G', name: '后端改动' },
+          { id: 'H', name: '跨端功能' }
         ];
       }
     },
     async generate() {
-      if (!this.taskDescription) { this.showToast('请输入任务描述', 'error'); return; }
+      if (!this.taskDescription) {
+        this.showToast('请输入任务描述', 'error');
+        return;
+      }
       this.generating = true;
       this.generatedPrompt = '';
       this.aiResponse = '';
       this.responseError = '';
       try {
-        const promptRes = await axios.post('/api/generate-prompt', { scenario: this.selectedScenario, task: this.taskDescription });
+        const promptRes = await axios.post('/api/generate-prompt', {
+          scenario: this.selectedScenario,
+          task: this.taskDescription
+        });
         this.generatedPrompt = promptRes.data.prompt;
         this.tokenBudget = promptRes.data.tokenBudget || null;
         const aiRes = await axios.post('/api/ai/generate', { prompt: this.generatedPrompt });
@@ -188,12 +220,20 @@ export default {
       }
     },
     async copyPrompt() {
-      try { await navigator.clipboard.writeText(this.generatedPrompt); this.showToast('已复制', 'success'); }
-      catch { this.showToast('复制失败', 'error'); }
+      try {
+        await navigator.clipboard.writeText(this.generatedPrompt);
+        this.showToast('已复制', 'success');
+      } catch {
+        this.showToast('复制失败', 'error');
+      }
     },
     async copyResponse() {
-      try { await navigator.clipboard.writeText(this.aiResponse); this.showToast('已复制', 'success'); }
-      catch { this.showToast('复制失败', 'error'); }
+      try {
+        await navigator.clipboard.writeText(this.aiResponse);
+        this.showToast('已复制', 'success');
+      } catch {
+        this.showToast('复制失败', 'error');
+      }
     },
     exportPrompt() {
       if (!this.generatedPrompt) return;
@@ -210,7 +250,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };
@@ -259,9 +301,21 @@ export default {
   margin-bottom: 8px;
   display: inline-block;
 }
-.token-ok { color: var(--text-secondary); background: var(--bg-hover); border: 1px solid var(--border); }
-.token-warn { color: var(--warning); background: var(--warning-dim); border: 1px solid var(--warning-border); }
-.token-over { color: var(--danger); background: var(--danger-dim); border: 1px solid var(--danger-border); }
+.token-ok {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+}
+.token-warn {
+  color: var(--warning);
+  background: var(--warning-dim);
+  border: 1px solid var(--warning-border);
+}
+.token-over {
+  color: var(--danger);
+  background: var(--danger-dim);
+  border: 1px solid var(--danger-border);
+}
 
 .prompt-card {
   flex-shrink: 0;
@@ -343,12 +397,24 @@ export default {
   animation: dotPulse 1.2s ease-in-out infinite;
 }
 
-.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
-.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
 
 @keyframes dotPulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .mono-dim {
@@ -389,7 +455,9 @@ export default {
   resize: vertical;
 }
 
-.required { color: var(--danger); }
+.required {
+  color: var(--danger);
+}
 
 @media (max-width: 768px) {
   .page-generate {

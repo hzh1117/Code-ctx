@@ -5,7 +5,15 @@ describe('package quality scripts', () => {
     expect(scripts.lint).toBe('eslint src/ bin/ web/src/ --ext .js,.vue');
   });
 
-  test('check runs lint before tests and the web build', () => {
-    expect(scripts.check).toBe('npm run lint && npm test -- --runInBand && npm run build:web');
+  test('check runs every release quality gate', () => {
+    expect(scripts.check.split(' && ')).toEqual([
+      'npm run format:check',
+      'npm run lint',
+      'npm run typecheck',
+      'npm test -- --runInBand',
+      'npm run coverage',
+      'npm run build:web',
+      'npm run pack:smoke'
+    ]);
   });
 });

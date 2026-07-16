@@ -20,9 +20,9 @@ function createDiscoveryService(dependencies = {}) {
     const config = loadConfig(rootDir);
     if (!Array.isArray(config.projects)) return projects;
 
-    const configuredByPath = new Map(config.projects
-      .filter(project => project.path)
-      .map(project => [pathImpl.resolve(rootDir, project.path), project]));
+    const configuredByPath = new Map(
+      config.projects.filter(project => project.path).map(project => [pathImpl.resolve(rootDir, project.path), project])
+    );
 
     return projects.map(project => {
       const configured = configuredByPath.get(pathImpl.resolve(project.path));
@@ -30,9 +30,7 @@ function createDiscoveryService(dependencies = {}) {
       return {
         ...project,
         type: configured.type || project.type,
-        scanPatterns: Array.isArray(configured.scanPatterns)
-          ? configured.scanPatterns.slice()
-          : undefined
+        scanPatterns: Array.isArray(configured.scanPatterns) ? configured.scanPatterns.slice() : undefined
       };
     });
   }
@@ -60,9 +58,7 @@ function createDiscoveryService(dependencies = {}) {
       if (options.project) {
         const target = projects.find(project => project.alias === options.project);
         if (!target) {
-          throw new Error(
-            `未找到子项目: ${options.project}，可用的子项目: ${projects.map(p => p.alias).join(', ')}`
-          );
+          throw new Error(`未找到子项目: ${options.project}，可用的子项目: ${projects.map(p => p.alias).join(', ')}`);
         }
         projects = [target];
         logger.log(`仅处理子项目: ${options.project}`);

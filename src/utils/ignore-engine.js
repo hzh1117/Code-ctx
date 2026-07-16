@@ -4,18 +4,33 @@ const ignore = require('ignore');
 const { loadProjectConfig } = require('./config');
 
 const DEFAULT_EXCLUDES = Object.freeze([
-  'node_modules', '.git', 'dist', 'build', 'ai-docs', 'coverage',
-  '.next', '.nuxt', '.output', '.cache', '.temp', '.tmp', 'tmp',
-  '__pycache__', '.tox', '.venv', 'venv', 'vendor'
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'ai-docs',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '.output',
+  '.cache',
+  '.temp',
+  '.tmp',
+  'tmp',
+  '__pycache__',
+  '.tox',
+  '.venv',
+  'venv',
+  'vendor'
 ]);
 const DEFAULT_FILES = Object.freeze(['code-ctx.config.json', 'code-ctx.config.js']);
 
 function directoryPattern(value) {
-  const normalized = String(value || '').replace(/\\/g, '/').replace(/^\.\//, '');
+  const normalized = String(value || '')
+    .replace(/\\/g, '/')
+    .replace(/^\.\//, '');
   if (!normalized) return null;
-  return /[*?![\]]/.test(normalized) || normalized.endsWith('/')
-    ? normalized
-    : `${normalized}/`;
+  return /[*?![\]]/.test(normalized) || normalized.endsWith('/') ? normalized : `${normalized}/`;
 }
 
 function createIgnoreEngine(rootDir, options = {}) {

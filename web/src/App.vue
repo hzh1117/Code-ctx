@@ -55,7 +55,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     }
   }
 };
@@ -94,7 +96,7 @@ export default {
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-[data-theme="light"] {
+[data-theme='light'] {
   --bg-base: #f5f5f7;
   --bg-surface: #ffffff;
   --bg-hover: #ebebef;
@@ -129,7 +131,8 @@ export default {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -226,12 +229,25 @@ body {
   font-family: var(--font-mono);
   z-index: 2000;
 }
-.toast-success { border-left: 3px solid var(--success); }
-.toast-error { border-left: 3px solid var(--danger); }
-.toast-slide-enter-active { transition: all 120ms ease; }
-.toast-slide-leave-active { transition: all 80ms ease; }
-.toast-slide-enter-from { opacity: 0; transform: translateY(8px); }
-.toast-slide-leave-to { opacity: 0; }
+.toast-success {
+  border-left: 3px solid var(--success);
+}
+.toast-error {
+  border-left: 3px solid var(--danger);
+}
+.toast-slide-enter-active {
+  transition: all 120ms ease;
+}
+.toast-slide-leave-active {
+  transition: all 80ms ease;
+}
+.toast-slide-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.toast-slide-leave-to {
+  opacity: 0;
+}
 
 /* ══════════════════════════════════════════
    GLOBAL COMPONENT CLASSES
@@ -245,8 +261,12 @@ body {
   animation: pageEnter 120ms ease;
 }
 @keyframes pageEnter {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .page-header {
@@ -350,7 +370,10 @@ body {
   cursor: pointer;
   border: none;
   outline: none;
-  transition: background 80ms, border-color 80ms, opacity 80ms;
+  transition:
+    background 80ms,
+    border-color 80ms,
+    opacity 80ms;
   white-space: nowrap;
   user-select: none;
 }
@@ -481,7 +504,9 @@ textarea.input {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Empty State (terminal style) ── */
@@ -574,7 +599,9 @@ textarea.input {
   background: var(--bg-base);
   border: 1px solid var(--border);
   border-radius: 10px;
-  transition: background 80ms, border-color 80ms;
+  transition:
+    background 80ms,
+    border-color 80ms;
 }
 
 .toggle-slider::before {
@@ -586,7 +613,9 @@ textarea.input {
   bottom: 2px;
   background: var(--text-muted);
   border-radius: 50%;
-  transition: transform 80ms, background 80ms;
+  transition:
+    transform 80ms,
+    background 80ms;
 }
 
 .toggle input:checked + .toggle-slider {
@@ -641,8 +670,13 @@ textarea.input {
 
 /* ── Blinking cursor ── */
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 .cursor-blink {

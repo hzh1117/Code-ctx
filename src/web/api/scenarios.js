@@ -8,7 +8,7 @@ const registerDocs = require('./handlers/docs');
 const registerUpdate = require('./handlers/update');
 const registerGeneratePrompt = require('./handlers/generate-prompt');
 
-module.exports = function(rootDir) {
+module.exports = function (rootDir) {
   const router = express.Router();
   registerScenarioCrud(router, rootDir);
   registerStatus(router, rootDir);

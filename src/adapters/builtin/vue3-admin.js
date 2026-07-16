@@ -2,7 +2,9 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class Vue3AdminAdapter extends BaseAdapter {
-  get type() { return 'vue3-admin'; }
+  get type() {
+    return 'vue3-admin';
+  }
 
   detect(pkg) {
     const version = pkg.dependencies?.vue || pkg.devDependencies?.vue;
@@ -10,11 +12,7 @@ class Vue3AdminAdapter extends BaseAdapter {
   }
 
   get scanPatterns() {
-    return [
-      'src/**/*.{vue,js,jsx,ts,tsx}',
-      '*.{js,ts,mjs,cjs}',
-      '.env.*'
-    ];
+    return ['src/**/*.{vue,js,jsx,ts,tsx}', '*.{js,ts,mjs,cjs}', '.env.*'];
   }
 
   get priorityKeywords() {
@@ -22,9 +20,9 @@ class Vue3AdminAdapter extends BaseAdapter {
       'main.js': 1,
       'router/index': 2,
       '/api/': 3,
-      'views': 4,
-      'components': 5,
-      'stores': 6,
+      views: 4,
+      components: 5,
+      stores: 6,
       'vite.config': 7,
       '.env': 8
     };

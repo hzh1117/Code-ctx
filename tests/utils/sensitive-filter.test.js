@@ -1,4 +1,7 @@
-const { filterSensitive } = require('../../src/utils/sensitive-filter');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { filterSensitive, scanDirectory } = require('../../src/utils/sensitive-filter');
 
 describe('filterSensitive', () => {
   test('should redact password', () => {
@@ -24,7 +27,8 @@ describe('filterSensitive', () => {
   });
 
   test('should filter JWT token', () => {
-    const input = 'token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+    const input =
+      'token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
     const { content, count } = filterSensitive(input);
     expect(content).toContain('[FILTERED]');
     expect(content).not.toContain('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
@@ -77,5 +81,27 @@ describe('filterSensitive', () => {
     expect(content).not.toContain('abc');
     expect(content).not.toContain('sk-1234567890');
     expect(content).not.toContain('xyz');
+  });
+
+  test('supports caller-provided redaction patterns', () => {
+    const { content, count } = filterSensitive('credential=custom-value', [
+      { pattern: /credential=[^\s]+/, replacement: 'credential=[FILTERED]' }
+    ]);
+
+    expect(content).toBe('credential=[FILTERED]');
+    expect(count).toBe(1);
+  });
+
+  test('scans markdown files and ignores other file types', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'code-ctx-sensitive-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'safe.txt'), 'password=ignored');
+      fs.writeFileSync(path.join(dir, 'context.md'), 'api_key=supersecretvalue');
+
+      expect(scanDirectory(dir)).toEqual([{ file: 'context.md', field: 'api_key' }]);
+      expect(scanDirectory(path.join(dir, 'missing'))).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

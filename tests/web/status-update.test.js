@@ -1,5 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+
+jest.mock('../../src/commands/update', () => ({
+  updateCommand: jest.fn().mockResolvedValue({ changedFiles: [], detectionMethod: 'hash' })
+}));
+
 const { createServer } = require('../../src/web/server');
 const { requestJson } = require('../helpers/http');
 
@@ -7,7 +12,7 @@ describe('web status content and update api', () => {
   const testDir = path.join(__dirname, '../fixtures/status-update-web');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -18,7 +23,7 @@ describe('web status content and update api', () => {
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });

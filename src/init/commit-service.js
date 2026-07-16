@@ -23,11 +23,15 @@ function createCommitService(dependencies = {}) {
       if (generation.success) {
         fileSystem.writeFileSync(
           pathImpl.join(outputDir, STATE_FILES.LAST_SCAN),
-          JSON.stringify({
-            timestamp: clock.now(),
-            lastCommitHash: isGitRepo(rootDir) ? currentCommit(rootDir) : null,
-            projects: projects.map(project => project.alias)
-          }, null, 2)
+          JSON.stringify(
+            {
+              timestamp: clock.now(),
+              lastCommitHash: isGitRepo(rootDir) ? currentCommit(rootDir) : null,
+              projects: projects.map(project => project.alias)
+            },
+            null,
+            2
+          )
         );
       }
       logger.verbose('状态文件已更新');

@@ -30,7 +30,7 @@ module.exports = new Command('dashboard')
   .option('-p, --port <port>', 'API 端口', '3456')
   .option('-d, --dir <path>', '项目目录（默认当前目录）')
   .option('--dev', '开发模式：同时启动 API 和 Vite')
-  .action((options) => {
+  .action(options => {
     const port = validatePort(options.port);
     const rootDir = options.dir ? validateDir(options.dir) : process.cwd();
 
@@ -59,10 +59,12 @@ module.exports = new Command('dashboard')
         process.exit(1);
       }
 
-      require('../../src/web/server').startServer(rootDir, port).catch((err) => {
-        console.error('启动失败:', err);
-        process.exit(1);
-      });
+      require('../../src/web/server')
+        .startServer(rootDir, port)
+        .catch(err => {
+          console.error('启动失败:', err);
+          process.exit(1);
+        });
       return;
     }
 
@@ -74,7 +76,8 @@ module.exports = new Command('dashboard')
     const concurrently = require('concurrently');
     const { result } = concurrently([
       {
-        command: 'node -e "const { startServer } = require(process.env.SERVER_MODULE); startServer(process.env.ROOT_DIR, Number(process.env.PORT));"',
+        command:
+          'node -e "const { startServer } = require(process.env.SERVER_MODULE); startServer(process.env.ROOT_DIR, Number(process.env.PORT));"',
         name: 'api',
         prefixColor: 'blue',
         env: { SERVER_MODULE: serverModulePath, ROOT_DIR: rootDir, PORT: String(port) }
@@ -82,7 +85,7 @@ module.exports = new Command('dashboard')
       { command: 'npm run dev', name: 'web', prefixColor: 'green', cwd: webDir }
     ]);
 
-    result.catch((err) => {
+    result.catch(err => {
       console.error('启动失败:', err);
       process.exit(1);
     });

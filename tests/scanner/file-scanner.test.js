@@ -148,21 +148,25 @@ describe('scanProject', () => {
       const result = scanProject(dir, 'react');
       const source = result.sourceFiles.find(file => file.path === 'src/App.jsx');
 
-      expect(source).toEqual(expect.objectContaining({
-        path: 'src/App.jsx',
-        language: 'javascript',
-        hashAlgorithm: 'sha256',
-        redactions: 1
-      }));
+      expect(source).toEqual(
+        expect.objectContaining({
+          path: 'src/App.jsx',
+          language: 'javascript',
+          hashAlgorithm: 'sha256',
+          redactions: 1
+        })
+      );
       expect(source.hash).toMatch(/^[a-f0-9]{64}$/);
       expect(source.content).toContain('export function boot()');
       expect(source.content).toContain('[FILTERED]');
       expect(source.content).not.toContain('top-secret-value');
-      expect(source.truncation).toEqual(expect.objectContaining({
-        truncated: false,
-        originalChars: source.content.length,
-        includedChars: source.content.length
-      }));
+      expect(source.truncation).toEqual(
+        expect.objectContaining({
+          truncated: false,
+          originalChars: source.content.length,
+          includedChars: source.content.length
+        })
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -177,11 +181,13 @@ describe('scanProject', () => {
       const source = result.sourceFiles.find(file => file.path === 'src/App.jsx');
 
       expect(source.content).toHaveLength(10);
-      expect(source.truncation).toEqual(expect.objectContaining({
-        truncated: true,
-        includedChars: 10,
-        reason: 'file-limit'
-      }));
+      expect(source.truncation).toEqual(
+        expect.objectContaining({
+          truncated: true,
+          includedChars: 10,
+          reason: 'file-limit'
+        })
+      );
       expect(source.truncation.originalChars).toBeGreaterThan(10);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -301,9 +307,9 @@ describe('scanProject', () => {
       const relativeFiles = result.keyFiles.map(file => path.relative(dir, file).replace(/\\/g, '/'));
 
       expect(relativeFiles).toEqual(expect.arrayContaining(['package.json', 'src/main.ts']));
-      expect(result.sourceFiles).toEqual(expect.arrayContaining([
-        expect.objectContaining({ path: 'src/main.ts', content: 'export const value = 1;' })
-      ]));
+      expect(result.sourceFiles).toEqual(
+        expect.arrayContaining([expect.objectContaining({ path: 'src/main.ts', content: 'export const value = 1;' })])
+      );
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -349,10 +355,12 @@ describe('adapter priorityKeywords', () => {
   const { defaultRegistry } = require('../../src/adapters');
 
   test('Java adapter prioritizes controller > service > entity', () => {
-    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/controller/UserController.java'))
-      .toBeLessThan(defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java'));
-    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java'))
-      .toBeLessThan(defaultRegistry.getFilePriority('java-backend', '/proj/src/entity/User.java'));
+    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/controller/UserController.java')).toBeLessThan(
+      defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java')
+    );
+    expect(defaultRegistry.getFilePriority('java-backend', '/proj/src/service/UserService.java')).toBeLessThan(
+      defaultRegistry.getFilePriority('java-backend', '/proj/src/entity/User.java')
+    );
   });
 
   test('Java adapter prioritizes application.yml above everything else', () => {
@@ -369,28 +377,33 @@ describe('adapter priorityKeywords', () => {
   });
 
   test('Go adapter prioritizes handler over service', () => {
-    expect(defaultRegistry.getFilePriority('go-backend', '/proj/handler/user.go'))
-      .toBeLessThan(defaultRegistry.getFilePriority('go-backend', '/proj/service/user.go'));
+    expect(defaultRegistry.getFilePriority('go-backend', '/proj/handler/user.go')).toBeLessThan(
+      defaultRegistry.getFilePriority('go-backend', '/proj/service/user.go')
+    );
   });
 
   test('Python adapter prioritizes urls.py over views.py', () => {
-    expect(defaultRegistry.getFilePriority('python-backend', '/proj/app/urls.py'))
-      .toBeLessThan(defaultRegistry.getFilePriority('python-backend', '/proj/app/views.py'));
+    expect(defaultRegistry.getFilePriority('python-backend', '/proj/app/urls.py')).toBeLessThan(
+      defaultRegistry.getFilePriority('python-backend', '/proj/app/views.py')
+    );
   });
 
   test('Node backend adapter prioritizes app.js over routes', () => {
-    expect(defaultRegistry.getFilePriority('node-backend', '/proj/app.js'))
-      .toBeLessThan(defaultRegistry.getFilePriority('node-backend', '/proj/routes/index.js'));
+    expect(defaultRegistry.getFilePriority('node-backend', '/proj/app.js')).toBeLessThan(
+      defaultRegistry.getFilePriority('node-backend', '/proj/routes/index.js')
+    );
   });
 
   test('React adapter prioritizes App.jsx over components', () => {
-    expect(defaultRegistry.getFilePriority('react', '/proj/src/app.jsx'))
-      .toBeLessThan(defaultRegistry.getFilePriority('react', '/proj/src/components/Button.jsx'));
+    expect(defaultRegistry.getFilePriority('react', '/proj/src/app.jsx')).toBeLessThan(
+      defaultRegistry.getFilePriority('react', '/proj/src/components/Button.jsx')
+    );
   });
 
   test('Vue3 admin adapter prioritizes main.js over api', () => {
-    expect(defaultRegistry.getFilePriority('vue3-admin', '/proj/src/main.js'))
-      .toBeLessThan(defaultRegistry.getFilePriority('vue3-admin', '/proj/src/api/user.js'));
+    expect(defaultRegistry.getFilePriority('vue3-admin', '/proj/src/main.js')).toBeLessThan(
+      defaultRegistry.getFilePriority('vue3-admin', '/proj/src/api/user.js')
+    );
   });
 
   test('Unknown project type returns default priority 100', () => {

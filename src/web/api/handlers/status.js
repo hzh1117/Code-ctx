@@ -60,7 +60,11 @@ module.exports = function register(router, rootDir) {
 
       if (doctorReport.issues.length > 0 || result.docQuality.overall === 'HIGH_RISK') {
         result.healthStatus = '异常';
-      } else if (doctorReport.warnings.length > 0 || result.documents.some(doc => doc.stale) || result.docQuality.overall === 'WARN') {
+      } else if (
+        doctorReport.warnings.length > 0 ||
+        result.documents.some(doc => doc.stale) ||
+        result.docQuality.overall === 'WARN'
+      ) {
         result.healthStatus = '警告';
       } else if (result.exists) {
         result.healthStatus = '正常';

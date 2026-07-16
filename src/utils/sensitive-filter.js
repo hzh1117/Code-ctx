@@ -14,7 +14,10 @@ const DEFAULT_PATTERNS = [
   { pattern: /Bearer\s+[A-Za-z0-9\-._~+/]{20,}/gi, replacement: 'Bearer [FILTERED]' },
   { pattern: /([?&](?:key|token|secret|api_key|access_token)=)([^&\s]{8,})/gi, replacement: '$1[FILTERED]' },
   { pattern: /(mongodb|mysql|postgres|redis):\/\/[^@]+@[^\s]+/gi, replacement: '$1://[FILTERED]' },
-  { pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1\s+PRIVATE\s+KEY-----/g, replacement: '[FILTERED SSH PRIVATE KEY]' }
+  {
+    pattern: /-----BEGIN\s+(RSA|EC|DSA|OPENSSH)\s+PRIVATE\s+KEY-----[\s\S]*?-----END\s+\1\s+PRIVATE\s+KEY-----/g,
+    replacement: '[FILTERED SSH PRIVATE KEY]'
+  }
 ];
 
 const DETECTION_PATTERNS = [
@@ -53,13 +56,14 @@ function filterSensitive(content, customPatterns = []) {
   let result = content;
   let count = 0;
   const pluginPatterns = pluginState.getState().sensitivePatterns;
-  const merged = (customPatterns.length === 0 && pluginPatterns.length === 0)
-    ? DEFAULT_PATTERNS_PRECOMPILED
-    : [
-        ...DEFAULT_PATTERNS_PRECOMPILED,
-        ...customPatterns.map(p => precompileCustom(p.pattern, p.replacement)),
-        ...pluginPatterns.map(p => precompileCustom(p.pattern, p.replacement))
-      ];
+  const merged =
+    customPatterns.length === 0 && pluginPatterns.length === 0
+      ? DEFAULT_PATTERNS_PRECOMPILED
+      : [
+          ...DEFAULT_PATTERNS_PRECOMPILED,
+          ...customPatterns.map(p => precompileCustom(p.pattern, p.replacement)),
+          ...pluginPatterns.map(p => precompileCustom(p.pattern, p.replacement))
+        ];
 
   for (const { pattern, replacement, globalRegex } of merged) {
     for (const _ of content.matchAll(globalRegex)) {
@@ -77,9 +81,8 @@ function scanDirectory(dir) {
 
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
   const pluginDetections = pluginState.getState().sensitiveDetectionPatterns;
-  const allDetections = pluginDetections.length === 0
-    ? DETECTION_PATTERNS
-    : [...DETECTION_PATTERNS, ...pluginDetections];
+  const allDetections =
+    pluginDetections.length === 0 ? DETECTION_PATTERNS : [...DETECTION_PATTERNS, ...pluginDetections];
 
   for (const file of files) {
     try {

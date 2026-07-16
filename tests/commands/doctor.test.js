@@ -38,8 +38,10 @@ describe('doctorCommand', () => {
   });
 
   test('should detect sensitive information', async () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n这是一个测试项目，包含前端和后端\n## 子项目列表\n- web: 前端项目\n- api: 后端项目\n## 技术栈\nReact + Node.js');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n这是一个测试项目，包含前端和后端\n## 子项目列表\n- web: 前端项目\n- api: 后端项目\n## 技术栈\nReact + Node.js'
+    );
     fs.writeFileSync(path.join(testDir, 'ai-docs/config.md'), 'password = "secret123"');
 
     const report = await doctorCommand(testDir);
@@ -51,13 +53,16 @@ describe('doctorCommand', () => {
     fs.mkdirSync(path.join(testDir, 'web'), { recursive: true });
     fs.writeFileSync(path.join(testDir, 'web/package.json'), '{"dependencies":{"react":"^18.0.0"}}');
 
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'),
-      `module.exports = { projects: [{ alias: 'web', path: './web', type: 'react', label: '前端' }] };`);
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = { projects: [{ alias: 'web', path: './web', type: 'react', label: '前端' }] };`
+    );
 
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n这是一个完整的测试项目，包含前端和后端\n## 子项目列表\n- web: 前端项目\n## 技术栈\nReact + Node.js + Express\n## 项目关系\n前端调用后端API');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'),
-      '# Web 前端项目\n## 目录结构\nsrc/\n## 核心模块\nApp.jsx');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n这是一个完整的测试项目，包含前端和后端\n## 子项目列表\n- web: 前端项目\n## 技术栈\nReact + Node.js + Express\n## 项目关系\n前端调用后端API'
+    );
+    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), '# Web 前端项目\n## 目录结构\nsrc/\n## 核心模块\nApp.jsx');
 
     const report = await doctorCommand(testDir);
     expect(report.issues.length).toBe(0);
@@ -79,8 +84,10 @@ describe('doctorCommand', () => {
 
   test('runDoctor silent mode caches result within TTL', async () => {
     _clearDoctorCache();
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact'
+    );
 
     // Identity check: cache hit returns the stored object reference, while
     // a fresh doctorCommand run would produce a new object each time.
@@ -92,8 +99,10 @@ describe('doctorCommand', () => {
 
   test('runDoctor silent cache invalidates when ai-docs mtime changes', async () => {
     _clearDoctorCache();
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试\n## 子项目列表\n- web\n## 技术栈\nReact'
+    );
 
     const a = await runDoctor({ rootDir: testDir, silent: true });
 
@@ -107,8 +116,10 @@ describe('doctorCommand', () => {
   });
 
   test('should return info object with projects', async () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n- web\n## 技术栈\nReact');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n- web\n## 技术栈\nReact'
+    );
 
     const report = await doctorCommand(testDir);
     expect(report.info).toBeDefined();
@@ -122,11 +133,12 @@ describe('doctorCommand', () => {
     fs.writeFileSync(path.join(testDir, 'web/package.json'), '{"dependencies":{"react":"^18.0.0"}}');
 
     // 配置中没有这个项目
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'),
-      `module.exports = { projects: [] };`);
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projects: [] };`);
 
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n## 技术栈\nReact');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n## 技术栈\nReact'
+    );
 
     const report = await doctorCommand(testDir);
     // 应该检测到未配置的项目
@@ -134,8 +146,10 @@ describe('doctorCommand', () => {
   });
 
   test('should accept strict option', async () => {
-    fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'),
-      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n## 技术栈\nReact');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/OVERVIEW.md'),
+      '# 项目总览\n## 项目概述\n测试项目\n## 子项目列表\n## 技术栈\nReact'
+    );
 
     const report = await doctorCommand(testDir, { strict: true });
     expect(report.info).toBeDefined();
@@ -168,8 +182,7 @@ describe('doctorFix', () => {
   });
 
   test('should report missing API key', async () => {
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'),
-      `module.exports = { projects: [] };`);
+    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = { projects: [] };`);
     // 创建 .env 文件，设置一个空的 API Key 以防止读取工具目录的 .env
     fs.writeFileSync(path.join(testDir, '.env'), 'OPENAI_API_KEY=\nANTHROPIC_API_KEY=\nANTHROPIC_AUTH_TOKEN=');
 

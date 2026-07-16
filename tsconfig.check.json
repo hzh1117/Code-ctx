@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "target": "ES2022",
+    "types": ["node"]
+  },
+  "include": [
+    "src/ai/errors.js",
+    "src/ai/presets.js",
+    "src/ai/privacy-gateway.js",
+    "src/config/setup-service.js",
+    "src/core/**/*.js",
+    "src/generator/one-shot-parser.js",
+    "src/init/progress-reporter.js",
+    "src/utils/constants.js",
+    "src/utils/file-reader.js",
+    "src/utils/git-utils.js",
+    "src/utils/mtime-utils.js",
+    "src/utils/prompt-output.js",
+    "src/utils/sensitive-filter.js",
+    "src/utils/token-estimator.js"
+  ],
+  "exclude": ["node_modules", "web"]
+}

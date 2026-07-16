@@ -19,13 +19,18 @@
             {{ qualityLabel(docQuality.overall) }}
           </span>
           <span class="quality-score">综合分 {{ docQuality.score }}</span>
-          <span class="quality-meta">完整度 {{ docQuality.summary?.completeness ?? 0 }} · 新鲜度 {{ docQuality.summary?.freshness ?? 0 }} · 风险 {{ docQuality.summary?.risk ?? 100 }}</span>
+          <span class="quality-meta"
+            >完整度 {{ docQuality.summary?.completeness ?? 0 }} · 新鲜度 {{ docQuality.summary?.freshness ?? 0 }} · 风险
+            {{ docQuality.summary?.risk ?? 100 }}</span
+          >
         </div>
         <ul v-if="docQualityIssues.length" class="quality-issue-list">
           <li v-for="(d, idx) in docQualityIssues" :key="idx">
             <strong>{{ d.name }}</strong>
             <span :class="['quality-tag', qualityClass(d.level)]">{{ d.level }}</span>
-            <span v-if="d.completeness?.missing?.length" class="quality-detail">缺失：{{ d.completeness.missing.join(', ') }}</span>
+            <span v-if="d.completeness?.missing?.length" class="quality-detail"
+              >缺失：{{ d.completeness.missing.join(', ') }}</span
+            >
             <span v-for="r in d.risks || []" :key="r.type" class="quality-detail">{{ r.message }}</span>
           </li>
         </ul>
@@ -72,9 +77,7 @@
           <span class="term-prompt">$</span>
           <span class="term-cmd">code-ctx init</span>
         </div>
-        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted);">
-          运行以上命令生成文档
-        </div>
+        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted)">运行以上命令生成文档</div>
         <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
       </div>
     </div>
@@ -161,7 +164,9 @@ export default {
     },
     showToast(message, type = 'success') {
       this.toast = { show: true, message, type };
-      setTimeout(() => { this.toast.show = false; }, 3000);
+      setTimeout(() => {
+        this.toast.show = false;
+      }, 3000);
     },
     formatSize(bytes) {
       if (!bytes) return '0 B';
@@ -171,7 +176,12 @@ export default {
     },
     formatDate(dateStr) {
       if (!dateStr) return '-';
-      return new Date(dateStr).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return new Date(dateStr).toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     },
     healthClass(doc) {
       if (!doc.exists) return 'health-missing';

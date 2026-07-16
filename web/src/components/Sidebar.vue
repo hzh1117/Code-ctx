@@ -4,7 +4,12 @@
       <div class="logo-mark">
         <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
           <rect x="1" y="1" width="26" height="26" rx="4" stroke="var(--accent)" stroke-width="1.5" fill="none" />
-          <path d="M7 10L14 7L21 10V18L14 21L7 18V10Z" stroke="var(--accent)" stroke-width="1.2" fill="var(--accent-dim)" />
+          <path
+            d="M7 10L14 7L21 10V18L14 21L7 18V10Z"
+            stroke="var(--accent)"
+            stroke-width="1.2"
+            fill="var(--accent-dim)"
+          />
           <circle cx="14" cy="14" r="2.5" fill="var(--accent)" />
         </svg>
       </div>
@@ -32,19 +37,27 @@
     <div class="sidebar-footer">
       <div class="theme-row">
         <button class="theme-btn" @click="toggle" :title="theme === 'dark' ? '切换浅色' : '切换深色'">
-          <svg v-if="theme === 'dark'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          <svg
+            v-if="theme === 'dark'"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
           </svg>
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
           <span class="theme-label">{{ theme === 'dark' ? '浅色模式' : '深色模式' }}</span>
         </button>
@@ -136,7 +149,9 @@ export default {
   height: 100vh;
   overflow: hidden;
   border-right: 1px solid var(--border);
-  transition: background-color 120ms, border-color 120ms;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
 }
 
 .sidebar-logo {
@@ -197,7 +212,9 @@ export default {
   text-decoration: none;
   font-size: 13px;
   font-weight: 400;
-  transition: background 80ms, color 80ms;
+  transition:
+    background 80ms,
+    color 80ms;
   position: relative;
   user-select: none;
 }
@@ -267,7 +284,9 @@ export default {
   cursor: pointer;
   font-size: 11px;
   font-family: var(--font-sans);
-  transition: border-color 80ms, color 80ms;
+  transition:
+    border-color 80ms,
+    color 80ms;
 }
 
 .theme-btn:hover {
@@ -294,8 +313,15 @@ export default {
 }
 
 @keyframes statusPulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--success-dim); }
-  50% { opacity: 0.7; box-shadow: 0 0 0 3px transparent; }
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--success-dim);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 3px transparent;
+  }
 }
 
 .status-text {

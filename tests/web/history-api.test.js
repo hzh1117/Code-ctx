@@ -18,18 +18,21 @@ describe('history web API', () => {
     _resetPluginState();
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'history-api-'));
     fs.mkdirSync(path.join(testDir, 'ai-docs'));
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-      projectName: 'history-test',
-      outputDir: 'ai-docs',
-      projects: []
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projectName: 'history-test',
+        outputDir: 'ai-docs',
+        projects: []
+      })
+    );
     await new Promise(resolve => {
       const app = createServer(testDir);
       server = app.listen(0, '127.0.0.1', resolve);
     });
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(() => {
       _clearCache();
       _resetPluginState();

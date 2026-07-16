@@ -81,9 +81,17 @@ function rewriteWithLatest(historyPath, lines, keep) {
 // dropped so callers can't accidentally leak unrelated state into the
 // history file.
 const ALLOWED_FIELDS = new Set([
-  'task', 'scenario', 'scenarioName', 'projects', 'relatedProjects',
-  'matchMethod', 'confidence', 'promptPath', 'changedFiles',
-  'detectionMethod', 'source'
+  'task',
+  'scenario',
+  'scenarioName',
+  'projects',
+  'relatedProjects',
+  'matchMethod',
+  'confidence',
+  'promptPath',
+  'changedFiles',
+  'detectionMethod',
+  'source'
 ]);
 
 function sanitizeEntry(taskData) {
@@ -170,8 +178,22 @@ function findEntryById(rootDir, id) {
 
 function summarizeEntryDiff(entryA, entryB) {
   return {
-    a: entryA && { id: entryA.id, timestamp: entryA.timestamp, scenario: entryA.scenario, promptHash: entryA.promptHash, promptLength: entryA.promptLength, promptPreview: entryA.promptPreview },
-    b: entryB && { id: entryB.id, timestamp: entryB.timestamp, scenario: entryB.scenario, promptHash: entryB.promptHash, promptLength: entryB.promptLength, promptPreview: entryB.promptPreview },
+    a: entryA && {
+      id: entryA.id,
+      timestamp: entryA.timestamp,
+      scenario: entryA.scenario,
+      promptHash: entryA.promptHash,
+      promptLength: entryA.promptLength,
+      promptPreview: entryA.promptPreview
+    },
+    b: entryB && {
+      id: entryB.id,
+      timestamp: entryB.timestamp,
+      scenario: entryB.scenario,
+      promptHash: entryB.promptHash,
+      promptLength: entryB.promptLength,
+      promptPreview: entryB.promptPreview
+    },
     scenarioChanged: entryA?.scenario !== entryB?.scenario,
     promptHashChanged: entryA?.promptHash !== entryB?.promptHash,
     lengthDelta: (entryB?.promptLength || 0) - (entryA?.promptLength || 0)

@@ -2,7 +2,9 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class JavaBackendAdapter extends BaseAdapter {
-  get type() { return 'java-backend'; }
+  get type() {
+    return 'java-backend';
+  }
 
   detect(pkg, files) {
     return files.includes('pom.xml') || files.includes('build.gradle');
@@ -24,16 +26,16 @@ class JavaBackendAdapter extends BaseAdapter {
       'application.properties': 1,
       'pom.xml': 2,
       'build.gradle': 2,
-      'controller': 3,
-      'service': 4,
-      'entity': 5,
-      'model': 5,
-      'dto': 6,
-      'vo': 6,
-      'repository': 7,
-      'mapper': 7,
-      'config': 8,
-      'util': 9
+      controller: 3,
+      service: 4,
+      entity: 5,
+      model: 5,
+      dto: 6,
+      vo: 6,
+      repository: 7,
+      mapper: 7,
+      config: 8,
+      util: 9
     };
   }
 

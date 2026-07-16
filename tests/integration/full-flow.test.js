@@ -6,12 +6,15 @@ const path = require('path');
 
 describe('Full Flow Integration', () => {
   const testDir = path.join(__dirname, '../fixtures/integration-test');
-  
+
   beforeAll(async () => {
     fs.mkdirSync(testDir, { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'package.json'), JSON.stringify({
-      dependencies: { vue: '^2.0.0', 'element-ui': '^2.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { vue: '^2.0.0', 'element-ui': '^2.0.0' }
+      })
+    );
   });
 
   afterAll(() => {
@@ -28,7 +31,7 @@ describe('Full Flow Integration', () => {
     expect(initResult.status).toBe('offline-completed');
     expect(fs.existsSync(path.join(testDir, 'ai-docs', 'OVERVIEW.md'))).toBe(true);
     expect(fs.existsSync(path.join(testDir, 'ai-docs', 'project-manifest.json'))).toBe(true);
-    
+
     // 2. Use
     const result = await useCommand({
       scenario: 'B',
@@ -38,7 +41,7 @@ describe('Full Flow Integration', () => {
     expect(result.prompt).toContain('用户管理');
     expect(result.prompt).toContain('deterministic repository scanning');
     expect(typeof result.prompt).toBe('string');
-    
+
     // 3. Doctor
     const report = await doctorCommand(testDir);
     expect(report).toBeDefined();
@@ -53,16 +56,22 @@ describe('Full Flow Integration', () => {
     }
     fs.mkdirSync(path.join(multiDir, 'frontend'), { recursive: true });
     fs.mkdirSync(path.join(multiDir, 'backend'), { recursive: true });
-    fs.writeFileSync(path.join(multiDir, 'frontend', 'package.json'), JSON.stringify({
-      dependencies: { react: '^18.0.0' }
-    }));
-    fs.writeFileSync(path.join(multiDir, 'backend', 'package.json'), JSON.stringify({
-      dependencies: { express: '^4.0.0' }
-    }));
+    fs.writeFileSync(
+      path.join(multiDir, 'frontend', 'package.json'),
+      JSON.stringify({
+        dependencies: { react: '^18.0.0' }
+      })
+    );
+    fs.writeFileSync(
+      path.join(multiDir, 'backend', 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^4.0.0' }
+      })
+    );
 
     const result = await initCommand(multiDir, { skipPrompt: true, skipAi: true });
     expect(result.projects.length).toBeGreaterThanOrEqual(1);
-    
+
     fs.rmSync(multiDir, { recursive: true, force: true });
   });
 
@@ -76,7 +85,7 @@ describe('Full Flow Integration', () => {
 
     const report = await doctorCommand(emptyDir);
     expect(report.issues.some(i => i.message.includes('ai-docs'))).toBe(true);
-    
+
     fs.rmSync(emptyDir, { recursive: true, force: true });
   });
 });

@@ -1,16 +1,16 @@
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue';
 
-const STORAGE_KEY = 'codectx-theme'
-const theme = ref(localStorage.getItem(STORAGE_KEY) || 'dark')
+const STORAGE_KEY = 'codectx-theme';
+const theme = ref(localStorage.getItem(STORAGE_KEY) || 'dark');
 
 watchEffect(() => {
-  document.documentElement.setAttribute('data-theme', theme.value)
-  localStorage.setItem(STORAGE_KEY, theme.value)
-})
+  document.documentElement.setAttribute('data-theme', theme.value);
+  localStorage.setItem(STORAGE_KEY, theme.value);
+});
 
 export function useTheme() {
   const toggle = () => {
-    theme.value = theme.value === 'dark' ? 'light' : 'dark'
-  }
-  return { theme, toggle }
+    theme.value = theme.value === 'dark' ? 'light' : 'dark';
+  };
+  return { theme, toggle };
 }

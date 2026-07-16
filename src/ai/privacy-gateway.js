@@ -31,6 +31,7 @@ function redactContent(content) {
 
   if (!Array.isArray(content)) return { content, fields: [] };
 
+  /** @type {Map<string, number>} */
   const fields = new Map();
   const safeBlocks = content.map(block => {
     if (!block || typeof block !== 'object' || typeof block.text !== 'string') return block;

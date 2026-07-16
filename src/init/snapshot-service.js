@@ -17,10 +17,7 @@ function createFileStateStore(fileSystem = fs, pathImpl = path) {
       }
     },
     save(outputDir, state) {
-      fileSystem.writeFileSync(
-        pathImpl.join(outputDir, STATE_FILES.INIT_STATE),
-        JSON.stringify(state, null, 2)
-      );
+      fileSystem.writeFileSync(pathImpl.join(outputDir, STATE_FILES.INIT_STATE), JSON.stringify(state, null, 2));
     }
   };
 }
@@ -45,9 +42,7 @@ function createSnapshotService(dependencies = {}) {
         logger.verbose('目录已存在:', outputDir);
       }
 
-      const limits = options.unlimited
-        ? { maxFiles: Infinity, maxTokens: Infinity }
-        : getLimits(rootDir);
+      const limits = options.unlimited ? { maxFiles: Infinity, maxTokens: Infinity } : getLimits(rootDir);
       logger.verbose('项目限制:', limits);
 
       const state = stateStore.load(outputDir);

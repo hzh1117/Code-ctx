@@ -1,4 +1,9 @@
-const { VALID_SCENARIO_ID_PATTERN, deriveOverall, buildDocumentsList, getLatestMtime } = require('../../src/web/api/helpers');
+const {
+  VALID_SCENARIO_ID_PATTERN,
+  deriveOverall,
+  buildDocumentsList,
+  getLatestMtime
+} = require('../../src/web/api/helpers');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');

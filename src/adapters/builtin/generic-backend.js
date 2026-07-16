@@ -1,15 +1,23 @@
 const { BaseAdapter } = require('../base');
 
 class GenericBackendAdapter extends BaseAdapter {
-  get type() { return 'generic-backend'; }
+  get type() {
+    return 'generic-backend';
+  }
 
-  get detectionPriority() { return 800; }
+  get detectionPriority() {
+    return 800;
+  }
 
   detect(pkg, files) {
     const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
     return !!(
-      deps['@apollo/server'] || deps['apollo-server'] || deps['graphql-yoga'] ||
-      deps['socket.io'] || files.includes('server.js') || files.includes('server.ts')
+      deps['@apollo/server'] ||
+      deps['apollo-server'] ||
+      deps['graphql-yoga'] ||
+      deps['socket.io'] ||
+      files.includes('server.js') ||
+      files.includes('server.ts')
     );
   }
 

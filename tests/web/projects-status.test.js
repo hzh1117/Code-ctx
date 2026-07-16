@@ -7,49 +7,68 @@ describe('web project/status api', () => {
   const testDir = path.join(__dirname, '../fixtures/web-api-project-status');
   let server;
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
     }
     fs.mkdirSync(path.join(testDir, 'ai-docs'), { recursive: true });
     fs.mkdirSync(path.join(testDir, 'web'), { recursive: true });
-    fs.writeFileSync(path.join(testDir, 'code-ctx.config.js'), `module.exports = {
+    fs.writeFileSync(
+      path.join(testDir, 'code-ctx.config.js'),
+      `module.exports = {
   projects: [
     { alias: 'web', path: './web', type: 'vue3-admin', label: '管理端' },
     { alias: 'api', path: './api', type: 'node-backend', label: '接口' }
   ]
-};\n`);
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.init-state.json'), JSON.stringify({
-      projects: {
-        web: { status: 'done' },
-        api: { status: 'failed' }
-      }
-    }, null, 2));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/web.md'), [
-      '# web',
-      '<!-- section:overview -->',
-      '项目概述',
-      '<!-- /section:overview -->',
-      '<!-- section:modules -->',
-      '核心模块',
-      '<!-- /section:modules -->'
-    ].join('\n'));
+};\n`
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.init-state.json'),
+      JSON.stringify(
+        {
+          projects: {
+            web: { status: 'done' },
+            api: { status: 'failed' }
+          }
+        },
+        null,
+        2
+      )
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/web.md'),
+      [
+        '# web',
+        '<!-- section:overview -->',
+        '项目概述',
+        '<!-- /section:overview -->',
+        '<!-- section:modules -->',
+        '核心模块',
+        '<!-- /section:modules -->'
+      ].join('\n')
+    );
     fs.writeFileSync(path.join(testDir, 'ai-docs/OVERVIEW.md'), '# Overview');
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.last-scan.json'), JSON.stringify({
-      timestamp: '2026-05-14T08:00:00.000Z',
-      files: {}
-    }));
-    fs.writeFileSync(path.join(testDir, 'ai-docs/.task-history.jsonl'), [
-      JSON.stringify({ timestamp: '2026-05-14T07:00:00.000Z', task: 'one' }),
-      JSON.stringify({ timestamp: '2026-05-14T07:30:00.000Z', task: 'two' })
-    ].join('\n') + '\n');
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.last-scan.json'),
+      JSON.stringify({
+        timestamp: '2026-05-14T08:00:00.000Z',
+        files: {}
+      })
+    );
+    fs.writeFileSync(
+      path.join(testDir, 'ai-docs/.task-history.jsonl'),
+      [
+        JSON.stringify({ timestamp: '2026-05-14T07:00:00.000Z', task: 'one' }),
+        JSON.stringify({ timestamp: '2026-05-14T07:30:00.000Z', task: 'two' })
+      ].join('\n') + '\n'
+    );
 
     const app = createServer(testDir);
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(done);
     if (fs.existsSync(testDir)) {
       fs.rmSync(testDir, { recursive: true, force: true });
@@ -87,23 +106,27 @@ describe('web project/status api', () => {
 
     expect(res.status).toBe(200);
     const webDoc = res.body.documents.find(doc => doc.name === 'web.md');
-    expect(webDoc).toEqual(expect.objectContaining({
-      name: 'web.md',
-      exists: true,
-      sections: ['overview', 'modules']
-    }));
+    expect(webDoc).toEqual(
+      expect.objectContaining({
+        name: 'web.md',
+        exists: true,
+        sections: ['overview', 'modules']
+      })
+    );
   });
 
   test('GET /api/status returns dashboard summary fields', async () => {
     const res = await requestJson(server, '/api/status');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(expect.objectContaining({
-      docCount: 2,
-      lastScanTime: '2026-05-14T08:00:00.000Z',
-      historyCount: 2,
-      healthStatus: expect.any(String)
-    }));
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        docCount: 2,
+        lastScanTime: '2026-05-14T08:00:00.000Z',
+        historyCount: 2,
+        healthStatus: expect.any(String)
+      })
+    );
     expect(res.body.recentHistory).toEqual([
       expect.objectContaining({ task: 'two' }),
       expect.objectContaining({ task: 'one' })
@@ -117,32 +140,28 @@ describe('web project/status api', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.healthStatus).toBe('异常');
-    expect(res.body.doctor).toEqual(expect.objectContaining({
-      issueCount: expect.any(Number),
-      warningCount: expect.any(Number)
-    }));
+    expect(res.body.doctor).toEqual(
+      expect.objectContaining({
+        issueCount: expect.any(Number),
+        warningCount: expect.any(Number)
+      })
+    );
     expect(res.body.doctor.issueCount).toBeGreaterThan(0);
   });
 
   test('GET /api/status refreshes sections after a doc mtime change', async () => {
     // First call populates the sections cache for web.md.
     const first = await requestJson(server, '/api/status');
-    expect(first.body.documents.find(d => d.name === 'web.md').sections)
-      .toEqual(['overview', 'modules']);
+    expect(first.body.documents.find(d => d.name === 'web.md').sections).toEqual(['overview', 'modules']);
 
     // Replace web.md with a single-section doc and bump mtime so the
     // cache entry is invalidated on the next request.
     const webPath = path.join(testDir, 'ai-docs/web.md');
-    fs.writeFileSync(webPath, [
-      '<!-- section:overview -->',
-      'just overview',
-      '<!-- /section:overview -->'
-    ].join('\n'));
+    fs.writeFileSync(webPath, ['<!-- section:overview -->', 'just overview', '<!-- /section:overview -->'].join('\n'));
     const future = new Date(Date.now() + 5000);
     fs.utimesSync(webPath, future, future);
 
     const second = await requestJson(server, '/api/status');
-    expect(second.body.documents.find(d => d.name === 'web.md').sections)
-      .toEqual(['overview']);
+    expect(second.body.documents.find(d => d.name === 'web.md').sections).toEqual(['overview']);
   });
 });

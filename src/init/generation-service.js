@@ -3,15 +3,8 @@ const path = require('path');
 const { getAIConfig } = require('../utils/config');
 const { generateWithContinuation } = require('../ai/client');
 const { isAICancellationError } = require('../ai/errors');
-const {
-  buildInitPrompt,
-  buildApiPrompt,
-  buildDatabasePrompt
-} = require('../generator/prompt-builder');
-const {
-  generateDeterministicDocs,
-  writeProjectManifest
-} = require('../generator/deterministic-docs');
+const { buildInitPrompt, buildApiPrompt, buildDatabasePrompt } = require('../generator/prompt-builder');
+const { generateDeterministicDocs, writeProjectManifest } = require('../generator/deterministic-docs');
 const { parseOneShotDocuments } = require('../generator/one-shot-parser');
 const { createProgressReporter } = require('./progress-reporter');
 
@@ -21,13 +14,16 @@ async function asyncPool(poolSize, items, fn) {
   const results = [];
   const executing = new Set();
   for (const item of items) {
-    const promise = fn(item).then(value => {
-      executing.delete(promise);
-      return value;
-    }, error => {
-      executing.delete(promise);
-      throw error;
-    });
+    const promise = fn(item).then(
+      value => {
+        executing.delete(promise);
+        return value;
+      },
+      error => {
+        executing.delete(promise);
+        throw error;
+      }
+    );
     promise.catch(() => {});
     executing.add(promise);
     results.push(promise);
@@ -76,23 +72,27 @@ function createGenerationService(dependencies = {}) {
   async function completeMissingSections(doc, expected, aiConfig, alias) {
     const missing = expected.filter(section => !validator.listSections(doc).includes(section));
     if (missing.length === 0) return doc;
-    const completion = await generateDocument([
-      `以上文档缺少以下章节，请补充完整：${missing.join(', ')}`,
-      '',
-      '要求：',
-      '- 只输出缺失章节内容',
-      '- 每个章节必须使用对应的 HTML section 标记包裹',
-      '- 不要重复已经存在的章节',
-      '',
-      '原文档：',
-      doc
-    ].join('\n'), aiConfig, alias);
+    const completion = await generateDocument(
+      [
+        `以上文档缺少以下章节，请补充完整：${missing.join(', ')}`,
+        '',
+        '要求：',
+        '- 只输出缺失章节内容',
+        '- 每个章节必须使用对应的 HTML section 标记包裹',
+        '- 不要重复已经存在的章节',
+        '',
+        '原文档：',
+        doc
+      ].join('\n'),
+      aiConfig,
+      alias
+    );
     return `${doc.trim()}\n\n${validator.sanitize(completion).trim()}\n`;
   }
 
   function pendingProjects(ctx) {
-    return ctx.projects.filter(project =>
-      !(ctx.state.projects[project.alias]?.status === 'completed' && !ctx.options.force)
+    return ctx.projects.filter(
+      project => !(ctx.state.projects[project.alias]?.status === 'completed' && !ctx.options.force)
     );
   }
 
@@ -114,16 +114,14 @@ function createGenerationService(dependencies = {}) {
   }
 
   function throwIfCancelled(settled) {
-    const cancellation = settled.find(result =>
-      result.status === 'rejected' && isAICancellationError(result.reason)
-    );
+    const cancellation = settled.find(result => result.status === 'rejected' && isAICancellationError(result.reason));
     if (cancellation) throw cancellation.reason;
   }
 
   async function generateTypeSpecific(ctx) {
     logger.log(`生成 ${ctx.options.docType.toUpperCase()} 文档...`);
-    const projects = pendingProjects(ctx).filter(project =>
-      project.type.includes('backend') || project.type.includes('java')
+    const projects = pendingProjects(ctx).filter(
+      project => project.type.includes('backend') || project.type.includes('java')
     );
     if (projects.length === 0) {
       logger.log(`没有适合生成 ${ctx.options.docType} 文档的项目`);
@@ -135,9 +133,10 @@ function createGenerationService(dependencies = {}) {
       try {
         const docType = ctx.options.docType;
         const template = docType === 'api' ? 'java-api-prompt.md' : 'java-database-prompt.md';
-        const prompt = docType === 'api'
-          ? buildApi({ project, scanResult: ctx.scanResults[project.alias] })
-          : buildDatabase({ project, scanResult: ctx.scanResults[project.alias] });
+        const prompt =
+          docType === 'api'
+            ? buildApi({ project, scanResult: ctx.scanResults[project.alias] })
+            : buildDatabase({ project, scanResult: ctx.scanResults[project.alias] });
         const startedAt = clock.now();
         const raw = await generateDocument(prompt, ctx.aiConfig, `${project.alias}-${docType}`);
         const doc = await completeMissingSections(
@@ -192,15 +191,8 @@ function createGenerationService(dependencies = {}) {
       }
       try {
         let doc = parsed.documents.get(project.alias);
-        doc = await completeMissingSections(
-          doc,
-          ctx.projectExpectedSections,
-          ctx.aiConfig,
-          project.alias
-        );
-        const missing = ctx.projectExpectedSections.filter(section =>
-          !validator.listSections(doc).includes(section)
-        );
+        doc = await completeMissingSections(doc, ctx.projectExpectedSections, ctx.aiConfig, project.alias);
+        const missing = ctx.projectExpectedSections.filter(section => !validator.listSections(doc).includes(section));
         if (missing.length > 0) throw new Error(`文档缺少 section: ${missing.join(', ')}`);
         fileSystem.writeFileSync(pathImpl.join(ctx.outputDir, `${project.alias}.md`), doc);
         ctx.generatedDocs[project.alias] = doc;
@@ -270,12 +262,16 @@ function createGenerationService(dependencies = {}) {
     const successCount = Object.keys(ctx.generatedDocs).length;
     if (successCount === 0) return;
     logger.log('\n生成 OVERVIEW.md...');
-    const raw = await generateDocument(buildPrompt({
-      type: 'overview',
-      config: ctx.config,
-      generatedDocs: ctx.generatedDocs,
-      scanResults: ctx.scanResults
-    }), ctx.aiConfig, 'OVERVIEW');
+    const raw = await generateDocument(
+      buildPrompt({
+        type: 'overview',
+        config: ctx.config,
+        generatedDocs: ctx.generatedDocs,
+        scanResults: ctx.scanResults
+      }),
+      ctx.aiConfig,
+      'OVERVIEW'
+    );
     const overview = await completeMissingSections(
       validator.sanitize(raw),
       validator.expectedSections('scan-prompt-overview.md'),
@@ -299,12 +295,7 @@ function createGenerationService(dependencies = {}) {
         return { generatedDocs: {}, failedDocs: [], status: 'scanned', success: true };
       }
       if (ctx.options.skipAi) {
-        const deterministic = deterministicDocs(
-          ctx.rootDir,
-          ctx.projects,
-          ctx.scanResults,
-          ctx.outputDir
-        );
+        const deterministic = deterministicDocs(ctx.rootDir, ctx.projects, ctx.scanResults, ctx.outputDir);
         ctx.projects.forEach(project => {
           ctx.state.projects[project.alias] = { status: 'completed', mode: 'deterministic' };
         });
@@ -387,7 +378,7 @@ function createGenerationService(dependencies = {}) {
       return {
         generatedDocs: ctx.generatedDocs,
         failedDocs: ctx.failedDocs,
-        status: success ? 'completed' : (generatedCount > 0 ? 'partial' : 'failed'),
+        status: success ? 'completed' : generatedCount > 0 ? 'partial' : 'failed',
         success
       };
     }

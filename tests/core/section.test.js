@@ -26,38 +26,22 @@ describe('extractSection', () => {
   });
 
   test('handles section name with hyphens', () => {
-    const content = [
-      '<!-- section:api-v2 -->',
-      'API v2 内容',
-      '<!-- /section:api-v2 -->'
-    ].join('\n');
+    const content = ['<!-- section:api-v2 -->', 'API v2 内容', '<!-- /section:api-v2 -->'].join('\n');
     expect(extractSection(content, 'api-v2')).toBe('API v2 内容');
   });
 
   test('handles section name with dots', () => {
-    const content = [
-      '<!-- section:v1.0-notes -->',
-      '版本说明',
-      '<!-- /section:v1.0-notes -->'
-    ].join('\n');
+    const content = ['<!-- section:v1.0-notes -->', '版本说明', '<!-- /section:v1.0-notes -->'].join('\n');
     expect(extractSection(content, 'v1.0-notes')).toBe('版本说明');
   });
 
   test('handles section name with regex special characters', () => {
-    const content = [
-      '<!-- section:api(legacy) -->',
-      '旧版 API',
-      '<!-- /section:api(legacy) -->'
-    ].join('\n');
+    const content = ['<!-- section:api(legacy) -->', '旧版 API', '<!-- /section:api(legacy) -->'].join('\n');
     expect(extractSection(content, 'api(legacy)')).toBe('旧版 API');
   });
 
   test('handles section name with plus and asterisk', () => {
-    const content = [
-      '<!-- section:c++ -->',
-      'C++ 内容',
-      '<!-- /section:c++ -->'
-    ].join('\n');
+    const content = ['<!-- section:c++ -->', 'C++ 内容', '<!-- /section:c++ -->'].join('\n');
     expect(extractSection(content, 'c++')).toBe('C++ 内容');
   });
 
@@ -82,20 +66,12 @@ describe('extractSection', () => {
   });
 
   test('handles markers with extra whitespace', () => {
-    const content = [
-      '<!--  section:spaced  -->',
-      '内容',
-      '<!--  /section:spaced  -->'
-    ].join('\n');
+    const content = ['<!--  section:spaced  -->', '内容', '<!--  /section:spaced  -->'].join('\n');
     expect(extractSection(content, 'spaced')).toBe('内容');
   });
 
   test('does not match partial section names', () => {
-    const content = [
-      '<!-- section:overview -->',
-      '概述',
-      '<!-- /section:overview -->'
-    ].join('\n');
+    const content = ['<!-- section:overview -->', '概述', '<!-- /section:overview -->'].join('\n');
     expect(extractSection(content, 'over')).toBeNull();
   });
 });
@@ -114,14 +90,7 @@ describe('replaceSection', () => {
   });
 
   test('preserves content outside the replaced section', () => {
-    const content = [
-      '# 标题',
-      '前言',
-      '<!-- section:s -->',
-      '旧内容',
-      '<!-- /section:s -->',
-      '尾部'
-    ].join('\n');
+    const content = ['# 标题', '前言', '<!-- section:s -->', '旧内容', '<!-- /section:s -->', '尾部'].join('\n');
 
     const result = replaceSection(content, 's', '新内容');
     expect(result).toContain('# 标题');
@@ -170,8 +139,12 @@ describe('replaceSection', () => {
 describe('listSections', () => {
   test('lists all section names', () => {
     const content = [
-      '<!-- section:overview -->', '...', '<!-- /section:overview -->',
-      '<!-- section:modules -->', '...', '<!-- /section:modules -->'
+      '<!-- section:overview -->',
+      '...',
+      '<!-- /section:overview -->',
+      '<!-- section:modules -->',
+      '...',
+      '<!-- /section:modules -->'
     ].join('\n');
     expect(listSections(content)).toEqual(['overview', 'modules']);
   });
@@ -186,8 +159,12 @@ describe('listSections', () => {
 
   test('deduplicates section names', () => {
     const content = [
-      '<!-- section:note -->', '...', '<!-- /section:note -->',
-      '<!-- section:note -->', '...', '<!-- /section:note -->'
+      '<!-- section:note -->',
+      '...',
+      '<!-- /section:note -->',
+      '<!-- section:note -->',
+      '...',
+      '<!-- /section:note -->'
     ].join('\n');
     expect(listSections(content)).toEqual(['note']);
   });
@@ -204,8 +181,12 @@ describe('listSections', () => {
 
   test('handles section names with special characters', () => {
     const content = [
-      '<!-- section:api-v2 -->', '...', '<!-- /section:api-v2 -->',
-      '<!-- section:c++ -->', '...', '<!-- /section:c++ -->'
+      '<!-- section:api-v2 -->',
+      '...',
+      '<!-- /section:api-v2 -->',
+      '<!-- section:c++ -->',
+      '...',
+      '<!-- /section:c++ -->'
     ].join('\n');
     expect(listSections(content)).toEqual(['api-v2', 'c++']);
   });

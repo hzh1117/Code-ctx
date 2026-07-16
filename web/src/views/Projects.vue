@@ -37,9 +37,7 @@
           <span class="term-prompt">$</span>
           <span class="term-cmd">code-ctx init</span>
         </div>
-        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted);">
-          运行以上命令初始化项目结构
-        </div>
+        <div class="term-line" style="padding-left: 2rem; color: var(--text-muted)">运行以上命令初始化项目结构</div>
         <div class="term-border-bottom">└──────────────────────────────────────────┘</div>
       </div>
     </div>

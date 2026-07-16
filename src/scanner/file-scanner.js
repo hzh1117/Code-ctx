@@ -42,8 +42,14 @@ const LANGUAGE_BY_EXTENSION = {
 };
 
 const PROJECT_MANIFEST_PATTERNS = [
-  'package.json', 'pom.xml', 'build.gradle', 'settings.gradle',
-  'go.mod', 'Cargo.toml', 'pyproject.toml', 'requirements*.txt'
+  'package.json',
+  'pom.xml',
+  'build.gradle',
+  'settings.gradle',
+  'go.mod',
+  'Cargo.toml',
+  'pyproject.toml',
+  'requirements*.txt'
 ];
 
 function scanProject(projectDir, projectType, options = {}) {
@@ -55,16 +61,16 @@ function scanProject(projectDir, projectType, options = {}) {
   const maxTokens = options.maxTokens || PROJECT_LIMITS.MAX_PROJECT_TOKENS;
   const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
-  
+
   const registry = options.registry || defaultRegistry;
-  const ignoreEngine = options.ignoreEngine || createIgnoreEngine(projectDir, {
-    excludeDirs: options.excludeDirs
-  });
+  const ignoreEngine =
+    options.ignoreEngine ||
+    createIgnoreEngine(projectDir, {
+      excludeDirs: options.excludeDirs
+    });
   const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
   const adapterPatterns = configuredPatterns || registry.getScanPatterns(projectType);
-  const patterns = adapterPatterns.length > 0
-    ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
-    : [];
+  const patterns = adapterPatterns.length > 0 ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS] : [];
   const keyFiles = [];
   const tree = buildTree(projectDir, '', 0, 5, ignoreEngine);
 
@@ -77,10 +83,11 @@ function scanProject(projectDir, projectType, options = {}) {
     keyFiles.push(...ignoreEngine.filter(matches));
   }
 
-  keyFiles.push(...registry.extractKeyFiles(projectType, projectDir)
-    .filter(filePath =>
-      fs.existsSync(filePath) && fs.statSync(filePath).isFile() && !ignoreEngine.ignores(filePath)
-    ));
+  keyFiles.push(
+    ...registry
+      .extractKeyFiles(projectType, projectDir)
+      .filter(filePath => fs.existsSync(filePath) && fs.statSync(filePath).isFile() && !ignoreEngine.ignores(filePath))
+  );
 
   const uniqueFiles = [...new Set(keyFiles)];
 
@@ -89,12 +96,7 @@ function scanProject(projectDir, projectType, options = {}) {
 
   // 限制 token 数量
   const result = limitByTokens(limitedFiles, maxTokens);
-  const sourceFiles = buildSourceSnapshots(
-    result.files,
-    projectDir,
-    maxSourceChars,
-    maxSourceFileChars
-  );
+  const sourceFiles = buildSourceSnapshots(result.files, projectDir, maxSourceChars, maxSourceFileChars);
 
   return {
     tree,
@@ -118,42 +120,43 @@ function detectLanguage(filePath) {
 function buildSourceSnapshots(files, projectDir, maxTotalChars, maxFileChars) {
   let remainingChars = Math.max(0, maxTotalChars);
 
-  return files.map(filePath => {
-    let content = '';
-    try {
-      content = fs.readFileSync(filePath, 'utf8');
-    } catch {
-      return null;
-    }
-
-    const safe = filterSensitive(content);
-    const originalChars = safe.content.length;
-    const includedChars = Math.min(originalChars, maxFileChars, remainingChars);
-    const snippet = safe.content.slice(0, includedChars);
-    remainingChars -= includedChars;
-
-    let reason = null;
-    if (includedChars < originalChars) {
-      reason = remainingChars === 0 && includedChars < Math.min(originalChars, maxFileChars)
-        ? 'total-budget'
-        : 'file-limit';
-    }
-
-    return {
-      path: path.relative(projectDir, filePath).split(path.sep).join('/'),
-      language: detectLanguage(filePath),
-      hash: crypto.createHash('sha256').update(content).digest('hex'),
-      hashAlgorithm: 'sha256',
-      content: snippet,
-      redactions: safe.count,
-      truncation: {
-        truncated: includedChars < originalChars,
-        originalChars,
-        includedChars,
-        reason
+  return files
+    .map(filePath => {
+      let content = '';
+      try {
+        content = fs.readFileSync(filePath, 'utf8');
+      } catch {
+        return null;
       }
-    };
-  }).filter(Boolean);
+
+      const safe = filterSensitive(content);
+      const originalChars = safe.content.length;
+      const includedChars = Math.min(originalChars, maxFileChars, remainingChars);
+      const snippet = safe.content.slice(0, includedChars);
+      remainingChars -= includedChars;
+
+      let reason = null;
+      if (includedChars < originalChars) {
+        reason =
+          remainingChars === 0 && includedChars < Math.min(originalChars, maxFileChars) ? 'total-budget' : 'file-limit';
+      }
+
+      return {
+        path: path.relative(projectDir, filePath).split(path.sep).join('/'),
+        language: detectLanguage(filePath),
+        hash: crypto.createHash('sha256').update(content).digest('hex'),
+        hashAlgorithm: 'sha256',
+        content: snippet,
+        redactions: safe.count,
+        truncation: {
+          truncated: includedChars < originalChars,
+          originalChars,
+          includedChars,
+          reason
+        }
+      };
+    })
+    .filter(Boolean);
 }
 
 function prioritizeFiles(files, projectType, registry = defaultRegistry) {
@@ -165,8 +168,16 @@ function prioritizeFiles(files, projectType, registry = defaultRegistry) {
     if (aScore !== bScore) return aScore - bScore;
     let aSize = Infinity;
     let bSize = Infinity;
-    try { aSize = fs.statSync(a).size; } catch { /* unreadable files sort last */ }
-    try { bSize = fs.statSync(b).size; } catch { /* unreadable files sort last */ }
+    try {
+      aSize = fs.statSync(a).size;
+    } catch {
+      /* unreadable files sort last */
+    }
+    try {
+      bSize = fs.statSync(b).size;
+    } catch {
+      /* unreadable files sort last */
+    }
     return aSize - bSize || a.localeCompare(b);
   });
 }
@@ -175,28 +186,28 @@ function limitByTokens(files, maxTokens) {
   let totalTokens = 0;
   const resultFiles = [];
   const skipped = [];
-  
+
   for (const filePath of files) {
     if (!fs.existsSync(filePath)) continue;
-    
+
     let content;
     try {
       content = fs.readFileSync(filePath, 'utf8');
     } catch {
       continue;
     }
-    
+
     const fileTokens = estimateTokensForContent(content);
-    
+
     if (totalTokens + fileTokens > maxTokens) {
       skipped.push({ path: filePath, reason: 'token-budget', estimatedTokens: fileTokens });
       continue;
     }
-    
+
     totalTokens += fileTokens;
     resultFiles.push(filePath);
   }
-  
+
   return { files: resultFiles, tokens: totalTokens, skipped };
 }
 
@@ -211,13 +222,14 @@ function buildTree(dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = nul
   }
 
   // Filter hidden dirs/files and node_modules, preserving entry objects
-  const visible = entries.filter(e =>
-    !e.name.startsWith('.') &&
-    e.name !== 'node_modules' &&
-    e.name !== 'ai-docs' &&
-    e.name !== 'code-ctx.config.json' &&
-    e.name !== 'code-ctx.config.js' &&
-    (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, e.name)))
+  const visible = entries.filter(
+    e =>
+      !e.name.startsWith('.') &&
+      e.name !== 'node_modules' &&
+      e.name !== 'ai-docs' &&
+      e.name !== 'code-ctx.config.json' &&
+      e.name !== 'code-ctx.config.js' &&
+      (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, e.name)))
   );
   let tree = '';
 
@@ -258,9 +270,7 @@ function estimateTokens(filePaths) {
   return Math.round(totalTokens);
 }
 
-async function buildTreeAsync(
-  dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = null, deadline = Infinity
-) {
+async function buildTreeAsync(dir, prefix = '', depth = 0, maxDepth = 5, ignoreEngine = null, deadline = Infinity) {
   if (Date.now() > deadline) return prefix + '└── (扫描时间预算已用尽)\n';
   if (depth >= maxDepth) return prefix + '└── ...\n';
   let entries;
@@ -269,13 +279,14 @@ async function buildTreeAsync(
   } catch {
     return prefix + '└── (无法读取目录)\n';
   }
-  const visible = entries.filter(entry =>
-    !entry.name.startsWith('.') &&
-    entry.name !== 'node_modules' &&
-    entry.name !== 'ai-docs' &&
-    entry.name !== 'code-ctx.config.json' &&
-    entry.name !== 'code-ctx.config.js' &&
-    (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, entry.name)))
+  const visible = entries.filter(
+    entry =>
+      !entry.name.startsWith('.') &&
+      entry.name !== 'node_modules' &&
+      entry.name !== 'ai-docs' &&
+      entry.name !== 'code-ctx.config.json' &&
+      entry.name !== 'code-ctx.config.js' &&
+      (!ignoreEngine || !ignoreEngine.ignores(path.join(dir, entry.name)))
   );
   let tree = '';
   for (let index = 0; index < visible.length; index++) {
@@ -286,9 +297,7 @@ async function buildTreeAsync(
     const fullPath = path.join(dir, entry.name);
     tree += `${prefix}${connector}${entry.name}${entry.isDirectory() ? '/' : ''}\n`;
     if (entry.isDirectory()) {
-      tree += await buildTreeAsync(
-        fullPath, childPrefix, depth + 1, maxDepth, ignoreEngine, deadline
-      );
+      tree += await buildTreeAsync(fullPath, childPrefix, depth + 1, maxDepth, ignoreEngine, deadline);
     }
   }
   return tree;
@@ -334,22 +343,26 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
   const maxSourceChars = options.maxSourceChars ?? CONTEXT_LIMITS.MAX_KEYFILE_CHARS;
   const maxSourceFileChars = options.maxSourceFileChars ?? CONTEXT_LIMITS.MAX_SOURCE_FILE_CHARS;
   const registry = options.registry || defaultRegistry;
-  const ignoreEngine = options.ignoreEngine || createIgnoreEngine(projectDir, {
-    excludeDirs: options.excludeDirs
-  });
+  const ignoreEngine =
+    options.ignoreEngine ||
+    createIgnoreEngine(projectDir, {
+      excludeDirs: options.excludeDirs
+    });
   const configuredPatterns = Array.isArray(options.scanPatterns) ? options.scanPatterns : null;
   const adapterPatterns = configuredPatterns || registry.getScanPatterns(projectType);
-  const patterns = adapterPatterns.length > 0
-    ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS]
-    : [];
+  const patterns = adapterPatterns.length > 0 ? [...adapterPatterns, ...PROJECT_MANIFEST_PATTERNS] : [];
 
   const [tree, patternMatches] = await Promise.all([
     buildTreeAsync(projectDir, '', 0, 5, ignoreEngine, deadline),
-    Promise.all(patterns.map(pattern => glob(pattern, {
-      cwd: projectDir,
-      absolute: true,
-      nodir: true
-    })))
+    Promise.all(
+      patterns.map(pattern =>
+        glob(pattern, {
+          cwd: projectDir,
+          absolute: true,
+          nodir: true
+        })
+      )
+    )
   ]);
   const extracted = registry.extractKeyFiles(projectType, projectDir);
   const candidates = [...new Set(ignoreEngine.filter([...patternMatches.flat(), ...extracted]))];
@@ -362,11 +375,14 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
     }
   });
   const existing = stats.filter(Boolean);
-  const prioritized = existing.slice().sort((a, b) => {
-    const aScore = registry.getFilePriority(projectType, a.filePath);
-    const bScore = registry.getFilePriority(projectType, b.filePath);
-    return aScore - bScore || a.size - b.size || a.filePath.localeCompare(b.filePath);
-  }).slice(0, maxFiles);
+  const prioritized = existing
+    .slice()
+    .sort((a, b) => {
+      const aScore = registry.getFilePriority(projectType, a.filePath);
+      const bScore = registry.getFilePriority(projectType, b.filePath);
+      return aScore - bScore || a.size - b.size || a.filePath.localeCompare(b.filePath);
+    })
+    .slice(0, maxFiles);
 
   let plannedBytes = 0;
   const planned = [];
@@ -389,9 +405,10 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
   const selected = [];
   for (const item of sampled) {
     const sampleTokens = estimateTokensForContent(item.content);
-    const estimated = item.sampleBytes < item.size && item.sampleBytes > 0
-      ? Math.ceil(sampleTokens * (item.size / item.sampleBytes))
-      : sampleTokens;
+    const estimated =
+      item.sampleBytes < item.size && item.sampleBytes > 0
+        ? Math.ceil(sampleTokens * (item.size / item.sampleBytes))
+        : sampleTokens;
     if (tokens + estimated > maxTokens) {
       skipped.push({ path: item.filePath, reason: 'token-budget', estimatedTokens: estimated });
       continue;
@@ -417,8 +434,7 @@ async function scanProjectAsync(projectDir, projectType, options = {}) {
         truncated: includedChars < originalChars || item.sampleBytes < item.size,
         originalChars: item.sampleBytes < item.size ? item.size : originalChars,
         includedChars,
-        reason: item.sampleBytes < item.size ? 'sample-limit' :
-          (includedChars < originalChars ? 'file-limit' : null)
+        reason: item.sampleBytes < item.size ? 'sample-limit' : includedChars < originalChars ? 'file-limit' : null
       }
     };
   });

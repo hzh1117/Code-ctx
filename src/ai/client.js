@@ -5,12 +5,7 @@ const dns = require('dns').promises;
 const { AI_CLIENT } = require('../utils/constants');
 const { evaluateContextBudget } = require('../utils/token-estimator');
 const { redactOutboundMessages } = require('./privacy-gateway');
-const {
-  createAbortError,
-  createDeadlineError,
-  createRequestTimeoutError,
-  isAICancellationError
-} = require('./errors');
+const { createAbortError, createDeadlineError, createRequestTimeoutError, isAICancellationError } = require('./errors');
 
 const DEFAULT_TIMEOUT = AI_CLIENT.DEFAULT_TIMEOUT;
 const DEFAULT_DEADLINE = AI_CLIENT.DEFAULT_DEADLINE;
@@ -21,12 +16,7 @@ const BASE_RETRY_DELAY = AI_CLIENT.BASE_RETRY_DELAY;
 
 const DEBUG = process.env.AI_DEBUG === 'true';
 const DEBUG_RESPONSE = process.env.AI_DEBUG_RESPONSE === 'true';
-const METADATA_HOSTS = new Set([
-  'metadata.google.internal',
-  'metadata',
-  'instance-data',
-  '169.254.169.254'
-]);
+const METADATA_HOSTS = new Set(['metadata.google.internal', 'metadata', 'instance-data', '169.254.169.254']);
 
 function debugLog(...args) {
   if (DEBUG) {
@@ -46,12 +36,14 @@ function debugResponse(label, data) {
         contentBlocks: Array.isArray(json.content) ? json.content.length : undefined,
         choices: Array.isArray(json.choices) ? json.choices.length : undefined,
         usage: json.usage,
-        error: json.error ? {
-          type: json.error.type,
-          code: json.error.code,
-          status: json.error.status,
-          messageLength: typeof json.error.message === 'string' ? json.error.message.length : undefined
-        } : undefined,
+        error: json.error
+          ? {
+              type: json.error.type,
+              code: json.error.code,
+              status: json.error.status,
+              messageLength: typeof json.error.message === 'string' ? json.error.message.length : undefined
+            }
+          : undefined,
         rawLength: data.length
       };
       console.log(JSON.stringify(summary, null, 2));
@@ -118,10 +110,7 @@ function isLocalOrPrivateHost(hostname) {
 }
 
 function validateBaseUrl(baseUrl, options = {}) {
-  const {
-    allowLocalBaseUrl = false,
-    allowInsecureBaseUrl = false
-  } = options;
+  const { allowLocalBaseUrl = false, allowInsecureBaseUrl = false } = options;
 
   if (!baseUrl || typeof baseUrl !== 'string') {
     throw new Error('AI baseUrl 不能为空');
@@ -150,10 +139,7 @@ function validateBaseUrl(baseUrl, options = {}) {
 }
 
 async function validateResolvedBaseUrl(parsedUrl, options = {}) {
-  const {
-    allowLocalBaseUrl = false,
-    dnsLookup = dns.lookup
-  } = options;
+  const { allowLocalBaseUrl = false, dnsLookup = dns.lookup } = options;
 
   if (allowLocalBaseUrl) return;
 
@@ -181,9 +167,8 @@ async function validateResolvedBaseUrl(parsedUrl, options = {}) {
 function createApiError(statusCode, json, fallbackMessage) {
   const status = statusCode || 'unknown';
   const error = json && json.error ? json.error : null;
-  const message = error && typeof error.message === 'string' && error.message.trim()
-    ? error.message.trim()
-    : fallbackMessage;
+  const message =
+    error && typeof error.message === 'string' && error.message.trim() ? error.message.trim() : fallbackMessage;
   const type = error && (error.type || error.code) ? ` (${error.type || error.code})` : '';
   return new Error(`[${status}] ${message}${type}`);
 }
@@ -240,15 +225,28 @@ function getRetryDelay(retries, res) {
 // helper (validateBaseUrl + validateResolvedBaseUrl), so a recursive retry
 // doesn't re-resolve DNS each pass.
 async function postJsonWithRetry({
-  url, headers, body, timeout, debugLabel, retries = 0,
-  maxRetries = MAX_RETRIES, signal, deadlineAt
+  url,
+  headers,
+  body,
+  timeout,
+  debugLabel,
+  retries = 0,
+  maxRetries = MAX_RETRIES,
+  signal,
+  deadlineAt
 }) {
   let attempt = retries;
   while (true) {
     throwIfCancelled(signal, deadlineAt);
     try {
       const result = await postJsonOnce({
-        url, headers, body, timeout, debugLabel, signal, deadlineAt
+        url,
+        headers,
+        body,
+        timeout,
+        debugLabel,
+        signal,
+        deadlineAt
       });
       if (!RETRYABLE_STATUS_CODES.includes(result.statusCode) || attempt >= maxRetries) {
         return { statusCode: result.statusCode, body: result.body };
@@ -261,14 +259,13 @@ async function postJsonWithRetry({
       attempt++;
     } catch (err) {
       if (err.code === 'AI_REQUEST_ABORTED' || err.code === 'AI_OPERATION_DEADLINE') throw err;
-      const retryable = err.code === 'AI_REQUEST_TIMEOUT' ||
+      const retryable =
+        err.code === 'AI_REQUEST_TIMEOUT' ||
         RETRYABLE_ERRORS.includes(err.code) ||
         err.message.includes('socket hang up');
       if (!retryable || attempt >= maxRetries) throw err;
 
-      const reason = err.code === 'AI_REQUEST_TIMEOUT'
-        ? err.message
-        : `连接失败 (${err.code || err.message})`;
+      const reason = err.code === 'AI_REQUEST_TIMEOUT' ? err.message : `连接失败 (${err.code || err.message})`;
       const delay = BASE_RETRY_DELAY * Math.pow(2, attempt);
       console.log(`${reason}，${Math.round(delay / 1000)}秒后重试 (${attempt + 1}/${maxRetries})...`);
       await waitForRetry(delay, signal, deadlineAt);
@@ -324,7 +321,7 @@ async function callOpenAIWithMessages(messages, options) {
 
   const { statusCode, body: rawBody } = await postJsonWithRetry({
     url,
-    headers: { 'Authorization': `Bearer ${apiKey}` },
+    headers: { Authorization: `Bearer ${apiKey}` },
     body,
     timeout,
     debugLabel: 'OpenAI 响应',
@@ -476,9 +473,20 @@ async function generateWithAI(prompt, options = {}) {
   }
 
   const callOptions = {
-    apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
-    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit,
-    signal, deadlineMs, deadlineAt: resolveDeadlineAt(options), maxRetries
+    apiKey,
+    baseUrl,
+    model,
+    maxTokens,
+    maxInputTokens,
+    timeout,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup,
+    onRedactionAudit,
+    signal,
+    deadlineMs,
+    deadlineAt: resolveDeadlineAt(options),
+    maxRetries
   };
 
   if (protocol === 'openai') {
@@ -514,9 +522,20 @@ async function generateFromMessages(messages, options = {}) {
   }
 
   const callOptions = {
-    apiKey, baseUrl, model, maxTokens, maxInputTokens, timeout,
-    allowLocalBaseUrl, allowInsecureBaseUrl, dnsLookup, onRedactionAudit,
-    signal, deadlineMs, deadlineAt, maxRetries,
+    apiKey,
+    baseUrl,
+    model,
+    maxTokens,
+    maxInputTokens,
+    timeout,
+    allowLocalBaseUrl,
+    allowInsecureBaseUrl,
+    dnsLookup,
+    onRedactionAudit,
+    signal,
+    deadlineMs,
+    deadlineAt,
+    maxRetries,
     returnMetadata: true
   };
 
@@ -532,9 +551,7 @@ async function generateFromMessages(messages, options = {}) {
 function resolveDeadlineAt(options = {}) {
   if (Number.isFinite(options.deadlineAt)) return options.deadlineAt;
   const deadlineMs = options.deadlineMs === undefined ? DEFAULT_DEADLINE : options.deadlineMs;
-  return Number.isFinite(deadlineMs) && deadlineMs > 0
-    ? Date.now() + deadlineMs
-    : Infinity;
+  return Number.isFinite(deadlineMs) && deadlineMs > 0 ? Date.now() + deadlineMs : Infinity;
 }
 
 function throwIfCancelled(signal, deadlineAt) {
@@ -563,10 +580,7 @@ function awaitWithCancellation(promise, signal, deadlineAt) {
 
     signal?.addEventListener('abort', onAbort, { once: true });
     if (Number.isFinite(deadlineAt)) {
-      deadlineTimer = setTimeout(
-        () => finish(reject, createDeadlineError()),
-        Math.max(0, deadlineAt - Date.now())
-      );
+      deadlineTimer = setTimeout(() => finish(reject, createDeadlineError()), Math.max(0, deadlineAt - Date.now()));
     }
     Promise.resolve(promise).then(
       value => finish(resolve, value),
@@ -594,13 +608,16 @@ function waitForRetry(delay, signal, deadlineAt) {
       callback(value);
     };
     const onAbort = () => finish(reject, createAbortError());
-    timer = setTimeout(() => {
-      if (Number.isFinite(deadlineAt) && Date.now() >= deadlineAt) {
-        finish(reject, createDeadlineError());
-      } else {
-        finish(resolve);
-      }
-    }, Math.max(0, wait));
+    timer = setTimeout(
+      () => {
+        if (Number.isFinite(deadlineAt) && Date.now() >= deadlineAt) {
+          finish(reject, createDeadlineError());
+        } else {
+          finish(resolve);
+        }
+      },
+      Math.max(0, wait)
+    );
 
     signal?.addEventListener('abort', onAbort, { once: true });
   });
@@ -652,10 +669,12 @@ function postJsonOnce({ url, headers, body, timeout, debugLabel, signal, deadlin
         headers: { 'Content-Type': 'application/json', ...headers },
         timeout
       },
-      (res) => {
+      res => {
         debugLog('收到响应', { statusCode: res.statusCode, headers: res.headers });
         let data = '';
-        res.on('data', chunk => { data += chunk; });
+        res.on('data', chunk => {
+          data += chunk;
+        });
         res.on('end', () => {
           debugResponse(debugLabel, data);
           finish(resolve, { statusCode: res.statusCode, body: data, response: res });
@@ -727,11 +746,7 @@ function continuationReasons(response, combined) {
 }
 
 async function generateWithContinuation(prompt, options = {}) {
-  const {
-    systemPrompt,
-    onProgress,
-    maxContinuations = 5
-  } = options;
+  const { systemPrompt, onProgress, maxContinuations = 5 } = options;
 
   const operationOptions = { ...options, deadlineAt: resolveDeadlineAt(options) };
   const continuationPrompt = `${prompt}\n\n若回答因长度限制被截断，请在截断位置输出 <<<CONTINUE>>> 标记`;
@@ -750,9 +765,7 @@ async function generateWithContinuation(prompt, options = {}) {
 
   while (reasons.length > 0) {
     if (continuationCount >= maxContinuations) {
-      throw new Error(
-        `AI 输出在 ${continuationCount} 次续写后仍被截断或结构不完整: ${reasons.join(', ')}`
-      );
+      throw new Error(`AI 输出在 ${continuationCount} 次续写后仍被截断或结构不完整: ${reasons.join(', ')}`);
     }
     continuationCount++;
     const attempt = continuationCount + 1;
@@ -814,10 +827,7 @@ function generateWithAIStream(prompt, options = {}) {
       let parsedBaseUrl, url, headers, body;
       const deadlineAt = resolveDeadlineAt({ ...options, deadlineMs });
       throwIfCancelled(signal, deadlineAt);
-      const safeMessages = redactOutboundMessages(
-        [{ role: 'user', content: prompt }],
-        onRedactionAudit
-      ).messages;
+      const safeMessages = redactOutboundMessages([{ role: 'user', content: prompt }], onRedactionAudit).messages;
       assertMessagesWithinBudget(safeMessages, {
         maxInputTokens,
         maxTokens
@@ -833,7 +843,7 @@ function generateWithAIStream(prompt, options = {}) {
         url = new URL(`${trimTrailingSlashes(parsedBaseUrl.toString())}/chat/completions`);
         headers = {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`
         };
         body = JSON.stringify({ model, max_tokens: maxTokens, messages: safeMessages, stream: true });
       } else if (protocol === 'anthropic') {
@@ -867,7 +877,7 @@ function generateWithAIStream(prompt, options = {}) {
         if (deadlineTimer) clearTimeout(deadlineTimer);
         signal?.removeEventListener('abort', onAbort);
       };
-      const emitError = (error) => {
+      const emitError = error => {
         if (settled) return;
         settled = true;
         cleanup();
@@ -879,97 +889,104 @@ function generateWithAIStream(prompt, options = {}) {
         emitError(error);
       };
 
-      req = protocolModule.request(url, {
-        method: 'POST',
-        headers,
-        timeout
-      }, (res) => {
-        if (res.statusCode >= 400) {
-          let errData = '';
-          res.on('data', chunk => errData += chunk);
-          res.on('end', () => {
-            try {
-              const json = JSON.parse(errData);
-              emitError(createApiError(res.statusCode, json, 'AI API 返回错误'));
-            } catch {
-              emitError(new Error(`[${res.statusCode}] AI API 返回错误`));
-            }
-          });
-          return;
-        }
-
-        let fullText = '';
-        let buffer = '';
-
-        res.on('data', (chunk) => {
-          buffer += chunk.toString();
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith('data:')) continue;
-            const data = trimmed.slice(5).trim();
-            if (data === '[DONE]') continue;
-
-            try {
-              const json = JSON.parse(data);
-              let token = '';
-              if (protocol === 'openai') {
-                token = json.choices?.[0]?.delta?.content || '';
-              } else {
-                // Anthropic streaming: content_block_delta events
-                if (json.type === 'content_block_delta') {
-                  token = json.delta?.text || '';
-                }
-              }
-              if (token) {
-                fullText += token;
-                emitter.emit('token', token);
-              }
-            } catch {
-              // ignore parse errors in stream chunks
-            }
-          }
-        });
-
-        res.on('end', () => {
-          // Process any remaining buffer
-          if (buffer.trim()) {
-            const trimmed = buffer.trim();
-            if (trimmed.startsWith('data:') && trimmed.slice(5).trim() !== '[DONE]') {
+      req = protocolModule.request(
+        url,
+        {
+          method: 'POST',
+          headers,
+          timeout
+        },
+        res => {
+          if (res.statusCode >= 400) {
+            let errData = '';
+            res.on('data', chunk => (errData += chunk));
+            res.on('end', () => {
               try {
-                const json = JSON.parse(trimmed.slice(5).trim());
+                const json = JSON.parse(errData);
+                emitError(createApiError(res.statusCode, json, 'AI API 返回错误'));
+              } catch {
+                emitError(new Error(`[${res.statusCode}] AI API 返回错误`));
+              }
+            });
+            return;
+          }
+
+          let fullText = '';
+          let buffer = '';
+
+          res.on('data', chunk => {
+            buffer += chunk.toString();
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data:')) continue;
+              const data = trimmed.slice(5).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const json = JSON.parse(data);
                 let token = '';
                 if (protocol === 'openai') {
                   token = json.choices?.[0]?.delta?.content || '';
-                } else if (json.type === 'content_block_delta') {
-                  token = json.delta?.text || '';
+                } else {
+                  // Anthropic streaming: content_block_delta events
+                  if (json.type === 'content_block_delta') {
+                    token = json.delta?.text || '';
+                  }
                 }
                 if (token) {
                   fullText += token;
                   emitter.emit('token', token);
                 }
               } catch {
-                // ignore
+                // ignore parse errors in stream chunks
               }
             }
-          }
-          if (!settled) {
-            settled = true;
-            cleanup();
-            emitter.emit('done', fullText);
-          }
-        });
-      });
+          });
+
+          res.on('end', () => {
+            // Process any remaining buffer
+            if (buffer.trim()) {
+              const trimmed = buffer.trim();
+              if (trimmed.startsWith('data:') && trimmed.slice(5).trim() !== '[DONE]') {
+                try {
+                  const json = JSON.parse(trimmed.slice(5).trim());
+                  let token = '';
+                  if (protocol === 'openai') {
+                    token = json.choices?.[0]?.delta?.content || '';
+                  } else if (json.type === 'content_block_delta') {
+                    token = json.delta?.text || '';
+                  }
+                  if (token) {
+                    fullText += token;
+                    emitter.emit('token', token);
+                  }
+                } catch {
+                  // ignore
+                }
+              }
+            }
+            if (!settled) {
+              settled = true;
+              cleanup();
+              emitter.emit('done', fullText);
+            }
+          });
+        }
+      );
 
       signal?.addEventListener('abort', onAbort, { once: true });
       if (Number.isFinite(deadlineAt)) {
-        deadlineTimer = setTimeout(() => {
-          const error = createDeadlineError();
-          req.destroy(error);
-          emitError(error);
-        }, Math.max(0, deadlineAt - Date.now()));
+        deadlineTimer = setTimeout(
+          () => {
+            const error = createDeadlineError();
+            req.destroy(error);
+            emitError(error);
+          },
+          Math.max(0, deadlineAt - Date.now())
+        );
       }
       req.on('error', emitError);
       req.on('timeout', () => {

@@ -25,33 +25,41 @@ describe('provider compatibility smoke tests', () => {
     expect(Boolean(openAIKey || anthropicKey)).toBe(true);
   });
 
-  (enabled && openAIKey ? test : test.skip)('default OpenAI contract is accepted', async () => {
-    const result = await generateWithAI('Reply with CODE_CTX_SMOKE_OK.', {
-      apiKey: openAIKey,
-      protocol: 'openai',
-      baseUrl: process.env.OPENAI_BASE_URL || providers.openai.baseUrl,
-      model: process.env.OPENAI_SMOKE_MODEL || process.env.OPENAI_MODEL || providers.openai.model,
-      maxTokens: 32,
-      timeout: 30000,
-      deadlineMs: 60000
-    });
+  (enabled && openAIKey ? test : test.skip)(
+    'default OpenAI contract is accepted',
+    async () => {
+      const result = await generateWithAI('Reply with CODE_CTX_SMOKE_OK.', {
+        apiKey: openAIKey,
+        protocol: 'openai',
+        baseUrl: process.env.OPENAI_BASE_URL || providers.openai.baseUrl,
+        model: process.env.OPENAI_SMOKE_MODEL || process.env.OPENAI_MODEL || providers.openai.model,
+        maxTokens: 32,
+        timeout: 30000,
+        deadlineMs: 60000
+      });
 
-    expect(typeof result).toBe('string');
-    expect(result.trim().length).toBeGreaterThan(0);
-  }, 70000);
+      expect(typeof result).toBe('string');
+      expect(result.trim().length).toBeGreaterThan(0);
+    },
+    70000
+  );
 
-  (enabled && anthropicKey ? test : test.skip)('default Anthropic contract is accepted', async () => {
-    const result = await generateWithAI('Reply with CODE_CTX_SMOKE_OK.', {
-      apiKey: anthropicKey,
-      protocol: 'anthropic',
-      baseUrl: process.env.ANTHROPIC_BASE_URL || providers.anthropic.baseUrl,
-      model: process.env.ANTHROPIC_SMOKE_MODEL || process.env.ANTHROPIC_MODEL || providers.anthropic.model,
-      maxTokens: 32,
-      timeout: 30000,
-      deadlineMs: 60000
-    });
+  (enabled && anthropicKey ? test : test.skip)(
+    'default Anthropic contract is accepted',
+    async () => {
+      const result = await generateWithAI('Reply with CODE_CTX_SMOKE_OK.', {
+        apiKey: anthropicKey,
+        protocol: 'anthropic',
+        baseUrl: process.env.ANTHROPIC_BASE_URL || providers.anthropic.baseUrl,
+        model: process.env.ANTHROPIC_SMOKE_MODEL || process.env.ANTHROPIC_MODEL || providers.anthropic.model,
+        maxTokens: 32,
+        timeout: 30000,
+        deadlineMs: 60000
+      });
 
-    expect(typeof result).toBe('string');
-    expect(result.trim().length).toBeGreaterThan(0);
-  }, 70000);
+      expect(typeof result).toBe('string');
+      expect(result.trim().length).toBeGreaterThan(0);
+    },
+    70000
+  );
 });

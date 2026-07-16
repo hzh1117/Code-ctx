@@ -33,7 +33,9 @@ function extractRouteClaims(content) {
 function extractSourceRoutes(contents) {
   const routes = [];
   for (const content of contents) {
-    for (const match of content.matchAll(/(?:router|app|server)\.(get|post|put|patch|delete)\s*\(\s*["']([^"']+)["']/gi)) {
+    for (const match of content.matchAll(
+      /(?:router|app|server)\.(get|post|put|patch|delete)\s*\(\s*["']([^"']+)["']/gi
+    )) {
       routes.push(`${match[1].toUpperCase()} ${match[2]}`);
     }
   }
@@ -45,10 +47,7 @@ function readDependencies(projectDir) {
   if (!fs.existsSync(packagePath)) return [];
   try {
     const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
-    return [...new Set([
-      ...Object.keys(pkg.dependencies || {}),
-      ...Object.keys(pkg.devDependencies || {})
-    ])].sort();
+    return [...new Set([...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})])].sort();
   } catch {
     return [];
   }
@@ -77,10 +76,9 @@ function unverifiedFacts(reason) {
 function verifyOverviewFacts(content, manifest) {
   if (!manifest) return unverifiedFacts('manifest-missing');
   const projects = manifest.projects || [];
-  const verified = projects.filter(project =>
-    content.includes(project.id) &&
-    content.includes(project.sourcePath) &&
-    content.includes(project.document)
+  const verified = projects.filter(
+    project =>
+      content.includes(project.id) && content.includes(project.sourcePath) && content.includes(project.document)
   ).length;
   const mappingScore = scoreRatio(verified, projects.length);
   return {
@@ -94,10 +92,15 @@ function verifyOverviewFacts(content, manifest) {
       routeConsistency: 100,
       dependencyConsistency: 100
     },
-    issues: mappingScore === 100 ? [] : [{
-      type: 'overview-manifest-mismatch',
-      message: `OVERVIEW.md 仅引用 ${verified}/${projects.length} 个 manifest 项目`
-    }]
+    issues:
+      mappingScore === 100
+        ? []
+        : [
+            {
+              type: 'overview-manifest-mismatch',
+              message: `OVERVIEW.md 仅引用 ${verified}/${projects.length} 个 manifest 项目`
+            }
+          ]
   };
 }
 
@@ -106,8 +109,8 @@ function verifyProjectFacts(rootDir, content, project, manifest) {
   const entry = manifest.projects.find(candidate => candidate.id === project.alias);
   if (!entry) return unverifiedFacts('project-manifest-entry-missing');
 
-  const expectedSourcePath = path.relative(rootDir, path.resolve(rootDir, project.path))
-    .split(path.sep).join('/') || '.';
+  const expectedSourcePath =
+    path.relative(rootDir, path.resolve(rootDir, project.path)).split(path.sep).join('/') || '.';
   const normalizedManifestPath = String(entry.sourcePath || '').replace(/^\.\//, '') || '.';
   const manifestMapping = normalizedManifestPath === expectedSourcePath ? 100 : 0;
   const projectDir = path.resolve(rootDir, project.path);
@@ -163,24 +166,34 @@ function verifyProjectFacts(rootDir, content, project, manifest) {
   };
   const score = Math.round(
     manifestMapping * 0.15 +
-    referenceResolution * 0.30 +
-    sourceCitationCoverage * 0.25 +
-    symbolResolution * 0.10 +
-    routeConsistency * 0.10 +
-    dependencyConsistency * 0.10
+      referenceResolution * 0.3 +
+      sourceCitationCoverage * 0.25 +
+      symbolResolution * 0.1 +
+      routeConsistency * 0.1 +
+      dependencyConsistency * 0.1
   );
   const issues = [];
-  if (manifestMapping < 100) issues.push({ type: 'project-mapping-mismatch', message: '文档项目路径与 manifest 不一致' });
-  if (referenceResolution < 100) issues.push({ type: 'source-reference-invalid', message: '部分源码引用不存在或 hash 已变化' });
-  if (sourceCitationCoverage < 80) issues.push({ type: 'source-citation-low', message: `来源引用覆盖率仅 ${sourceCitationCoverage}` });
-  if (symbolResolution < 100) issues.push({ type: 'symbol-reference-invalid', message: '部分符号引用无法在源码中解析' });
+  if (manifestMapping < 100)
+    issues.push({ type: 'project-mapping-mismatch', message: '文档项目路径与 manifest 不一致' });
+  if (referenceResolution < 100)
+    issues.push({ type: 'source-reference-invalid', message: '部分源码引用不存在或 hash 已变化' });
+  if (sourceCitationCoverage < 80)
+    issues.push({ type: 'source-citation-low', message: `来源引用覆盖率仅 ${sourceCitationCoverage}` });
+  if (symbolResolution < 100)
+    issues.push({ type: 'symbol-reference-invalid', message: '部分符号引用无法在源码中解析' });
   if (routeConsistency < 100) issues.push({ type: 'route-mismatch', message: '文档路由与源码不一致' });
-  if (dependencyConsistency < 80) issues.push({ type: 'dependency-coverage-low', message: `依赖证据覆盖率仅 ${dependencyConsistency}` });
+  if (dependencyConsistency < 80)
+    issues.push({ type: 'dependency-coverage-low', message: `依赖证据覆盖率仅 ${dependencyConsistency}` });
 
   return {
-    status: manifestMapping < 100 || referenceResolution < 100
-      ? 'invalid'
-      : score >= 80 ? 'verified' : score >= 40 ? 'low-confidence' : 'invalid',
+    status:
+      manifestMapping < 100 || referenceResolution < 100
+        ? 'invalid'
+        : score >= 80
+          ? 'verified'
+          : score >= 40
+            ? 'low-confidence'
+            : 'invalid',
     score,
     metrics,
     issues

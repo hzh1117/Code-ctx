@@ -15,14 +15,17 @@ describe('manifest-backed doc resolver', () => {
 
   function configure(projects) {
     fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({ projects }));
-    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
-      version: 1,
-      projects: projects.map(project => ({
-        id: project.alias,
-        sourcePath: project.path,
-        document: `${project.alias}.md`
-      }))
-    }));
+    fs.writeFileSync(
+      path.join(aiDocs, 'project-manifest.json'),
+      JSON.stringify({
+        version: 1,
+        projects: projects.map(project => ({
+          id: project.alias,
+          sourcePath: project.path,
+          document: `${project.alias}.md`
+        }))
+      })
+    );
     for (const project of projects) {
       fs.writeFileSync(path.join(aiDocs, `${project.alias}.md`), `# ${project.alias}\n正文不参与归属判断`);
     }
@@ -48,14 +51,18 @@ describe('manifest-backed doc resolver', () => {
       { alias: 'web', path: './packages/web', type: 'react' }
     ]);
 
-    expect(findRelatedDoc(root, 'packages/web/src/App.jsx')).toEqual(expect.objectContaining({
-      name: 'web.md',
-      projectId: 'web'
-    }));
-    expect(findRelatedDoc(root, 'package.json')).toEqual(expect.objectContaining({
-      name: 'root.md',
-      projectId: 'root'
-    }));
+    expect(findRelatedDoc(root, 'packages/web/src/App.jsx')).toEqual(
+      expect.objectContaining({
+        name: 'web.md',
+        projectId: 'web'
+      })
+    );
+    expect(findRelatedDoc(root, 'package.json')).toEqual(
+      expect.objectContaining({
+        name: 'root.md',
+        projectId: 'root'
+      })
+    );
   });
 
   test('resolves same-named nested directories by full project path', () => {
@@ -72,9 +79,12 @@ describe('manifest-backed doc resolver', () => {
 
   test('does not infer ownership from document body when manifest is missing', () => {
     fs.writeFileSync(path.join(aiDocs, 'web.md'), '# web\npackages/web src App');
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './packages/web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './packages/web', type: 'react' }]
+      })
+    );
     _clearCache();
 
     expect(findRelatedDoc(root, 'packages/web/src/App.jsx')).toBeNull();
@@ -82,13 +92,19 @@ describe('manifest-backed doc resolver', () => {
 
   test('rejects manifest source paths that disagree with config', () => {
     fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'web', path: './apps/web', type: 'react' }]
-    }));
+    fs.writeFileSync(
+      path.join(root, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'web', path: './apps/web', type: 'react' }]
+      })
+    );
     fs.writeFileSync(path.join(aiDocs, 'web.md'), '# Web');
-    fs.writeFileSync(path.join(aiDocs, 'project-manifest.json'), JSON.stringify({
-      projects: [{ id: 'web', sourcePath: './other/web', document: 'web.md' }]
-    }));
+    fs.writeFileSync(
+      path.join(aiDocs, 'project-manifest.json'),
+      JSON.stringify({
+        projects: [{ id: 'web', sourcePath: './other/web', document: 'web.md' }]
+      })
+    );
     _clearCache();
 
     expect(findRelatedDoc(root, 'apps/web/App.jsx')).toBeNull();
@@ -101,11 +117,7 @@ describe('manifest-backed doc resolver', () => {
       { alias: 'api', path: './packages/api', type: 'node-backend' }
     ]);
 
-    expect(groupChangesByProject(root, [
-      'README.md',
-      'packages/api/routes.js',
-      'ai-docs/root.md'
-    ])).toEqual({
+    expect(groupChangesByProject(root, ['README.md', 'packages/api/routes.js', 'ai-docs/root.md'])).toEqual({
       root: ['README.md'],
       api: ['packages/api/routes.js']
     });

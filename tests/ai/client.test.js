@@ -10,22 +10,20 @@ const {
 
 describe('generateWithAI', () => {
   test('rejects serialized messages that exceed the input budget', () => {
-    expect(() => assertMessagesWithinBudget([
-      { role: 'user', content: 'x'.repeat(10000) }
-    ], {
-      maxInputTokens: 10,
-      maxTokens: 200,
-      safetyMargin: 1
-    })).toThrow(/输入 Prompt 超出预算/);
+    expect(() =>
+      assertMessagesWithinBudget([{ role: 'user', content: 'x'.repeat(10000) }], {
+        maxInputTokens: 10,
+        maxTokens: 200,
+        safetyMargin: 1
+      })
+    ).toThrow(/输入 Prompt 超出预算/);
   });
   test('should throw error without API key', async () => {
-    await expect(generateWithAI('test', { protocol: 'openai' }))
-      .rejects.toThrow('API key');
+    await expect(generateWithAI('test', { protocol: 'openai' })).rejects.toThrow('API key');
   });
 
   test('should throw error for unsupported protocol', async () => {
-    await expect(generateWithAI('test', { apiKey: 'key', protocol: 'unsupported' }))
-      .rejects.toThrow('不支持的协议');
+    await expect(generateWithAI('test', { apiKey: 'key', protocol: 'unsupported' })).rejects.toThrow('不支持的协议');
   });
 
   test('should trim trailing slash before OpenAI chat completions path', async () => {
@@ -139,12 +137,16 @@ describe('generateWithAI', () => {
         requestCount++;
         res.setHeader('Content-Type', 'application/json');
         const first = requestCount === 1;
-        res.end(JSON.stringify({
-          choices: [{
-            message: { content: first ? 'part one ' : 'part two' },
-            finish_reason: first ? 'length' : 'stop'
-          }]
-        }));
+        res.end(
+          JSON.stringify({
+            choices: [
+              {
+                message: { content: first ? 'part one ' : 'part two' },
+                finish_reason: first ? 'length' : 'stop'
+              }
+            ]
+          })
+        );
       });
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -176,10 +178,12 @@ describe('generateWithAI', () => {
         requestCount++;
         res.setHeader('Content-Type', 'application/json');
         const first = requestCount === 1;
-        res.end(JSON.stringify({
-          content: [{ type: 'text', text: first ? 'alpha ' : 'omega' }],
-          stop_reason: first ? 'max_tokens' : 'end_turn'
-        }));
+        res.end(
+          JSON.stringify({
+            content: [{ type: 'text', text: first ? 'alpha ' : 'omega' }],
+            stop_reason: first ? 'max_tokens' : 'end_turn'
+          })
+        );
       });
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -210,12 +214,13 @@ describe('generateWithAI', () => {
       req.on('end', () => {
         requestCount++;
         res.setHeader('Content-Type', 'application/json');
-        const content = requestCount === 1
-          ? '<!-- section:overview -->\npartial'
-          : '\ncomplete\n<!-- /section:overview -->';
-        res.end(JSON.stringify({
-          choices: [{ message: { content }, finish_reason: 'stop' }]
-        }));
+        const content =
+          requestCount === 1 ? '<!-- section:overview -->\npartial' : '\ncomplete\n<!-- /section:overview -->';
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content }, finish_reason: 'stop' }]
+          })
+        );
       });
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -244,25 +249,29 @@ describe('generateWithAI', () => {
       req.resume();
       req.on('end', () => {
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          choices: [{ message: { content: 'truncated' }, finish_reason: 'length' }]
-        }));
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content: 'truncated' }, finish_reason: 'length' }]
+          })
+        );
       });
     });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 
     try {
       const { port } = server.address();
-      await expect(generateWithContinuation('write docs', {
-        apiKey: 'key',
-        protocol: 'openai',
-        baseUrl: `http://127.0.0.1:${port}/v1`,
-        model: 'test-model',
-        maxTokens: 10,
-        maxContinuations: 1,
-        allowLocalBaseUrl: true,
-        allowInsecureBaseUrl: true
-      })).rejects.toThrow(/1 次续写后仍被截断/);
+      await expect(
+        generateWithContinuation('write docs', {
+          apiKey: 'key',
+          protocol: 'openai',
+          baseUrl: `http://127.0.0.1:${port}/v1`,
+          model: 'test-model',
+          maxTokens: 10,
+          maxContinuations: 1,
+          allowLocalBaseUrl: true,
+          allowInsecureBaseUrl: true
+        })
+      ).rejects.toThrow(/1 次续写后仍被截断/);
     } finally {
       await new Promise(resolve => server.close(resolve));
     }
@@ -332,16 +341,22 @@ describe('generateWithAI', () => {
 
   test('should reject DNS resolution failure', async () => {
     const url = validateBaseUrl('https://nonexistent.example.com/v1');
-    await expect(validateResolvedBaseUrl(url, {
-      dnsLookup: async () => { throw new Error('ENOTFOUND'); }
-    })).rejects.toThrow(/DNS 解析失败/);
+    await expect(
+      validateResolvedBaseUrl(url, {
+        dnsLookup: async () => {
+          throw new Error('ENOTFOUND');
+        }
+      })
+    ).rejects.toThrow(/DNS 解析失败/);
   });
 
   test('should reject DNS resolving to IPv6 loopback', async () => {
     const url = validateBaseUrl('https://ai-proxy.example.com/v1');
-    await expect(validateResolvedBaseUrl(url, {
-      dnsLookup: async () => [{ address: '::1', family: 6 }]
-    })).rejects.toThrow(/DNS|localhost|内网|metadata/);
+    await expect(
+      validateResolvedBaseUrl(url, {
+        dnsLookup: async () => [{ address: '::1', family: 6 }]
+      })
+    ).rejects.toThrow(/DNS|localhost|内网|metadata/);
   });
 
   test('should allow explicit local insecure URLs for tests and local debugging', () => {
@@ -356,17 +371,21 @@ describe('generateWithAI', () => {
   test('should reject hostnames that resolve to private addresses', async () => {
     const url = validateBaseUrl('https://ai-proxy.example.com/v1');
 
-    await expect(validateResolvedBaseUrl(url, {
-      dnsLookup: async () => [{ address: '10.0.0.5', family: 4 }]
-    })).rejects.toThrow(/DNS|localhost|内网|metadata/);
+    await expect(
+      validateResolvedBaseUrl(url, {
+        dnsLookup: async () => [{ address: '10.0.0.5', family: 4 }]
+      })
+    ).rejects.toThrow(/DNS|localhost|内网|metadata/);
   });
 
   test('should allow public resolved AI base URLs', async () => {
     const url = validateBaseUrl('https://api.example.com/v1');
 
-    await expect(validateResolvedBaseUrl(url, {
-      dnsLookup: async () => [{ address: '8.8.8.8', family: 4 }]
-    })).resolves.toBeUndefined();
+    await expect(
+      validateResolvedBaseUrl(url, {
+        dnsLookup: async () => [{ address: '8.8.8.8', family: 4 }]
+      })
+    ).resolves.toBeUndefined();
   });
 
   test('should not leak full response content in debug output', async () => {
@@ -380,10 +399,12 @@ describe('generateWithAI', () => {
       const secretContent = 'SECRET_RESPONSE_CONTENT_SHOULD_NOT_APPEAR';
       const server = http.createServer((req, res) => {
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          choices: [{ message: { content: secretContent } }],
-          usage: { total_tokens: 42 }
-        }));
+        res.end(
+          JSON.stringify({
+            choices: [{ message: { content: secretContent } }],
+            usage: { total_tokens: 42 }
+          })
+        );
       });
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 
@@ -474,13 +495,14 @@ describe('outbound prompt privacy', () => {
     const server = http.createServer((req, res) => {
       let body = '';
       req.setEncoding('utf8');
-      req.on('data', chunk => { body += chunk; });
+      req.on('data', chunk => {
+        body += chunk;
+      });
       req.on('end', () => {
         requests.push(JSON.parse(body));
         res.setHeader('Content-Type', 'application/json');
-        const content = requests.length === 1
-          ? 'api_key = "provider-secret" in /home/provider/private <<<CONTINUE>>>'
-          : 'done';
+        const content =
+          requests.length === 1 ? 'api_key = "provider-secret" in /home/provider/private <<<CONTINUE>>>' : 'done';
         res.end(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }));
       });
     });
@@ -489,20 +511,17 @@ describe('outbound prompt privacy', () => {
     const audits = [];
     try {
       const { port } = server.address();
-      await generateWithContinuation(
-        'read C:\\Users\\alice\\private\\config.js with token=initial-secret-value',
-        {
-          apiKey: 'transport-key',
-          protocol: 'openai',
-          baseUrl: `http://127.0.0.1:${port}/v1`,
-          model: 'test-model',
-          maxTokens: 50,
-          systemPrompt: 'workspace /home/alice/private/project',
-          allowLocalBaseUrl: true,
-          allowInsecureBaseUrl: true,
-          onRedactionAudit: audit => audits.push(audit)
-        }
-      );
+      await generateWithContinuation('read C:\\Users\\alice\\private\\config.js with token=initial-secret-value', {
+        apiKey: 'transport-key',
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}/v1`,
+        model: 'test-model',
+        maxTokens: 50,
+        systemPrompt: 'workspace /home/alice/private/project',
+        allowLocalBaseUrl: true,
+        allowInsecureBaseUrl: true,
+        onRedactionAudit: audit => audits.push(audit)
+      });
 
       expect(requests).toHaveLength(2);
       const outbound = JSON.stringify(requests);
@@ -513,9 +532,7 @@ describe('outbound prompt privacy', () => {
       expect(outbound).not.toContain('provider-secret');
       expect(outbound).toContain('[REDACTED_PATH]');
       expect(outbound).toContain('[FILTERED]');
-      expect(requests[1].messages.map(message => message.role)).toEqual([
-        'system', 'user', 'assistant', 'user'
-      ]);
+      expect(requests[1].messages.map(message => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
       expect(audits).toHaveLength(2);
       expect(audits[1].messages.some(message => message.role === 'assistant')).toBe(true);
       expect(JSON.stringify(audits)).not.toContain('alice');
@@ -594,8 +611,9 @@ describe('AI retry mechanism', () => {
     await new Promise(r => server.listen(0, '127.0.0.1', r));
     try {
       const { port } = server.address();
-      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` }))
-        .rejects.toThrow('500');
+      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` })).rejects.toThrow(
+        '500'
+      );
       // 1 initial + 3 retries = 4
       expect(count).toBe(4);
     } finally {
@@ -634,19 +652,22 @@ describe('AI retry mechanism', () => {
     const server = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
       res.writeHead(400);
-      res.end(JSON.stringify({
-        error: {
-          message: 'Invalid request',
-          type: 'invalid_request_error',
-          internal_secret: 'should-not-leak'
-        }
-      }));
+      res.end(
+        JSON.stringify({
+          error: {
+            message: 'Invalid request',
+            type: 'invalid_request_error',
+            internal_secret: 'should-not-leak'
+          }
+        })
+      );
     });
     await new Promise(r => server.listen(0, '127.0.0.1', r));
     try {
       const { port } = server.address();
-      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` }))
-        .rejects.toThrow(/400.*Invalid request/);
+      await expect(generateWithAI('test', { ...baseOpts, baseUrl: `http://127.0.0.1:${port}/v1` })).rejects.toThrow(
+        /400.*Invalid request/
+      );
     } finally {
       await new Promise(r => server.close(r));
     }

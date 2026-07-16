@@ -2,7 +2,9 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class ReactAdapter extends BaseAdapter {
-  get type() { return 'react'; }
+  get type() {
+    return 'react';
+  }
 
   detect(pkg) {
     return !!pkg.dependencies?.react;
@@ -22,12 +24,12 @@ class ReactAdapter extends BaseAdapter {
     return {
       '/app.': 1,
       '/index.': 2,
-      'pages': 3,
-      'components': 4,
-      'hooks': 5,
-      'store': 6,
-      'config': 7,
-      'util': 8
+      pages: 3,
+      components: 4,
+      hooks: 5,
+      store: 6,
+      config: 7,
+      util: 8
     };
   }
 

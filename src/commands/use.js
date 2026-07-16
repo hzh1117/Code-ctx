@@ -70,7 +70,8 @@ function loadContextDocs(rootDir, selectedScenario) {
 
   if (selectedScenario.relatedProjects) {
     for (const alias of selectedScenario.relatedProjects) {
-      if (typeof alias !== 'string' || !alias || alias.includes('/') || alias.includes('\\') || alias.includes('..')) continue;
+      if (typeof alias !== 'string' || !alias || alias.includes('/') || alias.includes('\\') || alias.includes('..'))
+        continue;
       const docPath = path.join(aiDocsDir, `${alias}.md`);
       if (fs.existsSync(docPath)) {
         relatedDocs[`${alias}.md`] = fs.readFileSync(docPath, 'utf8');
@@ -89,9 +90,7 @@ function loadContextDocs(rootDir, selectedScenario) {
 }
 
 function sectionsForScenario(scenarioId, taskDescription) {
-  const sections = new Set(SCENARIO_SECTION_PROFILES[scenarioId] || [
-    'overview', 'modules', 'notes'
-  ]);
+  const sections = new Set(SCENARIO_SECTION_PROFILES[scenarioId] || ['overview', 'modules', 'notes']);
   const task = String(taskDescription || '').toLowerCase();
   if (/api|接口|路由|endpoint/.test(task)) sections.add('api');
   if (/数据|数据库|表|schema|model|store|状态/.test(task)) sections.add('data');
@@ -100,7 +99,10 @@ function sectionsForScenario(scenarioId, taskDescription) {
 }
 
 function summarizeRemoved(name, sectionName, content, reason) {
-  const summary = String(content || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  const summary = String(content || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
   return `- ${name}#${sectionName}: ${reason}; summary=${summary || '(empty)'}`;
 }
 
@@ -123,7 +125,9 @@ function compactDocument(name, content, preferredSections, budget, removals) {
       if (remaining > 30) {
         const ratio = remaining / tokens;
         const truncated = section.slice(0, Math.max(80, Math.floor(section.length * ratio)));
-        selected.push(`<!-- section:${sectionName} -->\n${truncated}\n[truncated: token budget]\n<!-- /section:${sectionName} -->`);
+        selected.push(
+          `<!-- section:${sectionName} -->\n${truncated}\n[truncated: token budget]\n<!-- /section:${sectionName} -->`
+        );
         usedTokens = budget;
       }
       removals.push(summarizeRemoved(name, sectionName, section, 'token budget'));
@@ -131,20 +135,15 @@ function compactDocument(name, content, preferredSections, budget, removals) {
   }
   for (const sectionName of availableSections) {
     if (!preferredSections.includes(sectionName)) {
-      removals.push(summarizeRemoved(
-        name,
-        sectionName,
-        extractSection(content, sectionName),
-        'not selected for scenario'
-      ));
+      removals.push(
+        summarizeRemoved(name, sectionName, extractSection(content, sectionName), 'not selected for scenario')
+      );
     }
   }
   return selected.join('\n\n');
 }
 
-function compactPrompt(
-  prompt, taskDescription, selectedScenario, overviewContent, relatedDocs, language
-) {
+function compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs, language) {
   const originalLength = prompt.length;
   const originalTokens = estimateTokensForContent(prompt);
   const preferredSections = sectionsForScenario(selectedScenario.id, taskDescription);
@@ -155,10 +154,7 @@ function compactPrompt(
     template: selectedScenario.template || '',
     language
   });
-  const contentBudget = Math.max(
-    200,
-    COMPACT_THRESHOLD_TOKENS - estimateTokensForContent(basePrompt) - 250
-  );
+  const contentBudget = Math.max(200, COMPACT_THRESHOLD_TOKENS - estimateTokensForContent(basePrompt) - 250);
   const documentCount = Object.keys(relatedDocs).length + (overviewContent ? 1 : 0);
   const perDocumentBudget = Math.max(100, Math.floor(contentBudget / Math.max(1, documentCount)));
   const removals = [];
@@ -168,9 +164,7 @@ function compactPrompt(
 
   const compactRelatedDocs = {};
   for (const [name, content] of Object.entries(relatedDocs)) {
-    compactRelatedDocs[name] = compactDocument(
-      name, content, preferredSections, perDocumentBudget, removals
-    );
+    compactRelatedDocs[name] = compactDocument(name, content, preferredSections, perDocumentBudget, removals);
   }
 
   if (removals.length > 0) {
@@ -215,9 +209,7 @@ async function buildContext(task, scenario, options = {}) {
   prompt = filterSensitive(prompt).content;
 
   if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
-    const result = compactPrompt(
-      prompt, task, resolved.selectedScenario, overviewContent, relatedDocs, language
-    );
+    const result = compactPrompt(prompt, task, resolved.selectedScenario, overviewContent, relatedDocs, language);
     prompt = filterSensitive(result.prompt).content;
   }
 
@@ -267,14 +259,7 @@ async function useCommand(options = {}) {
   // 6. 精简模式：超过阈值时自动压缩
   let compactInfo = null;
   if (estimateTokensForContent(prompt) > COMPACT_THRESHOLD_TOKENS) {
-    const result = compactPrompt(
-      prompt,
-      taskDescription,
-      selectedScenario,
-      overviewContent,
-      relatedDocs,
-      language
-    );
+    const result = compactPrompt(prompt, taskDescription, selectedScenario, overviewContent, relatedDocs, language);
     prompt = filterSensitive(result.prompt).content;
     compactInfo = {
       originalLength: result.originalLength,

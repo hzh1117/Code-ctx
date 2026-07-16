@@ -34,9 +34,7 @@ describe('fixCommand', () => {
       projectName: 'test-project',
       outputDir: './ai-docs',
       aiMode: 'clipboard',
-      projects: [
-        { alias: projectAlias, path: projectPath, type: projectType, label: projectAlias }
-      ],
+      projects: [{ alias: projectAlias, path: projectPath, type: projectType, label: projectAlias }],
       excludeDirs: ['node_modules', '.git', 'dist', 'build', 'ai-docs'],
       gitTrack: true
     };
@@ -59,15 +57,13 @@ describe('fixCommand', () => {
   });
 
   test('should throw when config file does not exist', async () => {
-    await expect(fixCommand(testDir, 'web', { dryRun: true }))
-      .rejects.toThrow('配置文件不存在');
+    await expect(fixCommand(testDir, 'web', { dryRun: true })).rejects.toThrow('配置文件不存在');
   });
 
   test('should throw when project alias not found', async () => {
     createConfig('web', './web', 'react');
 
-    await expect(fixCommand(testDir, 'unknown', { dryRun: true }))
-      .rejects.toThrow('未找到项目');
+    await expect(fixCommand(testDir, 'unknown', { dryRun: true })).rejects.toThrow('未找到项目');
   });
 
   test('should write doc file when AI generates successfully', async () => {
@@ -104,11 +100,14 @@ describe('fixCommand', () => {
       fs.rmSync(testDir2, { recursive: true, force: true });
     }
     fs.mkdirSync(testDir2, { recursive: true });
-    fs.writeFileSync(path.join(testDir2, 'code-ctx.config.js'), `module.exports = {
+    fs.writeFileSync(
+      path.join(testDir2, 'code-ctx.config.js'),
+      `module.exports = {
     projectName: 'test-app',
     outputDir: './ai-docs',
     projects: [{ alias: 'web', path: './web', type: 'react', label: '前端' }]
-  };`);
+  };`
+    );
     fs.mkdirSync(path.join(testDir2, 'web'), { recursive: true });
     fs.writeFileSync(path.join(testDir2, 'web', 'package.json'), '{"dependencies":{"react":"^18.0.0"}}');
 

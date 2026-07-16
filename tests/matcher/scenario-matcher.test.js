@@ -87,10 +87,13 @@ describe('matchScenario', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codectx-matcher-'));
     const tempPath = path.join(tempDir, 'scenarios.json');
     try {
-      fs.writeFileSync(tempPath, JSON.stringify([
-        { id: 'A', name: 'a', description: 'a', relatedProjects: [], template: '' },
-        { id: 'F', name: 'f', description: 'f', relatedProjects: [], template: '' }
-      ]));
+      fs.writeFileSync(
+        tempPath,
+        JSON.stringify([
+          { id: 'A', name: 'a', description: 'a', relatedProjects: [], template: '' },
+          { id: 'F', name: 'f', description: 'f', relatedProjects: [], template: '' }
+        ])
+      );
 
       // getScenarios honors the custom-path branch only when called with a path.
       // matchScenario itself always reads the default path, so to assert

@@ -11,21 +11,30 @@ describe('update CLI default mode', () => {
     fs.mkdirSync(path.join(rootDir, 'src'), { recursive: true });
     fs.mkdirSync(path.join(rootDir, 'ai-docs'), { recursive: true });
     fs.writeFileSync(path.join(rootDir, 'src/app.js'), 'export const cliEvidence = true;');
-    fs.writeFileSync(path.join(rootDir, 'ai-docs/src.md'), [
-      '# src project',
-      '<!-- section:overview -->',
-      'old overview',
-      '<!-- /section:overview -->',
-      '<!-- section:modules -->',
-      'old modules',
-      '<!-- /section:modules -->'
-    ].join('\n'));
-    fs.writeFileSync(path.join(rootDir, 'code-ctx.config.json'), JSON.stringify({
-      projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
-    }));
-    fs.writeFileSync(path.join(rootDir, 'ai-docs/project-manifest.json'), JSON.stringify({
-      projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
-    }));
+    fs.writeFileSync(
+      path.join(rootDir, 'ai-docs/src.md'),
+      [
+        '# src project',
+        '<!-- section:overview -->',
+        'old overview',
+        '<!-- /section:overview -->',
+        '<!-- section:modules -->',
+        'old modules',
+        '<!-- /section:modules -->'
+      ].join('\n')
+    );
+    fs.writeFileSync(
+      path.join(rootDir, 'code-ctx.config.json'),
+      JSON.stringify({
+        projects: [{ alias: 'src', path: './src', type: 'generic-js-ts' }]
+      })
+    );
+    fs.writeFileSync(
+      path.join(rootDir, 'ai-docs/project-manifest.json'),
+      JSON.stringify({
+        projects: [{ id: 'src', sourcePath: './src', document: 'src.md' }]
+      })
+    );
   });
 
   afterEach(() => {

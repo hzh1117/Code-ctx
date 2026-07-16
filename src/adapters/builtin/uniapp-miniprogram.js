@@ -2,7 +2,9 @@ const path = require('path');
 const { BaseAdapter } = require('../base');
 
 class UniappMiniprogramAdapter extends BaseAdapter {
-  get type() { return 'uniapp-miniprogram'; }
+  get type() {
+    return 'uniapp-miniprogram';
+  }
 
   detect(pkg, files) {
     return !!(pkg.dependencies?.['uni-app'] || files.includes('manifest.json'));
@@ -20,9 +22,9 @@ class UniappMiniprogramAdapter extends BaseAdapter {
       'main.js': 4,
       '/api/': 5,
       'pages/': 6,
-      'components': 7,
-      'utils': 8,
-      'config': 9
+      components: 7,
+      utils: 8,
+      config: 9
     };
   }
 

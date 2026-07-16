@@ -51,11 +51,14 @@ function setupFixture() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'scenarios-err-'));
   fs.mkdirSync(path.join(dir, 'ai-docs'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'ai-docs/OVERVIEW.md'), '# Overview\n内容');
-  fs.writeFileSync(path.join(dir, 'code-ctx.config.json'), JSON.stringify({
-    projectName: 'errs',
-    outputDir: 'ai-docs',
-    projects: []
-  }));
+  fs.writeFileSync(
+    path.join(dir, 'code-ctx.config.json'),
+    JSON.stringify({
+      projectName: 'errs',
+      outputDir: 'ai-docs',
+      projects: []
+    })
+  );
   return dir;
 }
 
@@ -68,7 +71,7 @@ describe('web/api/scenarios — error & boundary paths', () => {
   // 在共享 scenarios.json 上互相覆盖，导致非确定性失败。
   const originalScenariosContent = require('fs').readFileSync(scenariosPath, 'utf8');
 
-  beforeEach((done) => {
+  beforeEach(done => {
     delete process.env.DASHBOARD_TOKEN;
     _clearCache();
     _resetPluginState();
@@ -82,7 +85,9 @@ describe('web/api/scenarios — error & boundary paths', () => {
     updateCmd.updateCommand.mockImplementation(jest.requireActual('../../src/commands/update').updateCommand);
     useCmd.useCommand.mockImplementation(jest.requireActual('../../src/commands/use').useCommand);
     useCmd.buildContext.mockImplementation(jest.requireActual('../../src/commands/use').buildContext);
-    taskHistory.getRecentHistory.mockImplementation(jest.requireActual('../../src/utils/task-history').getRecentHistory);
+    taskHistory.getRecentHistory.mockImplementation(
+      jest.requireActual('../../src/utils/task-history').getRecentHistory
+    );
     taskHistory.findEntryById.mockImplementation(jest.requireActual('../../src/utils/task-history').findEntryById);
     taskHistory.getHistory.mockImplementation(jest.requireActual('../../src/utils/task-history').getHistory);
 
@@ -91,7 +96,7 @@ describe('web/api/scenarios — error & boundary paths', () => {
     server = app.listen(0, '127.0.0.1', done);
   });
 
-  afterEach((done) => {
+  afterEach(done => {
     server.close(() => {
       clearCache();
       _clearCache();
@@ -231,7 +236,7 @@ describe('web/api/scenarios — error & boundary paths', () => {
 
     test('GET /api/docs/:name — readFileSync 抛错 → 500', async () => {
       const docPath = path.join(testDir, 'ai-docs', 'OVERVIEW.md');
-      const readSpy = jest.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      const readSpy = jest.spyOn(fs, 'readFileSync').mockImplementation(p => {
         if (p === docPath) throw new Error('EACCES');
         return jest.requireActual('fs').readFileSync(p, 'utf8');
       });
@@ -271,16 +276,18 @@ describe('web/api/scenarios — error & boundary paths', () => {
     });
 
     test('POST /api/generate-prompt — 低置信度返回场景候选', async () => {
-      useCmd.useCommand.mockImplementation(() => Promise.resolve({
-        lowConfidenceScenarios: [
-          { id: 'A', name: '修复 Bug', description: '' },
-          { id: 'B', name: '新增功能', description: '' }
-        ],
-        matchedScenario: 'A',
-        confidence: 30,
-        matchedKeyword: null,
-        matchMethod: 'keyword'
-      }));
+      useCmd.useCommand.mockImplementation(() =>
+        Promise.resolve({
+          lowConfidenceScenarios: [
+            { id: 'A', name: '修复 Bug', description: '' },
+            { id: 'B', name: '新增功能', description: '' }
+          ],
+          matchedScenario: 'A',
+          confidence: 30,
+          matchedKeyword: null,
+          matchMethod: 'keyword'
+        })
+      );
 
       const res = await requestJson(server, '/api/generate-prompt', {
         method: 'POST',
@@ -296,13 +303,16 @@ describe('web/api/scenarios — error & boundary paths', () => {
 
   describe('GET /api/status 流程分支', () => {
     test('projects 为对象形式时正确归一化为数组', async () => {
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projectName: 'obj-form',
-        outputDir: 'ai-docs',
-        projects: {
-          api: { path: './api', type: 'node', label: '接口' }
-        }
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projectName: 'obj-form',
+          outputDir: 'ai-docs',
+          projects: {
+            api: { path: './api', type: 'node', label: '接口' }
+          }
+        })
+      );
       _clearCache();
       // 屏蔽 runDoctor，专注覆盖 projectsArray 归一化分支
       doctorCmd.runDoctor.mockResolvedValue({ issues: [], warnings: [], info: {}, quality: { overall: 'OK' } });
@@ -318,11 +328,14 @@ describe('web/api/scenarios — error & boundary paths', () => {
       fs.mkdirSync(path.join(testDir, 'srcproj/src'), { recursive: true });
       fs.mkdirSync(path.join(testDir, 'srcproj/node_modules'), { recursive: true });
       fs.writeFileSync(path.join(testDir, 'srcproj/node_modules/skipme.js'), 'should not be scanned');
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projectName: 'stale',
-        outputDir: 'ai-docs',
-        projects: [{ alias: 'srcproj', path: './srcproj', type: 'node', label: '后端' }]
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projectName: 'stale',
+          outputDir: 'ai-docs',
+          projects: [{ alias: 'srcproj', path: './srcproj', type: 'node', label: '后端' }]
+        })
+      );
       _clearCache();
 
       const docPath = path.join(testDir, 'ai-docs/srcproj.md');
@@ -356,11 +369,13 @@ describe('web/api/scenarios — error & boundary paths', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThan(0);
-      expect(res.body[0]).toEqual(expect.objectContaining({
-        id: expect.any(String),
-        key: expect.any(String),
-        name: expect.any(String)
-      }));
+      expect(res.body[0]).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          key: expect.any(String),
+          name: expect.any(String)
+        })
+      );
     });
 
     test('PUT /api/scenarios/:id — id 通过 A-H 校验但不存在 → 404', async () => {
@@ -385,10 +400,7 @@ describe('web/api/scenarios — error & boundary paths', () => {
 
     test('GET /api/doctor — sensitive 文件触发 HIGH_RISK', async () => {
       // 写入一个包含敏感串（API key 形态）的文档让 scanDirectory 检出
-      fs.writeFileSync(
-        path.join(testDir, 'ai-docs', 'leak.md'),
-        '# Leak\nsk-ant-api03-' + 'A'.repeat(80) + '\n'
-      );
+      fs.writeFileSync(path.join(testDir, 'ai-docs', 'leak.md'), '# Leak\nsk-ant-api03-' + 'A'.repeat(80) + '\n');
       doctorCmd.runDoctor.mockResolvedValue({
         issues: [],
         warnings: [],
@@ -404,10 +416,13 @@ describe('web/api/scenarios — error & boundary paths', () => {
 
     test('GET /api/doctor — schemaErrors 触发 WARN', async () => {
       // 写入含非法字段的 config 产生 schemaErrors
-      fs.writeFileSync(path.join(testDir, 'code-ctx.config.json'), JSON.stringify({
-        projectName: 'x',
-        unknownField: 1
-      }));
+      fs.writeFileSync(
+        path.join(testDir, 'code-ctx.config.json'),
+        JSON.stringify({
+          projectName: 'x',
+          unknownField: 1
+        })
+      );
       _clearCache();
       doctorCmd.runDoctor.mockResolvedValue({
         issues: [],

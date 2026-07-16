@@ -58,7 +58,10 @@ function saveUserAllowedPlugin(spec) {
 function getEnvAllowedSpecs() {
   const env = process.env.CODE_CTX_PLUGINS_ALLOW;
   if (!env) return [];
-  return env.split(',').map(s => s.trim()).filter(Boolean);
+  return env
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
 }
 
 function isPluginAllowed(spec) {
@@ -93,7 +96,11 @@ function promptUserSync(question) {
       if (answer.length > 256) break;
     }
     if (useDevTty) {
-      try { fs.closeSync(fd); } catch { /* ignore */ }
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* ignore */
+      }
     }
     return answer.replace(/\r$/, '').trim();
   } catch {
@@ -109,16 +116,16 @@ function ensurePluginTrusted(spec, resolved) {
   if (!process.stdin.isTTY) {
     throw new Error(
       `插件 "${spec}" 不在信任列表中（非交互式环境）。\n` +
-      `  - 设置环境变量 CODE_CTX_PLUGINS_ALLOW="${spec}" 临时放行\n` +
-      `  - 或将 spec 加入 ${allowlistPath}\n` +
-      `  - 测试环境可设 CODE_CTX_PLUGINS_ALLOW_ALL=1`
+        `  - 设置环境变量 CODE_CTX_PLUGINS_ALLOW="${spec}" 临时放行\n` +
+        `  - 或将 spec 加入 ${allowlistPath}\n` +
+        `  - 测试环境可设 CODE_CTX_PLUGINS_ALLOW_ALL=1`
     );
   }
 
   const answer = promptUserSync(
     `\n⚠️  安全警告：插件 "${spec}" 不在信任列表中。\n` +
-    `   路径: ${resolved}\n` +
-    `   加载此插件将执行其代码。是否允许？ [y/N] `
+      `   路径: ${resolved}\n` +
+      `   加载此插件将执行其代码。是否允许？ [y/N] `
   );
 
   if (answer === null) {
@@ -203,9 +210,7 @@ function applyPlugin(pluginExports, name, runtime) {
     validated.forEach(adapter => runtime.registry.register(adapter));
   }
 
-  const scenarios = Array.isArray(pluginExports.scenarios)
-    ? pluginExports.scenarios.filter(isValidScenario)
-    : [];
+  const scenarios = Array.isArray(pluginExports.scenarios) ? pluginExports.scenarios.filter(isValidScenario) : [];
 
   const sensitivePatterns = Array.isArray(pluginExports.sensitivePatterns)
     ? pluginExports.sensitivePatterns.filter(isValidPattern)
@@ -271,7 +276,7 @@ function initPlugins(rootDir) {
   for (const spec of specs) {
     try {
       const mod = loadPluginModule(spec, rootDir);
-      const name = (mod && typeof mod === 'object' && typeof mod.name === 'string') ? mod.name : spec;
+      const name = mod && typeof mod === 'object' && typeof mod.name === 'string' ? mod.name : spec;
       applyPlugin(mod, name, runtime);
     } catch (err) {
       runtime.errors.push({ plugin: spec, error: err.message || String(err) });

@@ -47,11 +47,20 @@ function checkSectionIntegrity(aiDocsDir) {
     }
 
     if (file === 'OVERVIEW.md') {
-      const requiredSections = ['项目概述', '子项目', '技术栈'];
+      const requiredSections = [
+        { id: 'overview', label: '项目概述' },
+        { id: 'subprojects', label: '子项目' },
+        { id: 'tech-stack', label: '技术栈' }
+      ];
       for (const section of requiredSections) {
-        const hasSection = lines.some(l => l.includes(section));
+        const hasSection =
+          content.includes(`<!-- section:${section.id} -->`) || lines.some(line => line.includes(section.label));
         if (!hasSection) {
-          issues.push({ type: 'missing-section', file, message: `OVERVIEW.md 缺少「${section}」相关内容` });
+          issues.push({
+            type: 'missing-section',
+            file,
+            message: `OVERVIEW.md 缺少「${section.label}」相关内容`
+          });
         }
       }
     }

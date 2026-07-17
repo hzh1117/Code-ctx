@@ -1,6 +1,10 @@
-const { scripts } = require('../../package.json');
+const { bin, scripts } = require('../../package.json');
 
 describe('package quality scripts', () => {
+  test('published package exposes the code-ctx executable', () => {
+    expect(bin).toEqual({ 'code-ctx': 'bin/cli.js' });
+  });
+
   test('lint covers the CLI, backend, and Vue source files', () => {
     expect(scripts.lint).toBe('eslint src/ bin/ web/src/ --ext .js,.vue');
   });

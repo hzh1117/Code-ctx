@@ -10,6 +10,10 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 ### [Unreleased]
 
+暂无。
+
+### [1.1.0] - 2026-07-17
+
 #### Added
 
 - 扫描器输出带相对路径、语言、SHA-256、截断信息和脱敏源码的结构化证据；Git 与 hash 更新模式都会向 Prompt 提供有界变更证据，并识别删除文件。
@@ -28,6 +32,7 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 - continuation 会结合 provider 截断原因和输出结构校验；one-shot 使用严格机器边界并逐项目校验，不再依赖自由标题拆分。
 - 配置未知字段会给出迁移警告，类型错误会阻止运行；旧 `code-ctx.config.js` 只按静态 `module.exports = {...}` 数据解析，不再执行 JavaScript。
 - `use` 按场景和 token 预算压缩上下文并报告删除摘要；Web Prompt 生成不再重复构建上下文；项目检测只执行一次有界深度遍历。
+- `config setup` 先创建 AI 配置后，`init` 现在会把探测出的项目字段合并并写回 JSON；确定性 `OVERVIEW.md` 的机器 section 标记可被 doctor 正确识别。
 
 #### Security
 
@@ -79,6 +84,10 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 ### [Unreleased]
 
+No changes yet.
+
+### [1.1.0] - 2026-07-17
+
 #### Added
 
 - Scanner output now carries structured source evidence with relative paths, language, SHA-256, truncation metadata, and redacted content. Git and hash update modes include bounded change evidence and detect deleted files.
@@ -97,6 +106,7 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 - Continuation uses provider truncation reasons plus output-structure validation. One-shot output uses strict machine boundaries with per-project validation instead of free-form headings.
 - Unknown config fields produce migration warnings while invalid types block execution. Legacy `code-ctx.config.js` is parsed only as static `module.exports = {...}` data and is never executed.
 - `use` compresses context by scenario and token budget with a removal summary; Web prompt generation reuses one context build; project detection performs one bounded traversal.
+- After `config setup` creates AI settings, `init` now merges and persists detected project fields to JSON. Doctor also recognizes machine section markers in deterministic `OVERVIEW.md` files.
 
 #### Security
 

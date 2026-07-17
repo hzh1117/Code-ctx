@@ -51,7 +51,7 @@ try {
   run(process.execPath, npmArgs(['init', '-y']), installDir);
   run(process.execPath, npmArgs(['install', '--ignore-scripts', tarball]), installDir);
   const packagedCli = path.join(installDir, 'node_modules', 'code-ctx', 'bin', 'cli.js');
-  const version = run(process.execPath, [packagedCli, '--version'], installDir);
+  const version = run(process.execPath, npmArgs(['exec', '--', 'code-ctx', '--version']), installDir);
   assert(version === require('../package.json').version, `packaged CLI version mismatch: ${version}`);
 
   const configHelp = run(process.execPath, [packagedCli, 'config', '--help'], installDir);

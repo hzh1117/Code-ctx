@@ -15,7 +15,7 @@ English | [中文](README.md)
 
 ---
 
-> **Project status:** v1.0.0 has shipped, and the current `master` has completed every P0-P3 item in the technical issue list. Initialization, incremental updates, fact verification, privacy filtering, AI request control, and engineering gates have passed the full regression suite. Review "Known Risks" before production deployment.
+> **Project status:** v1.1.0 is sealed on Gitee, and the current `master` has completed every P0-P3 item in the technical issue list. The npm registry still serves the old `1.0.0`; use the Gitee tag below until the registry is updated. Initialization, incremental updates, fact verification, privacy filtering, AI request control, and engineering gates have passed the full regression suite.
 
 > **License:** Released under the [MIT License](LICENSE). Free for personal and commercial use, modification, and redistribution.
 
@@ -51,18 +51,18 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 ### Requirements
 
 - **Node.js >= 20.0.0** (this project uses commander 14, express 5, and other modern dependencies — Node 20+ is required)
-- Git (recommended for precise incremental diffs; non-Git directories fall back to file-hash detection)
+- Git (required for the current Gitee-tag install; at runtime it enables precise diffs, while non-Git projects fall back to file hashes)
 
 ### Install
 
 ```bash
-npm install -g code-ctx@latest
+npm install -g git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0
 code-ctx --version
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) when developing from source; those steps are not required for normal installation.
 
-The version should be `1.1.0` or newer. The old npm `1.0.0` does not contain the current setup wizard or complete release gates; run the install command above to upgrade.
+The version should be `1.1.0`. The old npm `1.0.0` does not contain the current setup wizard or complete release gates. After `1.1.0` reaches the npm registry, the install command will return to `npm install -g code-ctx@latest`.
 
 ### 60-Second No-Key Tour
 
@@ -101,14 +101,13 @@ code-ctx use "Fix login page white screen" --out .ai-prompt.md
 
 ### Run Without a Global Install
 
-Every command in the npx path must keep the `npx --yes code-ctx@latest` prefix; do not mix it with global commands:
+With `npm exec`, every command must retain the complete package argument; do not mix this path with global commands:
 
 ```bash
-npx --yes code-ctx@latest --version
-npx --yes code-ctx@latest init --skip-ai
-npx --yes code-ctx@latest config validate
-npx --yes code-ctx@latest doctor
-npx --yes code-ctx@latest use -s A --no-ai-match --non-interactive "Understand the project structure" --stdout
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx --version
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx init --skip-ai
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx config validate
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx doctor
 ```
 
 ## Commands

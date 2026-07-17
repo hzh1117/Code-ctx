@@ -1,6 +1,6 @@
 {
   "name": "code-ctx",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "AI 开发上下文工具，生成可复用的代码库上下文和 AI prompt",
   "main": "src/index.js",
   "bin": {

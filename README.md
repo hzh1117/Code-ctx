@@ -15,7 +15,7 @@
 
 ---
 
-> **项目状态：** v1.1.0 已在 Gitee 封板；当前 `master` 已完成技术问题清单中的全部 P0-P3。npm registry 暂仍是旧版 `1.0.0`，在 registry 更新前请使用下方 Gitee 标签安装。初始化、增量更新、事实校验、隐私过滤、AI 请求控制和工程门禁已经过完整回归。
+> **项目状态：** v1.1.1 已在 Gitee 封板；当前 `master` 已完成技术问题清单中的全部 P0-P3。npm registry 暂仍是旧版 `1.0.0`，在 registry 更新前请使用下方 Gitee 标签安装。初始化、增量更新、事实校验、隐私过滤、AI 请求控制和工程门禁已经过完整回归。
 
 > **许可说明：** 本项目采用 [MIT 许可证](LICENSE)，允许个人和商业自由使用、修改、分发，无需支付费用或取得额外授权。
 
@@ -58,11 +58,11 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 从源码参与开发请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)，无需作为普通用户的安装步骤执行。
 
 ```bash
-npm install -g git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0
+npm install -g git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.1
 code-ctx --version
 ```
 
-版本应为 `1.1.0`。旧的 npm `1.0.0` 不包含当前的配置向导和完整发布门禁；npm registry 发布 `1.1.0` 后，安装命令会恢复为 `npm install -g code-ctx@latest`。
+版本应为 `1.1.1`。旧的 npm `1.0.0` 不包含当前的配置向导和完整发布门禁；npm registry 发布 `1.1.1` 后，安装命令会恢复为 `npm install -g code-ctx@latest`。
 
 ### 60 秒无密钥体验
 
@@ -104,10 +104,10 @@ code-ctx use "修复登录页面白屏问题" --out .ai-prompt.md
 使用 `npm exec` 时，每条命令都需要保留完整包参数，不能与全局命令混用：
 
 ```bash
-npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx --version
-npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx init --skip-ai
-npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx config validate
-npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.0 -- code-ctx doctor
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.1 -- code-ctx --version
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.1 -- code-ctx init --skip-ai
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.1 -- code-ctx config validate
+npm exec --yes --package=git+https://gitee.com/yo-yo-lu-mingming/code-ctx.git#v1.1.1 -- code-ctx doctor
 ```
 
 ## 命令一览

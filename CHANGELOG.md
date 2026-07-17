@@ -12,6 +12,12 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 暂无。
 
+### [1.1.1] - 2026-07-17
+
+#### Changed
+
+- 将生产依赖 `glob` 升级到受支持的 13.x，保持 Node 20 兼容并消除新安装时的旧版本弃用警告。
+
 ### [1.1.0] - 2026-07-17
 
 #### Added
@@ -85,6 +91,12 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 ### [Unreleased]
 
 No changes yet.
+
+### [1.1.1] - 2026-07-17
+
+#### Changed
+
+- Upgraded the production `glob` dependency to the supported 13.x line, preserving Node 20 compatibility and removing the old-version warning during fresh installs.
 
 ### [1.1.0] - 2026-07-17
 

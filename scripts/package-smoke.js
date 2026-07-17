@@ -63,6 +63,7 @@ try {
   const offlineProject = createProject(tempDir, 'offline-project');
   run(process.execPath, [packagedCli, 'init', '--skip-ai'], offlineProject);
   run(process.execPath, [packagedCli, 'config', 'validate'], offlineProject);
+  run(process.execPath, [packagedCli, 'doctor'], offlineProject);
   const offlineConfig = readJson(path.join(offlineProject, 'code-ctx.config.json'));
   assert(offlineConfig.projects?.length === 1, 'offline onboarding did not persist the detected project');
   assert(fs.existsSync(path.join(offlineProject, 'ai-docs', 'OVERVIEW.md')), 'offline onboarding missed OVERVIEW.md');
@@ -93,6 +94,7 @@ try {
   );
   run(process.execPath, [packagedCli, 'init', '--skip-ai'], configuredProject);
   run(process.execPath, [packagedCli, 'config', 'validate'], configuredProject);
+  run(process.execPath, [packagedCli, 'doctor'], configuredProject);
   const configured = readJson(path.join(configuredProject, 'code-ctx.config.json'));
   assert(configured.ai?.protocol === 'openai', 'configured onboarding lost the selected provider');
   assert(configured.projects?.length === 1, 'configured onboarding did not persist the detected project');

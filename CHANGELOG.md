@@ -41,6 +41,7 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 - 项目许可证从 Code-ctx Non-Commercial Source License 切换回 MIT License，允许个人和商业自由使用、修改和分发。同步更新 README、README_EN、CONTRIBUTING、SUPPORT、CODE_OF_CONDUCT、Issue 模板和 `package.json` 的 license 字段。
 - 技术问题清单中的 P0（7/7）、P1（15/15）、P2（17/17）与 P3（10/10）已全部完成；README、安全策略、贡献指南和 CI 已同步当前实现。
 - 补全插件信任、非交互 AI 配置、Provider smoke、类型检查范围和 Bug 诊断说明；npm 发布包现在包含 README 已引用的 `TYPE_CHECKING.md` 与 `examples/plugin-basic/`。
+- 快速开始拆分为无密钥和完整 AI 两条路径，统一全局安装与 npx 命令，移除平台相关文件检查，并明确 `config setup` 创建的文件和升级步骤。
 
 ### [1.0.0] - 2026-05-23
 
@@ -109,6 +110,7 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 - Switched the project license from the Code-ctx Non-Commercial Source License back to the MIT License. The project is now free for personal and commercial use, modification, and redistribution. README, README_EN, CONTRIBUTING, SUPPORT, CODE_OF_CONDUCT, the issue template, and the `package.json` license field were updated accordingly.
 - All technical P0 (7/7), P1 (15/15), P2 (17/17), and P3 (10/10) items are complete. README, security guidance, contribution guidance, and CI now reflect the current implementation.
 - Expanded guidance for plugin trust, non-interactive AI setup, provider smoke tests, the enforced type-checking set, and redacted bug diagnostics. The npm package now includes the README-linked `TYPE_CHECKING.md` and `examples/plugin-basic/` files.
+- Split Quick Start into no-key and full-AI paths, made global and npx commands consistent, removed platform-specific file checks, and documented setup-created files and upgrade steps.
 
 ### [1.0.0] - 2026-05-23
 

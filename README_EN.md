@@ -51,34 +51,64 @@ Code-ctx is not an AI IDE. It does not provide code completion, editor-native in
 ### Requirements
 
 - **Node.js >= 20.0.0** (this project uses commander 14, express 5, and other modern dependencies — Node 20+ is required)
-- Git
+- Git (recommended for precise incremental diffs; non-Git directories fall back to file-hash detection)
 
 ### Install
 
 ```bash
-npm install -g code-ctx
-# Or run without a global install
-npx code-ctx --version
+npm install -g code-ctx@latest
+code-ctx --version
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) when developing from source; those steps are not required for normal installation.
 
-### Configure and Initialize Your Project
+The version should be `1.1.0` or newer. The old npm `1.0.0` does not contain the current setup wizard or complete release gates; run the install command above to upgrade.
+
+### 60-Second No-Key Tour
+
+This path does not contact an external AI provider. Use it to verify scanning, documentation, and prompt generation first:
+
+```bash
+cd /path/to/your-project
+code-ctx init --skip-ai
+code-ctx config validate
+code-ctx doctor
+code-ctx use -s A --no-ai-match --non-interactive "Understand the project structure" --stdout
+```
+
+On success, the project root contains `code-ctx.config.json` and `ai-docs/`. `ai-docs/OVERVIEW.md` is the repository overview, and the other Markdown files represent detected projects. `--stdout` prints the prompt directly and does not depend on the system clipboard.
+
+### Generate Detailed Documentation with AI
+
+Run this path from a project that has not been initialized yet:
 
 ```bash
 cd /path/to/your-project
 code-ctx config setup
-code-ctx config validate
 code-ctx init
-test -f ai-docs/OVERVIEW.md
-code-ctx use "Add user login feature"
+code-ctx config validate
+code-ctx doctor
+code-ctx use "Add user login feature" --stdout
 ```
 
-By default, the generated prompt is copied to your clipboard. You can also write it to a file or stdout:
+`config setup` asks you to choose a provider, confirm the API address and model, enter an API key, and test the connection. It creates or updates `.env`, `.gitignore`, and `code-ctx.config.json`; `init` then persists detected project fields and generates `ai-docs/`. If you already completed the no-key tour, run `code-ctx init --force` after configuring AI to regenerate detailed documents.
+
+Without `--stdout`, prompts go to the clipboard by default. You can also write one to a file:
 
 ```bash
 code-ctx use "Fix login page white screen" --out .ai-prompt.md
-code-ctx use "Add order export" --stdout
+```
+
+### Run Without a Global Install
+
+Every command in the npx path must keep the `npx --yes code-ctx@latest` prefix; do not mix it with global commands:
+
+```bash
+npx --yes code-ctx@latest --version
+npx --yes code-ctx@latest init --skip-ai
+npx --yes code-ctx@latest config validate
+npx --yes code-ctx@latest doctor
+npx --yes code-ctx@latest use -s A --no-ai-match --non-interactive "Understand the project structure" --stdout
 ```
 
 ## Commands
@@ -126,7 +156,7 @@ code-ctx dashboard --dev
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and keep real credentials local:
+Prefer `code-ctx config setup`; it safely creates or updates `.env` in the project root and ensures `.gitignore` contains `.env`. Create `.env` yourself only for manual configuration:
 
 ```env
 OPENAI_API_KEY=
@@ -142,6 +172,8 @@ AI_TIMEOUT=180000
 ```
 
 Never commit `.env`. If a secret appears in logs, screenshots, issues, or pull requests, treat it as compromised and rotate it immediately.
+
+The repository and npm package include `.env.example` as a field reference only. You do not need to copy it into a managed project, and it must not overwrite an `.env` created by `config setup`.
 
 AI `baseUrl` values accept public HTTPS endpoints by default and reject localhost, private-network, link-local, and metadata addresses. If local model gateways are needed, add an explicit local-development option with tests instead of loosening Dashboard validation.
 

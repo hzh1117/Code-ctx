@@ -51,34 +51,64 @@ Code-ctx 不是 AI IDE，也不做代码补全、编辑器内联生成或通用 
 ### 环境要求
 
 - **Node.js >= 20.0.0**（项目使用 commander 14、express 5 等现代依赖，需 Node 20+）
-- Git
+- Git（推荐，用于生成精确的增量 diff；非 Git 目录会退回文件 hash 检测）
 
 ### 安装
 
 从源码参与开发请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)，无需作为普通用户的安装步骤执行。
 
 ```bash
-npm install -g code-ctx
-# 或者无需全局安装
-npx code-ctx --version
+npm install -g code-ctx@latest
+code-ctx --version
 ```
 
-### 配置并初始化你的项目
+版本应为 `1.1.0` 或更高。旧的 npm `1.0.0` 不包含当前的配置向导和完整发布门禁，请先执行上面的安装命令升级。
+
+### 60 秒无密钥体验
+
+这条路径不会连接外部 AI，适合先确认扫描、文档和 Prompt 流程是否适合你的项目：
+
+```bash
+cd /path/to/your-project
+code-ctx init --skip-ai
+code-ctx config validate
+code-ctx doctor
+code-ctx use -s A --no-ai-match --non-interactive "了解项目结构" --stdout
+```
+
+成功后，项目根目录会新增 `code-ctx.config.json` 和 `ai-docs/`；`ai-docs/OVERVIEW.md` 是总览，其他 Markdown 对应探测到的子项目。`--stdout` 会直接在终端显示 Prompt，不依赖系统剪贴板。
+
+### 使用 AI 生成详细文档
+
+在一个尚未初始化的项目根目录中运行：
 
 ```bash
 cd /path/to/your-project
 code-ctx config setup
-code-ctx config validate
 code-ctx init
-test -f ai-docs/OVERVIEW.md
-code-ctx use "新增用户登录功能"
+code-ctx config validate
+code-ctx doctor
+code-ctx use "新增用户登录功能" --stdout
 ```
 
-默认会把 prompt 写入剪贴板。也可以输出到文件或终端：
+`config setup` 会让你选择服务商、确认 API 地址和模型、输入 API Key，并测试连接。它自动创建或更新 `.env`、`.gitignore` 和 `code-ctx.config.json`；`init` 随后补齐探测到的项目字段并生成 `ai-docs/`。如果你已经运行过无密钥体验，配置 AI 后使用 `code-ctx init --force` 重新生成详细文档。
+
+不加 `--stdout` 时，Prompt 默认写入剪贴板；也可以输出到文件：
 
 ```bash
 code-ctx use "修复登录页面白屏问题" --out .ai-prompt.md
-code-ctx use "新增订单导出" --stdout
+```
+
+### 不全局安装
+
+npx 路径中的每条命令都需要带 `npx --yes code-ctx@latest`，不能与全局命令混用：
+
+```bash
+npx --yes code-ctx@latest --version
+npx --yes code-ctx@latest init --skip-ai
+npx --yes code-ctx@latest config validate
+npx --yes code-ctx@latest doctor
+npx --yes code-ctx@latest use -s A --no-ai-match --non-interactive "了解项目结构" --stdout
 ```
 
 ## 命令一览
@@ -126,7 +156,7 @@ code-ctx dashboard --dev
 
 ### 环境变量
 
-复制 `.env.example` 为 `.env`，只在本地保存真实密钥：
+推荐使用 `code-ctx config setup`，它会在项目根目录安全创建或更新 `.env`，并确保 `.gitignore` 包含 `.env`。只有需要手动配置时，才自行创建 `.env`：
 
 ```env
 OPENAI_API_KEY=
@@ -142,6 +172,8 @@ AI_TIMEOUT=180000
 ```
 
 不要提交 `.env`。如果密钥曾出现在日志、截图、issue 或 PR 中，视为已泄露并立即轮换。
+
+仓库和 npm 包中的 `.env.example` 只是字段参考，不需要复制到被管理项目；不要用它覆盖 `config setup` 已生成的 `.env`。
 
 AI `baseUrl` 默认只接受公网 HTTPS 地址，并拒绝 localhost、内网、link-local 和 metadata 地址。需要对接本机模型网关时，应新增显式本地开发开关并配套测试，不要直接放开 Dashboard 配置校验。
 

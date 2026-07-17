@@ -1,4 +1,5 @@
 const { initCommand } = require('../../src/commands/init');
+const { setupAIConfig } = require('../../src/config/setup-service');
 const { loadProjectConfig, _clearCache } = require('../../src/utils/config');
 const fs = require('fs');
 const path = require('path');
@@ -264,6 +265,37 @@ describe('initCommand', () => {
     expect(result.configMerge.conflicts).toEqual(
       expect.arrayContaining([expect.objectContaining({ field: 'label', kept: 'Configured Label' })])
     );
+  });
+
+  test('persists detected project fields after config setup creates an AI-only config', async () => {
+    fs.writeFileSync(
+      path.join(testDir, 'package.json'),
+      JSON.stringify({
+        dependencies: { express: '^5.0.0' }
+      })
+    );
+    await setupAIConfig(testDir, {
+      provider: 'openai',
+      apiKey: 'test-secret-key',
+      testConnection: false
+    });
+
+    await initCommand(testDir, { skipPrompt: true, skipAi: true });
+
+    const persisted = JSON.parse(fs.readFileSync(path.join(testDir, 'code-ctx.config.json'), 'utf8'));
+    expect(persisted).toEqual(
+      expect.objectContaining({
+        projectName: 'init-test',
+        outputDir: './ai-docs',
+        aiMode: 'clipboard',
+        gitTrack: true,
+        ai: expect.objectContaining({ protocol: 'openai' })
+      })
+    );
+    expect(persisted.projects).toEqual([
+      expect.objectContaining({ alias: 'init-test', path: '.', type: 'node-backend' })
+    ]);
+    expect(persisted.excludeDirs).toEqual(expect.arrayContaining(['node_modules', '.git', 'ai-docs']));
   });
 });
 

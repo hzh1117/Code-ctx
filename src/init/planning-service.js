@@ -1,4 +1,5 @@
 const path = require('path');
+const { isDeepStrictEqual } = require('util');
 const { getConfigFile, loadProjectConfig, saveProjectConfig } = require('../utils/config');
 const { buildInitPrompt } = require('../generator/prompt-builder');
 const { evaluateContextBudget } = require('../utils/token-estimator');
@@ -87,20 +88,21 @@ function createPlanningService(dependencies = {}) {
       logger.step('5/7', '生成配置文件');
       const detectedConfig = buildConfig(rootDir, projects);
       const info = inspectConfig(rootDir);
-      const merged = info.exists
-        ? mergeConfig(rootDir, detectedConfig, loadConfig(rootDir))
+      const existingConfig = info.exists ? loadConfig(rootDir) : null;
+      const merged = existingConfig
+        ? mergeConfig(rootDir, detectedConfig, existingConfig)
         : {
             config: detectedConfig,
             report: { source: 'detected', detected: projects.length, matched: 0, retained: [], conflicts: [] }
           };
       const config = merged.config;
+      const configChanged = !existingConfig || !isDeepStrictEqual(existingConfig, config);
 
-      if (info.exists && !options.force) {
-        logger.verbose('配置文件已存在，跳过');
-        if (info.format === 'js') {
-          logger.log('提示：检测到 code-ctx.config.js（旧格式）。新格式 code-ctx.config.json 更安全，可手动迁移：');
-          logger.log('  cp code-ctx.config.js code-ctx.config.json # 然后改为纯 JSON');
-        }
+      if (info.exists && info.format === 'js' && !options.force) {
+        logger.verbose('旧 JS 配置已存在，跳过写回');
+        logger.log('提示：检测到 code-ctx.config.js（旧格式），请运行 code-ctx config migrate 安全迁移为 JSON。');
+      } else if (info.exists && !options.force && !configChanged) {
+        logger.verbose('配置文件已存在且内容未变化，跳过写回');
       } else {
         const written = saveConfig(rootDir, config, { format: 'json' });
         logger.verbose('配置文件已写入:', written.path);

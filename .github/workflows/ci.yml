@@ -74,6 +74,13 @@ jobs:
       - name: Install CLI dependencies
         run: npm ci
 
+      - name: Install dashboard dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Build dashboard
+        run: npm run build:web
+
       - name: Test published package
         run: npm run pack:smoke
 

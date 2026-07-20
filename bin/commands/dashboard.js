@@ -25,7 +25,34 @@ function validateDir(dir) {
   return resolved;
 }
 
-module.exports = new Command('dashboard')
+function resolveConfigPath(rootDir) {
+  const jsonPath = path.join(rootDir, 'code-ctx.config.json');
+  if (fs.existsSync(jsonPath)) return jsonPath;
+
+  const jsPath = path.join(rootDir, 'code-ctx.config.js');
+  if (fs.existsSync(jsPath)) return jsPath;
+
+  return jsonPath;
+}
+
+function ensureDashboardAssets(webDir) {
+  const indexPath = path.join(webDir, 'dist', 'index.html');
+  if (fs.existsSync(indexPath)) return;
+
+  const packagePath = path.join(webDir, 'package.json');
+  if (!fs.existsSync(packagePath)) {
+    throw new Error(`未找到 Dashboard 构建产物: ${indexPath}。请重新安装 code-ctx`);
+  }
+
+  console.log('[CodeCtx] 未找到前端构建产物，正在从源码构建...');
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const buildResult = spawnSync(npmCmd, ['run', 'build'], { cwd: webDir, stdio: 'inherit', shell: false });
+  if (buildResult.error || buildResult.status !== 0 || !fs.existsSync(indexPath)) {
+    throw new Error('前端构建失败');
+  }
+}
+
+const dashboard = new Command('dashboard')
   .description('启动 Web 管理界面')
   .option('-p, --port <port>', 'API 端口', '3456')
   .option('-d, --dir <path>', '项目目录（默认当前目录）')
@@ -34,9 +61,9 @@ module.exports = new Command('dashboard')
     const port = validatePort(options.port);
     const rootDir = options.dir ? validateDir(options.dir) : process.cwd();
 
-    const configPath = path.join(rootDir, 'code-ctx.config.js');
+    const configPath = resolveConfigPath(rootDir);
     if (!fs.existsSync(configPath)) {
-      console.warn(`⚠️  未找到 ${configPath}，请确认已在该目录运行 code-ctx init`);
+      console.warn(`⚠️  未找到 code-ctx.config.json 或 code-ctx.config.js，请确认已在 ${rootDir} 运行 code-ctx init`);
     }
 
     const webDir = path.join(__dirname, '../../web');
@@ -49,13 +76,10 @@ module.exports = new Command('dashboard')
     console.log(`[CodeCtx] 访问地址: ${accessUrl}`);
 
     if (!options.dev) {
-      console.log('[CodeCtx] 构建前端资源...');
-      // shell: false — 参数已数组化，无需 shell 解释器，减少攻击面
-      // Windows 下 npm 实际是 npm.cmd，需平台感知
-      const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const buildResult = spawnSync(npmCmd, ['run', 'build'], { cwd: webDir, stdio: 'inherit', shell: false });
-      if (buildResult.error || buildResult.status !== 0) {
-        console.error('前端构建失败');
+      try {
+        ensureDashboardAssets(webDir);
+      } catch (error) {
+        console.error(error.message);
         process.exit(1);
       }
 
@@ -90,3 +114,8 @@ module.exports = new Command('dashboard')
       process.exit(1);
     });
   });
+
+dashboard.resolveConfigPath = resolveConfigPath;
+dashboard.ensureDashboardAssets = ensureDashboardAssets;
+
+module.exports = dashboard;

@@ -15,7 +15,7 @@ English | [中文](README.md)
 
 ---
 
-> **Project status:** v1.1.1 is published on npm and sealed on Gitee, and the current `master` has completed every P0-P3 item in the technical issue list. Initialization, incremental updates, fact verification, privacy filtering, AI request control, and engineering gates have passed the full regression suite.
+> **Project status:** v1.1.2 fixes production Dashboard startup from the npm package, and the current `master` has completed every P0-P3 item in the technical issue list. Initialization, incremental updates, fact verification, privacy filtering, AI request control, and engineering gates have passed the full regression suite.
 
 > **License:** Released under the [MIT License](LICENSE). Free for personal and commercial use, modification, and redistribution.
 
@@ -62,7 +62,7 @@ code-ctx --version
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) when developing from source; those steps are not required for normal installation.
 
-The version should be `1.1.1`.
+The version should be `1.1.2`.
 
 ### 60-Second No-Key Tour
 

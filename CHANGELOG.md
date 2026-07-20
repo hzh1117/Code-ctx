@@ -12,6 +12,12 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 
 暂无。
 
+### [1.1.2] - 2026-07-20
+
+#### Fixed
+
+- 修复 npm 安装包启动 Dashboard 时错误检查旧版 `code-ctx.config.js` 并尝试现场构建前端的问题；生产模式现在直接使用随包发布的 `web/dist`，并在 package smoke 中启动已安装包验证 HTTP 200。
+
 ### [1.1.1] - 2026-07-17
 
 #### Changed
@@ -91,6 +97,12 @@ Code-ctx is released under the MIT License. See [LICENSE](LICENSE).
 ### [Unreleased]
 
 No changes yet.
+
+### [1.1.2] - 2026-07-20
+
+#### Fixed
+
+- Fixed the npm-installed Dashboard checking only the legacy `code-ctx.config.js` and attempting an impossible runtime frontend build. Production mode now serves the bundled `web/dist`, and package smoke starts the installed Dashboard and verifies HTTP 200.
 
 ### [1.1.1] - 2026-07-17
 
